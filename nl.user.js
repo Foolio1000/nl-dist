@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.68
+// @version      0.5.69
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.68', features: [] };
+const NL = window.__nl2 = { version: '0.5.69', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -303,7 +303,34 @@ NL.renderSettings = function () {
     secs.push(sec);
   }
   const all = (on) => NL.h('button', { type: 'button', class: 'nl2-sec-all', onclick: () => secs.forEach((x) => x.toggleOpen(on)) }, on ? 'Expand all' : 'Collapse all');
-  box.append(NL.h('div', { class: 'nl2-sec-bar' }, all(true), all(false)), note, ...secs);
+  // GL-041: search box. Matches setting and feature names and descriptions (and a set's name shows the whole set), any case, part of a word.
+  // While searching, matching sets show open with only their matching rows; other sets hide. Saved open/closed state is never touched,
+  // so clearing the box puts everything back as it was. Esc clears the box first, then closes the screen as before.
+  const none = NL.h('small', { class: 'nl2-sec-none', style: { display: 'none' } }, 'No settings match.');
+  const find = NL.h('input', { type: 'search', class: 'nl2-sec-find', placeholder: 'Search settings', 'aria-label': 'Search settings' });
+  const filter = () => {
+    const q = find.value.trim().toLowerCase();
+    box.classList.toggle('nl2-filtering', !!q);
+    let any = false;
+    for (const sec of secs) {
+      const setHit = !!q && sec.querySelector('.nl2-sec-name').textContent.toLowerCase().includes(q);
+      let hits = 0, head = null, headHits = 0;
+      const endHead = () => { if (head) head.style.display = q && !headHits ? 'none' : ''; };
+      for (const el of sec.querySelector('.nl2-sec-body').children) {
+        if (el.classList.contains('nl2-set-h')) { endHead(); head = el; headHits = 0; continue; }
+        const hit = !q || setHit || el.textContent.toLowerCase().includes(q) || String(el.title || '').toLowerCase().includes(q);
+        el.style.display = hit ? '' : 'none';
+        if (hit) { hits++; headHits++; }
+      }
+      endHead();
+      sec.classList.toggle('nl2-nomatch', !!q && !hits);
+      if (hits) any = true;
+    }
+    none.style.display = q && !any ? '' : 'none';
+  };
+  find.addEventListener('input', filter);
+  find.addEventListener('keydown', (e) => { if (e.key === 'Escape' && find.value) { e.stopPropagation(); find.value = ''; filter(); } });
+  box.append(NL.h('div', { class: 'nl2-sec-bar' }, all(true), all(false), find), note, none, ...secs);
   if (!secs.length) box.append(NL.h('small', null, 'No features yet.'));
   return box;
 };
@@ -349,6 +376,13 @@ function settingsUi() {
     .nl2-sec-bar{display:flex;gap:8px;margin:10px 0 8px}
     .nl2-sec-all{padding:4px 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font:600 13px Rajdhani,"Exo 2",system-ui,sans-serif;cursor:pointer}
     .nl2-sec-all:hover{background:rgba(56,189,248,.22);color:#fff}
+    .nl2-sec-find{flex:0 1 240px;min-width:120px;padding:4px 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:#14203a;color:#fff;font:600 13px Rajdhani,"Exo 2",system-ui,sans-serif;outline:none}
+    .nl2-sec-find:focus{border-color:rgba(120,200,255,.7)}
+    .nl2-sec-find::placeholder{color:#8aa3c0}
+    .nl2-filtering .nl2-sec-body{display:block}
+    .nl2-filtering .nl2-sec-caret{transform:rotate(90deg)}
+    .nl2-filtering .nl2-sec.nl2-nomatch{display:none}
+    .nl2-sec-none{margin:10px 0}
     .nl2-sec{margin:6px 0;border:1px solid rgba(120,200,255,.2);border-radius:8px;background:rgba(20,32,58,.45)}
     .nl2-sec-head{display:flex;align-items:center;gap:10px;width:100%;padding:9px 14px;background:none;border:0;color:#fff;font:700 15px Rajdhani,"Exo 2",system-ui,sans-serif;letter-spacing:.3px;text-align:left;cursor:pointer}
     .nl2-sec-head:hover{background:rgba(56,189,248,.08)}
@@ -2660,12 +2694,12 @@ function ldRender() {
   for (const x of [ts(v.travelEndsAt), ts(v.recoveryEndsAt)]) if (x > t) { t = x; }
   const busy = v.assignedMissionId != null || t > now || (v.status && v.status !== 'ready');
   const nm = String(v.callsign || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));      // GL-034 (2 Nov, David): his name first, then a dot
-  const html = (nm ? nm + ' · ' : '') + (!busy ? 'Idle' : t > now ? fsTimeHtml(t, est) : 'Busy');
+  const html = (nm ? nm + ' · ' : '') + (!busy ? 'Idle' : t > now ? fsTimeHtml(t, est) : '…');      // GL-040 (2 Nov): '…' while the mission or PVE's estimate data is still loading (was 'Busy')
   ldBox.style.display = '';
   if (ldBox.dataset.nl2fs !== html) { ldBox.innerHTML = html; ldBox.dataset.nl2fs = html; }
   const tip = (v.callsign || 'Leader') + (busy ? (t > now ? ' home at ' + new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + (est ? ' (estimated)' : '') : ' is busy') : ' is idle');
   if (ldBox.title !== tip) ldBox.title = tip;
-  if (busy && t > now && !fsTick) fsTick = setTimeout(() => { fsTick = 0; fsRender(); }, 1000);
+  if (busy && !fsTick) fsTick = setTimeout(() => { fsTick = 0; fsRender(); }, 1000);      // also while no time yet: PVE's data (wormhole runs, belts) lands later
 }
 NL.feature({
   id: 'gl-leaderpill', set: 'Global', name: 'Leader in the banner',
