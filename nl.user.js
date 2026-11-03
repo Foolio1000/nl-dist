@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.73
+// @version      0.5.74
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.73', features: [] };
+const NL = window.__nl2 = { version: '0.5.74', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -3980,7 +3980,7 @@ NL.feature({
   name: 'Hide underway',
   desc: 'RE-004: a Hide underway checkbox on the Research page that hides researches underway on any planet.',
   init(ctx) {
-    NL.css('re-underway', '.nl2-reuw.nl2-on span{color:#f5b83d}.nl2-reuw.nl2-on input{box-shadow:0 0 8px rgba(245,184,61,.55)}');
+    // looks exactly like the game's own checkboxes beside it, no amber (David 3 Nov, after v0.5.73)
     let on = !!ctx.store.get('on', false);
     let fromResearch = new Set(), fromSummary = new Set();
     const RUNNING = /progress|active|running|research|queue|pending|paus/i;
@@ -4015,7 +4015,6 @@ NL.feature({
     function apply() {
       document.querySelectorAll('.research-grid .research-card').forEach((c) => reSetFlag(c, 'data-nl2-reuw', on && underway(c)));
       reActive.underway = on;
-      if (box) box.classList.toggle('nl2-on', on);
       reCount();
     }
     NL.watch('.research-page .research-filter-toggles', (tg) => {
@@ -5501,7 +5500,8 @@ NL.feature({
       ${L} > .mission-card[data-nl2-fat-open]{margin:2px 0 6px 24px!important}
       ${L} > .nl2-fat{display:grid;grid-template-columns:150px 120px 170px 90px 120px 120px minmax(160px,1fr) 96px;align-items:center;
         font:15px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7;border-bottom:1px solid rgba(120,200,255,.1);background:rgb(11,21,37)}
-      ${L} > .nl2-fat > div{padding:5px 9px;min-width:0}
+      ${L} > .nl2-fat > div{padding:5px 9px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}  /* FL-047: rows never wrap, "…" + hover */
+      ${L} > .nl2-fat > div > .mission-type-badge{display:inline-block;max-width:calc(100% - 18px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
       ${L} > .nl2-fat > div + div{border-left:1px solid rgba(120,200,255,.1)}
       ${L} > .nl2-fat.nl2-z{background:rgb(15,27,46)}
       ${L} > .nl2-fat-h{color:#8fb3d9;font-weight:600;font-size:13.6px;white-space:nowrap}
@@ -5699,6 +5699,8 @@ NL.feature({
           if (open.has(m.id)) out.push(detail(card, m, o++));
         });
       }
+      // FL-047: a cell cut short shows its full text on hover (not the live countdowns, which change every second)
+      for (const e of out) if (e.classList.contains('nl2-fat') && !e.classList.contains('nl2-fat-h')) for (const c of e.children) if (!c.hasAttribute('data-nl2-tip') && !c.querySelector('[data-nl2-fat-ph],[data-nl2-fat-cd],button')) { const t = (c.textContent || '').replace(/[▸▾]/g, '').trim(); if (t && t !== '–') c.setAttribute('data-nl2-tip', t); }
       for (const e of out) list.appendChild(e);
       ticker();
     });
