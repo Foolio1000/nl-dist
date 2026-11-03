@@ -1,13 +1,70 @@
 {
-  "version": "0.5.70",
-  "built": "2026-11-03T00:22:27.480Z",
+  "version": "0.5.71",
+  "built": "2026-11-03T01:13:10.710Z",
   "items": [
-    "GL-042",
-    "GL-043",
-    "GL-044",
-    "GL-045",
-    "FL-037",
-    "FL-038",
-    "FL-039"
+    "GL-046",
+    "GL-047",
+    "GL-048",
+    "GL-049",
+    "GL-050",
+    "GL-051",
+    "GL-052",
+    "GL-053",
+    "FL-040",
+    "FL-041"
+  ],
+  "notes": {
+    "GL-046": "Loss note in wormhole and expedition dialogs",
+    "GL-047": "Fleet Slots strip yellow at 1 slot left",
+    "GL-048": "Rank gaps on hover",
+    "GL-049": "Station times in local time",
+    "GL-050": "Market value check",
+    "GL-051": "What's new in the update bar",
+    "GL-052": "Style checks in tests",
+    "GL-053": "Rank pills use the NL tooltip",
+    "FL-040": "Fleet Transfer tab",
+    "FL-041": "Go Deeper fix"
+  },
+  "history": [
+    {
+      "version": "0.5.71",
+      "items": [
+        "GL-046",
+        "GL-047",
+        "GL-048",
+        "GL-049",
+        "GL-050",
+        "GL-051",
+        "GL-052",
+        "GL-053",
+        "FL-040",
+        "FL-041"
+      ],
+      "notes": {
+        "GL-046": "Loss note in wormhole and expedition dialogs",
+        "GL-047": "Fleet Slots strip yellow at 1 slot left",
+        "GL-048": "Rank gaps on hover",
+        "GL-049": "Station times in local time",
+        "GL-050": "Market value check",
+        "GL-051": "What's new in the update bar",
+        "GL-052": "Style checks in tests",
+        "GL-053": "Rank pills use the NL tooltip",
+        "FL-040": "Fleet Transfer tab",
+        "FL-041": "Go Deeper fix"
+      }
+    },
+    {
+      "version": "0.5.70",
+      "items": [
+        "GL-042",
+        "GL-043",
+        "GL-044",
+        "GL-045",
+        "FL-037",
+        "FL-038",
+        "FL-039"
+      ],
+      "notes": {}
+    }
   ]
 }

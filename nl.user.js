@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.70
+// @version      0.5.71
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.70', features: [] };
+const NL = window.__nl2 = { version: '0.5.71', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -945,6 +945,7 @@ try {
   if (P && !P.__nl2Quiet) { const start = P.start; P.start = function () { if (quiet) return; return start.apply(this, arguments); }; P.__nl2Quiet = 1; }
 } catch (e) { /* the game's sound stays as it was */ }
 const quietClick = (el) => { quiet++; try { el.click(); } finally { quiet--; } };
+NL.quietClick = quietClick;      // FL-041 (Fleet thread, 3 Nov): Go Deeper / Retreat press the game's hidden button without its sound playing twice
 function pressQuiet(el) {     // a full press-and-release the game's menus react to, with the game's click sound muted
   quiet++;
   try { for (const ev of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) el.dispatchEvent(new MouseEvent(ev, { bubbles: true, cancelable: true, view: window })); } finally { quiet--; }
@@ -1094,6 +1095,7 @@ async function openPlanet(name, path = '/shipyard') {
   for (let i = 0; i < 40 && location.pathname !== path; i++) await sleep(150);
 }
 NL.openPlanet = openPlanet;
+NL.openOutpost = openOutpost;      // FL-040 (Transfer thread, 3 Nov): the Transfer tab's Collect button opens that outpost directly (declared below, hoisted)
 NL.moonsOf = (planet) => moons.filter((m) => m.planet === planet).map((m) => m.name);   // SH-002: that planet's moons, picker order
 // Outposts have no page of their own: Mining page, Outposts tab, then that outpost's selector button (.outpost-selector-btn).
 // Names can repeat (two "Outpost 1", 25 Oct), so the menu passes the outpost id: the buttons are in the same order as the game's
@@ -1694,15 +1696,60 @@ function setRank(j) {
   glSave('rankData', { rank: rankData, at: rankAt });
   renderRanks();
 }
+// GL-048 (David 3 Nov): each pill's hover names the players just above and below in that category, and my change since yesterday.
+// Data: the game's GET /api/rankings/players (teed when Rankings is open; one read of the overall top 100 at start when the saved copy
+// is over 15 min old, as for /me). Each entry carries all four scores, so one list serves every category. Once per Pacific day my four
+// scores and ranks are saved (14 days kept) and compared with the latest earlier day. GL-053: hovers use data-nl2-tip, not title.
+let rankList = null, rankListAt = 0;
+{ const st = glLoad('rankList', null); if (st && Array.isArray(st.list)) { rankList = st.list; rankListAt = st.at || 0; } }
+const RK_KEEP = ['rank', 'userId', 'username', 'score', 'militaryScore', 'economyScore', 'researchScore', 'overallScore'];
+function setRankList(path, d) {
+  const lb = d && Array.isArray(d.leaderboard) ? d.leaderboard : null; if (!lb || !lb.length) return;
+  const cat = (String(path).match(/[?&]category=(\w+)/) || [])[1] || 'overall', slim = lb.map((e) => Object.fromEntries(RK_KEEP.map((k) => [k, e[k]])));
+  const prev = rankList && rankListAt && Date.now() - rankListAt < 15 * 60 * 1000 ? rankList : [];
+  const by = new Map(prev.map((e) => [e.userId, e])); for (const e of slim) by.set(e.userId, Object.assign({}, by.get(e.userId), e, { ['rank_' + cat]: e.rank }));
+  rankList = [...by.values()]; rankListAt = Date.now();
+  glSave('rankList', { list: rankList, at: rankListAt });
+  renderRanks();
+}
+const pacDay = (t) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+function rankSnap() {      // once per Pacific day: my four scores and ranks; returns the latest snapshot from an earlier day
+  if (!rankData) return null;
+  const h = glLoad('rankHist', {}) || {}, today = pacDay(Date.now());
+  if (!h[today]) {
+    h[today] = Object.fromEntries(RANKS.flatMap(([k]) => [[k + 'Rank', rankData[k + 'Rank']], [k + 'Score', Number(rankData[k + 'Score']) || 0]]));
+    const days = Object.keys(h).sort(); while (days.length > 14) delete h[days.shift()];
+    glSave('rankHist', h);
+  }
+  const prior = Object.keys(h).filter((d) => d < today).sort().pop();
+  return prior ? h[prior] : null;
+}
+const rkClock = (t) => { const d = new Date(t), today = d.toDateString() === new Date().toDateString(); return (today ? '' : d.toLocaleDateString([], { weekday: 'short' }) + ' ') + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); };
+function rankTip(k, name, rank, score, prior) {
+  const me = Number(score) || 0, rows = [name + ' #' + rank + ' · ' + me.toLocaleString()];
+  if (rankList && rankList.length) {
+    const sk = k + 'Score', others = rankList.filter((e) => e && !(rankData.userId != null ? e.userId === rankData.userId : Number(e[sk]) === me && e.rank === rank));
+    const above = others.filter((e) => Number(e[sk]) > me).sort((a, b) => a[sk] - b[sk])[0], below = others.filter((e) => Number(e[sk]) < me).sort((a, b) => b[sk] - a[sk])[0];
+    if (above && rank > 1) rows.push('#' + (above['rank_' + k] || rank - 1) + ' ' + above.username + ': ' + Number(above[sk]).toLocaleString() + ' (' + (above[sk] - me).toLocaleString() + ' ahead of you)');
+    if (below) rows.push('#' + (below['rank_' + k] || rank + 1) + ' ' + below.username + ': ' + Number(below[sk]).toLocaleString() + ' (' + (me - below[sk]).toLocaleString() + ' behind you)');
+  }
+  if (!prior) rows.push('Since yesterday: —');
+  else {
+    const ds = me - (Number(prior[k + 'Score']) || 0), dr = (Number(prior[k + 'Rank']) || rank) - rank;
+    rows.push('Since yesterday: ' + (ds >= 0 ? '+' : '−') + Math.abs(ds).toLocaleString() + ' · ' + (!dr ? 'rank unchanged' : dr > 0 ? 'up ' + dr + (dr > 1 ? ' places' : ' place') : 'down ' + -dr + (dr < -1 ? ' places' : ' place')));
+  }
+  rows.push('As of ' + rkClock(rankAt) + (rankData.lastCalculatedAt ? ' · rankings calculated ' + rkClock(rankData.lastCalculatedAt) : ''));
+  return rows.join('\n');
+}
 function renderRanks() {
   if (!rankBox || !rankData) return;
+  const prior = rankSnap();
   const html = RANKS.filter(([k]) => rankData[k + 'Rank'] != null).map(([k, name, col]) => {
     const rank = rankData[k + 'Rank'], score = Number(rankData[k + 'Score']) || 0;
-    return `<a class="nl2-rank" href="/rankings" data-nl2-tab="${name}" style="--nl2-c:${col}" title="${name}: rank #${rank}, score ${score.toLocaleString()}">${name} #${rank}</a>`;
+    return `<a class="nl2-rank" href="/rankings" data-nl2-tab="${name}" style="--nl2-c:${col}" data-nl2-tip="${glEsc(rankTip(k, name, rank, score, prior))}">${name} #${rank}</a>`;
   }).join('');
   if (rankBox.innerHTML !== html) rankBox.innerHTML = html;
-  const when = (rankData.lastCalculatedAt ? 'Rankings last calculated ' + new Date(rankData.lastCalculatedAt).toLocaleString() + '. ' : '') + 'As of ' + new Date(rankAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (rankBox.title !== when) rankBox.title = when;
+  if (rankBox.hasAttribute('title')) rankBox.removeAttribute('title');
 }
 function clickRankingTab(name, tries = 0) {
   const tab = [...document.querySelectorAll('.rankings-tab')].find((b) => (b.textContent || '').trim() === name);
@@ -1782,6 +1829,8 @@ NL.feature({
       }`);
     NL.onData(/^\/api\/rankings\/me(\?|$)/, (p, d) => setRank(d));
     if (!rankData || Date.now() - rankAt > 15 * 60 * 1000) NL.getJson('/api/rankings/me', ctx);      // the one read at start, only when nothing fresh is saved
+    NL.onData(/^\/api\/rankings\/players(\?|$)/, setRankList);      // GL-048
+    if (!rankList || Date.now() - rankListAt > 15 * 60 * 1000) NL.getJson('/api/rankings/players?category=overall&limit=100&offset=0', ctx);
     try { const pend = sessionStorage.getItem('nl2RankTab'); if (pend) { sessionStorage.removeItem('nl2RankTab'); if (location.pathname === '/rankings') clickRankingTab(pend); } } catch (e) { /* */ }
     window.addEventListener('storage', (e) => { if (e.key === GAME_MUTE_KEY) updateMuteBtn(); });
     NL.watch('.topbar', () => { ensureMuteBtn(); ensureRanks(); pillify(); });
@@ -2603,7 +2652,7 @@ const FS_ROWS = '.nl2-fslots-v, .nxs-fs, .nxt-fs';
 // larger strip just under the dialog title ("Fleet Slots 15 / 19 · 0m 41s", red when every slot is in use). The value element itself is
 // moved, so the 1 s tick above keeps updating it; its old label (PVE / Tasks grid cell, or our whole row) is hidden.
 const FS_DLG = '.nl2-fleet, .nxs-modal, .nxt-modal', FS_HEAD = '.nl2-fleet-head, .nxs-mh, .nxt-mh';
-let fsFull = false;
+let fsFull = false, fsLow = false;      // GL-047 (David 3 Nov): fsLow: exactly one slot left -> the dialog strip turns yellow
 function fsTop(e) {
   if (e.closest('.nl2-fstop')) return;
   const dlg = e.closest(FS_DLG), head = dlg && dlg.querySelector(FS_HEAD);
@@ -2619,7 +2668,7 @@ function fsTop(e) {
 function fsRows(el) {
   for (const e of el ? [el] : document.querySelectorAll(FS_ROWS)) {
     try { fsTop(e); } catch (x) { console.warn('[NL fleetslots] top strip', x); }
-    const top = e.closest('.nl2-fstop'); if (top) top.classList.toggle('nl2-fstop-full', fsFull);
+    const top = e.closest('.nl2-fstop'); if (top) { top.classList.toggle('nl2-fstop-full', fsFull); top.classList.toggle('nl2-fstop-low', fsLow); }
     if (fsText && (e.dataset.nl2fs !== fsHtml || e.textContent !== fsText)) { e.innerHTML = fsHtml; e.dataset.nl2fs = fsHtml; }
   }
 }
@@ -2634,7 +2683,7 @@ function fsRender() {
   for (const m of hold) { const h = fsHome(m); if (h && h.t > (h.est ? now : now - 1000) && (!next || h.t < next.t)) next = h; }
   let txt = hold.length + (max != null ? ' / ' + max : ''), html = txt;
   if (next) { txt += ' · ' + fsDur(next.t - now); html += ' · ' + fsTimeHtml(next.t, next.est); }
-  fsFull = max != null && hold.length >= max;
+  fsFull = max != null && hold.length >= max; fsLow = max != null && max - hold.length === 1;
   fsText = txt; fsHtml = html; fsRows();
   const tip = next ? 'Next slot frees at ' + new Date(next.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + (next.est ? ' (estimated)' : '') : 'No fleet due home';
   if (fsBox) {
@@ -2681,6 +2730,7 @@ NL.feature({
       .nl2-fstop .nl2-fstop-k{color:#9fb3c8}
       .nl2-fstop > :not(.nl2-fstop-k){color:inherit;font:inherit}
       .nl2-fstop.nl2-fstop-full{color:#f87171}
+      .nl2-fstop.nl2-fstop-low{color:#e6c34a}
       .nl2-fstop em{font-style:italic}`);
     NL.onData(/^\/api\/fleet\/missions(\?|$)/, (p, d) => { if (d && Array.isArray(d.missions)) { fsData = d; fsRender(); } });
     NL.onWrite(FS_WRITE, fsChanged);
@@ -2760,12 +2810,21 @@ NL.feature({
 // available (you have vA.B.C) · Update now". Dismissal lasts for that version only (nl2.gl.updDismissed). Any failure: nothing shown.
 const UPD_BASE = 'https://raw.githubusercontent.com/Foolio1000/nl-dist/main/';
 const verNewer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
-function updShow(v) {
+// GL-051 (David 3 Nov): what's new, counting every version since mine: version.json carries notes {id: title} and history [{version, items, notes}]
+function updNews(j) {
+  const vers = (Array.isArray(j.history) && j.history.length ? j.history : [{ version: j.version, items: j.items, notes: j.notes }])
+    .filter((h) => h && typeof h.version === 'string' && verNewer(h.version, NL.version)).sort((a, b) => (verNewer(a.version, b.version) ? -1 : 1));
+  const groups = vers.map((h) => ({ v: h.version, rows: (Array.isArray(h.items) ? h.items : []).map((id) => ({ id, t: (h.notes || {})[id] || '' })) })).filter((g) => g.rows.length);
+  const all = groups.flatMap((g) => g.rows), titles = all.map((r) => r.t || r.id);
+  if (!titles.length) return null;
+  return { text: titles.slice(0, 2).join(', ') + (titles.length > 2 ? ', +' + (titles.length - 2) + ' more' : ''), tip: groups.map((g) => 'v' + g.v + '\n' + g.rows.map((r) => r.id + (r.t ? ' ' + r.t : '')).join('\n')).join('\n\n') };
+}
+function updShow(v, news) {
   if (document.querySelector('.nl2-updbar')) return;
   const bar = NL.h('div', { class: 'nl2-updbar', role: 'status' },
-    NL.h('span', {}, 'Nexus Legacy v' + v + ' is available (you have v' + NL.version + ')'),
+    NL.h('span', news ? { 'data-nl2-tip': news.tip } : {}, 'Nexus Legacy v' + v + ' is available (you have v' + NL.version + ')' + (news ? ' · ' + news.text : '')),
     NL.h('a', { href: UPD_BASE + 'nl.user.js', target: '_blank', rel: 'noopener', class: 'nl2-updnow' }, 'Update now'),
-    NL.h('button', { type: 'button', class: 'nl2-updx', title: 'Dismiss for this version', 'aria-label': 'Dismiss' }, '×'));
+    NL.h('button', { type: 'button', class: 'nl2-updx', 'data-nl2-tip': 'Dismiss for this version', 'aria-label': 'Dismiss' }, '×'));
   bar.querySelector('.nl2-updx').addEventListener('click', () => { glSave('updDismissed', v); bar.remove(); });
   (document.body || document.documentElement).appendChild(bar);
 }
@@ -2784,7 +2843,8 @@ NL.feature({
         const j = await r.json();
         const v = j && typeof j.version === 'string' && /^\d+\.\d+\.\d+$/.test(j.version) ? j.version : null;
         if (!v || !verNewer(v, NL.version) || glLoad('updDismissed', '') === v) return;
-        const show = () => updShow(v);
+        let news = null; try { news = updNews(j); } catch (e) { /* older version.json: no list */ }
+        const show = () => updShow(v, news);
         document.body ? show() : document.addEventListener('DOMContentLoaded', show, { once: true });
       } catch (e) { /* offline, blocked or bad JSON: show nothing */ }
     };
@@ -2794,6 +2854,105 @@ NL.feature({
     const again = () => { if (document.querySelector('.nl2-updbar') || Date.now() - last < 60000) return; last = Date.now(); run(); };
     setInterval(again, 10 * 60000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') again(); });
+  },
+});
+
+// ================================================================ GL-049: station operations in local time, with a vulnerability countdown (David 3 Nov)
+// Alliance > Station Operations: the game's .so-window box shows three UTC times ("11/3/2026, 18:00:00 — 22:00:00"). Each game <strong>
+// is hidden (data-nl2-so) and our own strong beside it shows local time in the STYLE format (weekday when not today), the UTC original on
+// hover. The Vulnerability line gets "starts in 1h 05m", a red "open · ends in 4m 32s" during the window, nothing after. The hint's
+// "Times are UTC." reads "Times are your local time." Page text only, no reads; a 1 s tick while the box is on screen.
+const SO_RE = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*[—–-]\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*$/;
+const soClock = (t) => { const d = new Date(t), today = d.toDateString() === new Date().toDateString(); return (today ? '' : d.toLocaleDateString([], { weekday: 'short' }) + ' ') + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); };
+const soDur = (ms) => { const s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? h + 'h ' + String(m).padStart(2, '0') + 'm' : m + 'm ' + String(s % 60).padStart(2, '0') + 's'; };
+let soTimer = 0;
+function soPaint() {
+  const boxes = document.querySelectorAll('.so-window');
+  if (!boxes.length) { clearInterval(soTimer); soTimer = 0; return; }
+  for (const box of boxes) for (const g of box.querySelectorAll(':scope > div > strong:not(.nl2-so)')) {
+    const m = SO_RE.exec(g.textContent || ''); if (!m) continue;
+    const [, mo, dd, yy, h1, m1, s1, h2, m2, s2] = m, a = Date.UTC(+yy, mo - 1, +dd, +h1, +m1, +(s1 || 0));
+    let b = h2 != null ? Date.UTC(+yy, mo - 1, +dd, +h2, +m2, +(s2 || 0)) : null; if (b != null && b <= a) b += 864e5;      // a window past midnight UTC
+    let mine = g.nextElementSibling && g.nextElementSibling.classList.contains('nl2-so') ? g.nextElementSibling : null;
+    if (!mine) { mine = NL.h('strong', { class: 'nl2-so' }); g.after(mine); }
+    if (!g.hasAttribute('data-nl2-so')) g.setAttribute('data-nl2-so', '');
+    const vuln = /vulnerab/i.test((g.parentElement.querySelector('span') || {}).textContent || ''), now = Date.now();
+    let html = glEsc(soClock(a)) + (b != null ? ' — ' + glEsc(soClock(b)) : '');
+    if (vuln && b != null) html += now < a ? ' <span class="nl2-so-cd">· starts in ' + soDur(a - now) + '</span>' : now < b ? ' <span class="nl2-so-cd nl2-so-open">· open · ends in ' + soDur(b - now) + '</span>' : '';
+    const tip = 'UTC: ' + g.textContent.trim();
+    if (mine.innerHTML !== html) mine.innerHTML = html;
+    if (mine.getAttribute('data-nl2-tip') !== tip) mine.setAttribute('data-nl2-tip', tip);
+  }
+  for (const p of document.querySelectorAll('p.so-window-hint')) for (const n of p.childNodes) if (n.nodeType === 3 && /Times are UTC\./.test(n.nodeValue)) n.nodeValue = n.nodeValue.replace('Times are UTC.', 'Times are your local time.');
+}
+NL.feature({
+  id: 'gl-stationtimes', set: 'Global', name: 'Station operations in local time',
+  desc: 'GL-049: Station Operations window times in your local time, with a countdown to the next vulnerability window.',
+  init() {
+    NL.css('gl-stationtimes', `
+      .so-window strong[data-nl2-so]{display:none!important}
+      .so-window .nl2-so-cd{color:#8aa4c4;font-weight:600}
+      .so-window .nl2-so-cd.nl2-so-open{color:#f87171}`);
+    NL.watch('.so-window', () => { soPaint(); if (!soTimer) soTimer = setInterval(soPaint, 1000); });
+  },
+});
+
+// ================================================================ GL-050: Market offers coloured by RSS value (David 3 Nov)
+// Value = what you receive × its weight ÷ (what you pay × its weight), weights from notes/rss_values.md (Bio-Extract and Dark Matter 12).
+// Green "Value 112%" at 100% or more (you gain RSS), red below; the hover gives both sides in RSS. Shown on each Order Book offer row
+// (button.market-book-level: spans You pay "4,932,870 Ore", You receive "986,574 Silicates"), the order ticket's "You receive after fee"
+// line, and each My Orders row ("1,000,000/1,000,000 Alloys", "1 Alloys : 0.5 Quantum Dust"; buy = you get the amount). Page text only.
+const MV_W = { ore: 1, silicate: 2, hydrogen: 2, alloy: 6, cryoice: 4, plasma: 8, plasmacore: 8, bioextract: 12, quantumdust: 16, darkmatter: 12, antimatter: 64 };
+const mvW = (name) => { const k = String(name || '').toLowerCase().replace(/[^a-z]/g, '').replace(/s$/, ''); return MV_W[k] || MV_W[k.replace(/core$/, '')] || 0; };
+const mvNum = (s) => parseFloat(String(s).replace(/,/g, '')) || 0;
+const mvAmt = (txt) => { const m = String(txt).trim().match(/^([\d,.]+)\s+(.+?)\s*$/); return m ? { n: mvNum(m[1]), w: mvW(m[2]) } : null; };
+const mvOwn = (el) => [...el.childNodes].filter((n) => !(n.nodeType === 1 && n.classList.contains('nl2-mv'))).map((n) => n.textContent).join('');
+function mvMark(host, pay, get) {      // pay/get in RSS; adds or updates one <em class="nl2-mv"> at the end of host
+  let em = host.querySelector(':scope > .nl2-mv');
+  if (!(pay > 0) || !(get > 0)) { if (em) em.remove(); return; }
+  const pct = Math.round(get / pay * 100), txt = ' · Value ' + pct + '%', cls = 'nl2-mv ' + (pct >= 100 ? 'nl2-mv-g' : 'nl2-mv-r');
+  const tip = 'You pay ' + Math.round(pay).toLocaleString() + ' RSS · you get ' + Math.round(get).toLocaleString() + ' RSS';
+  if (!em) { em = document.createElement('em'); host.appendChild(em); }
+  if (em.textContent !== txt) em.textContent = txt;
+  if (em.className !== cls) em.className = cls;
+  if (em.getAttribute('data-nl2-tip') !== tip) em.setAttribute('data-nl2-tip', tip);
+}
+function mvBookRow(row) {
+  const sp = [...row.children].filter((e) => e.tagName === 'SPAN' && !e.classList.contains('market-book-price') && !e.classList.contains('market-book-level-action'));
+  if (sp.length < 2) return;
+  const a = mvAmt(mvOwn(sp[0])), b = mvAmt(mvOwn(sp[1]));
+  mvMark(sp[1], a && a.n * a.w, b && b.n * b.w);
+}
+function mvTicket(form) {
+  const rows = [...form.querySelectorAll('.market-ticket-summary > span')], st = (re) => { const s = rows.find((r) => re.test(mvOwn(r))); return s && s.querySelector('strong'); };
+  const ps = st(/^\s*You pay/i), rs = st(/You receive after fee/i);
+  if (!ps || !rs) return;
+  const a = mvAmt(mvOwn(ps)), b = mvAmt(mvOwn(rs));
+  mvMark(rs.parentElement, a && a.n * a.w, b && b.n * b.w);
+}
+function mvMyOrder(row) {
+  const amtEl = row.querySelector('.market-resource-amount'), lim = row.querySelector('.market-my-order-limit');
+  if (!amtEl || !lim) return;
+  const v = (amtEl.querySelector('.market-resource-value') || {}).textContent || '', total = mvNum(String(v).split('/').pop());
+  const res = mvW((amtEl.querySelector(':scope > span:not(.market-resource-value)') || {}).textContent);
+  const m = mvOwn(lim).match(/^\s*([\d,.]+)\s+(.+?)\s*:\s*([\d,.]+)\s+(.+?)\s*$/);
+  if (!m || !total || !res) return;
+  const rate = mvNum(m[3]) / (mvNum(m[1]) || 1), other = mvW(m[4]), buy = !!row.querySelector('.market-order-side-badge.buy');
+  const mine = total * res, theirs = total * rate * other;
+  mvMark(lim, buy ? theirs : mine, buy ? mine : theirs);
+}
+NL.feature({
+  id: 'gl-marketvalue', set: 'Global', name: 'Market value check',
+  desc: 'GL-050: Market offers, the order ticket and My Orders show Value (what you get ÷ what you pay, in RSS): green at 100% or more, red below.',
+  init() {
+    NL.css('gl-marketvalue', `
+      .nl2-mv{font-style:normal;font-weight:700;white-space:nowrap}
+      .nl2-mv.nl2-mv-g{color:#4ade80}
+      .nl2-mv.nl2-mv-r{color:#f87171}`);
+    NL.watch('.market-book-levels .market-book-level', mvBookRow);
+    // the summary's numbers change in place (text only, which the page observer doesn't see): re-check after each keystroke or click in the ticket
+    NL.watch('form.market-order-ticket', (f) => { mvTicket(f); if (!f.__nl2mv) { f.__nl2mv = 1; const again = () => setTimeout(() => mvTicket(f), 60); f.addEventListener('input', again); f.addEventListener('change', again); f.addEventListener('click', again); } });
+    NL.watch('.market-my-order-row', mvMyOrder);
   },
 });
 
@@ -4658,6 +4817,23 @@ NL.feature({
     }
     const waiting = (r) => r.status === 'inside' && !r.nextEncounterAt && num(r.currentEncounter) < num(r.totalEncounters);
     const CONT_RE = /continue|proceed|advance|deeper|press on|next encounter|go on/i;
+    // FL-041 (David 3 Nov, bug on 0.5.70): one press of Go Deeper / Retreat clears both buttons at once and plays the game's sound once.
+    // Our press already played the click sound, so the game's hidden button is clicked quietly (Global's NL.quietClick). The run is
+    // then held as decided until the game's next answer moves it on (or 30 s pass, when the buttons come back if nothing changed).
+    const decided = new Map();             // run id -> { at, sig, kind }
+    const decSig = (r) => r.currentEncounter + ':' + (r.nextEncounterAt || '') + ':' + r.status;
+    function pendingOf(r) {
+      const d = decided.get(r.id);
+      if (!d) return null;
+      if (d.sig !== decSig(r) || Date.now() - d.at > 30000) { decided.delete(r.id); return null; }
+      return d;
+    }
+    function decide(r, btn, kind) {
+      decided.set(r.id, { at: Date.now(), sig: decSig(r), kind });
+      (NL.quietClick || ((b) => b.click()))(btn);
+      paintAll();
+      setTimeout(paintAll, 30500);       // the fallback above, if the game never answers
+    }
     function gameBtn(card, re) { return card && [...card.querySelectorAll('button')].find((b) => re.test((b.textContent || '').trim())); }
 
     // FL-011 (David 1 Nov): no wormhole names or run numbers; the system is a link to the Galaxy map (as PVE's system links:
@@ -4697,6 +4873,8 @@ NL.feature({
     const cdCell = (label, t) => [label ? label + ' ' : '', NL.h('span', { class: 'nl2-flw-t', 'data-nl2-cd': String(t) }, cd(t)), NL.h('span', { class: 'nl2-flw-u' }, utc(t))];
     function nextCell(r) {
       const m = missionOf(r), now = Date.now();
+      const pd = waiting(r) && pendingOf(r);
+      if (pd) return NL.h('div', { class: 'nl2-d' }, pd.kind === 'retreat' ? 'Retreating…' : 'Going deeper…');
       if (waiting(r)) {
         const auto = ts(r.encounterStartedAt) != null ? ts(r.encounterStartedAt) + WH_AUTO_MS : null;
         return [NL.h('div', { class: 'nl2-flw-t' }, 'Waiting for you'), auto && auto > now ? NL.h('div', { class: 'nl2-flw-auto' }, cdCell('auto in', auto)) : null];
@@ -4725,11 +4903,11 @@ NL.feature({
         const lostAll = Array.isArray(r.totalShipsLost) && r.totalShipsLost.length ? shipSum([r.totalShipsLost]) : shipSum(log.map((e) => e.shipsLost));
         const dmgAll = shipSum(log.map((e) => e.shipsDamaged));
         const card = cards.get(r.id), acts = [];
-        if (waiting(r)) {
+        if (waiting(r) && !pendingOf(r)) {
           const c = gameBtn(card, CONT_RE), x = gameBtn(card, /retreat/i);
           // the game's own label (0.5.51: its Continue button reads "Go Deeper", so it was missed and only Retreat showed)
-          if (c) acts.push(NL.h('button', { type: 'button', class: 'nl2-flw-cont', onclick: () => { c.click(); NL._kick(); } }, (c.textContent || '').trim() || 'Continue'));
-          if (x) acts.push(NL.h('button', { type: 'button', class: 'nl2-flw-retr', onclick: () => { x.click(); NL._kick(); } }, 'Retreat'));
+          if (c) acts.push(NL.h('button', { type: 'button', class: 'nl2-flw-cont', onclick: () => decide(r, c, 'continue') }, (c.textContent || '').trim() || 'Continue'));
+          if (x) acts.push(NL.h('button', { type: 'button', class: 'nl2-flw-retr', onclick: () => decide(r, x, 'retreat') }, 'Retreat'));
         }
         const sh = runShares(r), lr = sh.lost;
         const bad = lr != null && lr >= LOSS_PCT;
@@ -4863,7 +5041,7 @@ NL.feature({
       if (!use) { if (box) box.remove(); return; }
       const soon = (r) => { const m = missionOf(r) || {}; return ts(r.nextEncounterAt) || ts(/return|retreat/.test(r.status || '') ? m.returnArrivesAt : m.arrivesAt) || Infinity; };
       runs.sort((a, b) => (waiting(b) - waiting(a)) || (soon(a) - soon(b)) || (b.id - a.id));
-      const sig = runs.map((r) => [r.id, r.status, r.currentEncounter, r.nextEncounterAt, (r.encounterLog || []).length, waiting(r) && [...((cards.get(r.id) || {}).querySelectorAll ? cards.get(r.id).querySelectorAll('button') : [])].map((b) => (b.textContent || '').trim()).join('/'), (whOf(r.wormholeId) || {}).c, r.encounterStartedAt, (missionOf(r) || {}).arrivesAt, (missionOf(r) || {}).returnArrivesAt, runSys(r).name, badRun(r), pctTxt(runShares(r).dmg), pctTxt(runShares(r).lost)].join(':')).join(',') + '|' + [...open].join(',');
+      const sig = runs.map((r) => [r.id, !!pendingOf(r), r.status, r.currentEncounter, r.nextEncounterAt, (r.encounterLog || []).length, waiting(r) && [...((cards.get(r.id) || {}).querySelectorAll ? cards.get(r.id).querySelectorAll('button') : [])].map((b) => (b.textContent || '').trim()).join('/'), (whOf(r.wormholeId) || {}).c, r.encounterStartedAt, (missionOf(r) || {}).arrivesAt, (missionOf(r) || {}).returnArrivesAt, runSys(r).name, badRun(r), pctTxt(runShares(r).dmg), pctTxt(runShares(r).lost)].join(':')).join(',') + '|' + [...open].join(',');
       if (box && box.dataset.sig === sig && box.dataset.ver === String(ver)) return;
       if (!box) { box = NL.h('div', { class: 'nl2-flw' }); sec.appendChild(box); }      // at the end, as EM-005: React keeps its own children in order
       box.dataset.sig = sig; box.dataset.ver = String(ver);
@@ -5036,7 +5214,7 @@ NL.feature({
 // dropdown, daily upkeep, current reserve, Clear unread on the right); the 12 menu buttons become one row of small buttons in David's
 // order. Only the game's own elements are hidden, restyled and reordered (data-nl2-* marks + CSS); its select, buttons and badges keep
 // their own behaviour. Our only element is the Clear unread button, which clicks the game's (hidden) one. DOM read live 2 Nov.
-const FL_TAB_ORDER = ['active', 'dispatch', 'reports', 'espionage', 'wormholes', 'pirates', 'expeditions', 'surveys', 'debris', 'patrol', 'mines', 'ai officer'];
+const FL_TAB_ORDER = ['active', 'dispatch', 'reports', 'espionage', 'wormholes', 'pirates', 'expeditions', 'surveys', 'transfer', 'debris', 'patrol', 'mines', 'ai officer'];
 // reserve text such as "85 h", "2 d 4 h", "30 m" -> hours (null if no number)
 const flHours = (t) => {
   let h = 0, any = false;
@@ -5584,6 +5762,633 @@ NL.feature({
       else if (st.kind === 'two') box.append(NL.h('span', { class: 'nl2-fls-note' }, st.n + ' Stealth Deploy fleets on this target; recall from Fleet > Active'));
     }
     NL.watch('.spy-report-detail', paint);
+  },
+});
+
+}
+
+// ================================================================ 64_fl_transfer.js
+{
+// ---- 64_fl_transfer.js: FL-040 Fleet > Transfer tab (Transfer tab thread; David 3 Nov, design 'defaults', mockup mockups/FL-040_transfer_tab_mockup.png) ----
+// A Transfer tab between Surveys and Debris lists transfer and gather tasks the script finds on its own:
+//   Move out   a planet with a produced resource at the Buildings storage threshold (Custom 'bu-storage.pct', 90%): excess to the nearest moon/planet
+//   Collect    an outpost or a moon with a produced resource (hydrogen excluded on outposts, as OU-004) at the same threshold
+//   Bring in   a planet short of resources for the first item of its Build Next list (BU-009)
+// Two tables: Active (en-route rows greyed with a blue EN ROUTE, not counted) and Covered by a route (the game's Logistics routes; not counted).
+// Row buttons open existing dialogs, never send: Move out = our Collection dialog (Transfer to a moon/planet, every field editable);
+// Collect = the Outposts / Moons modules' own Collect buttons (OU-002, MO-010); Bring in = the game's own "Bring missing resources";
+// Make route = the game's Logistics form, filled in (mode, From, resource, Trigger when ≥ 90% of storage, Send amount 40%, To = nearest
+// hub planet with a free slot); David presses Create Route himself. Hide ▾ = 24 hours / 7 days / indefinitely.
+// Copy-the-game data (nexus_tests/logistics_3nov.md, fleet_missions_29oct.md):
+// - Planet stock/caps/rates: the Buildings module's saved empire-resources snapshot (nl2.bu-storage.snap, kept fresh by BU-010: teed,
+//   re-read every 10 min while visible) and its NL.buStorage.onChange. Moons: the same empire-resources reply (moons[]) and any teed
+//   GET /api/moons/{id} (as MO-008). Outposts: teed GET /api/outposts (the Mining page reads it). Missions: teed GET /api/fleet/missions
+//   (Fleet page, on open and every 60 s). Build Next costs: teed GET /api/planets/{id} buildings[].previewUpgradeCost.
+// - Logistics: the Logistics page reads GET /api/logistics/routes, /hub-levels, /collectible-sources on open. We tee them, and read the
+//   ones that are missing or over 5 min old when the Transfer tab opens (~1 s apart), as the Logistics page does on its own open.
+// - Saved copies (outposts, moons, routes, hubs, costs, ships) keep the table filled after a reload, with the data's age shown.
+
+const TR_RES = [['antimatter', 'antimatter', 'Antimatter'], ['dark_matter', 'darkMatter', 'Dark Matter'], ['quantum_dust', 'quantumDust', 'Quantum Dust'],
+  ['plasma_core', 'plasmaCore', 'Plasma Core'], ['bio_extract', 'bioExtract', 'Bio-Extract'], ['cryo_ice', 'cryoIce', 'Cryo-Ice'],
+  ['alloys', 'alloys', 'Alloys'], ['hydrogen', 'hydrogen', 'Hydrogen'], ['silicates', 'silicates', 'Silicates'], ['ore', 'ore', 'Ore']];   // value order, as FL-001
+const TR_BASE = ['ore', 'silicates', 'hydrogen', 'alloys'];
+const TR_TRANSPORTS = ['bulk_carrier', 'freighter', 'transport_shuttle', 'tanker'];
+const TR_DONE = new Set(['returned', 'completed', 'complete', 'cancelled', 'canceled', 'failed', 'recalled', 'destroyed']);
+const trN = (v) => (Number.isFinite(+v) ? +v : 0);
+const trSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const trList = (d, ...keys) => { if (Array.isArray(d)) return d; for (const k of keys) if (d && Array.isArray(d[k])) return d[k]; return []; };
+const trClean = (t) => String(t == null ? '' : t).replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+const trSnake = (k) => { const s = String(k || '').replace(/[A-Z]/g, (c) => '_' + c.toLowerCase()).replace(/-/g, '_'); return TR_RES.some((r) => r[0] === s) ? s : null; };
+const trName = (k) => (TR_RES.find((r) => r[0] === k) || [k, k, k])[2];
+const trFmt = (n) => Math.round(trN(n)).toLocaleString('en-US');
+const trTs = (v) => { if (v == null) return null; const t = typeof v === 'number' ? v : Date.parse(v); return Number.isFinite(t) ? t : null; };
+const trDur = (sec) => {                      // STYLE: 4m 32s under an hour, 1h 05m from an hour up
+  const a = Math.max(0, Math.ceil(sec)), d = Math.floor(a / 86400), h = Math.floor(a % 86400 / 3600), m = Math.floor(a % 3600 / 60), s = a % 60;
+  return d ? `${d}d ${h}h` : h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m ${String(s).padStart(2, '0')}s`;
+};
+const trClock = (t) => { const d = new Date(t), today = d.toDateString() === new Date().toDateString(); return (today ? '' : d.toLocaleDateString([], { weekday: 'short' }) + ' ') + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); };
+const trAge = (at) => { if (!at) return 'no data yet'; const m = Math.round((Date.now() - at) / 60000); return m < 1 ? 'just now' : m < 60 ? m + 'm old' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm old'; };
+
+NL.feature({
+  id: 'fl-transfer',
+  set: 'Fleet',
+  name: 'Transfer tab',
+  desc: 'FL-040: a Transfer tab on the Fleet page (between Surveys and Debris) listing storage that is filling up (planets, moons, outposts) and resources short for Build Next, with buttons that open the right dialog or the game\'s Logistics route form. Counted in the Fleet menu badge.',
+  init(ctx) {
+    const st = ctx.store;
+    const ROUTE_FRESH = 5 * 60000, FRESH = 60000;
+
+    // ------------------------------------------------------------ saved copies of the game's own answers
+    const saved = (k) => st.get(k, null);
+    const keep = (k, d, at) => st.set(k, { d, at: at || Date.now() });
+    let missions = [], missionsAt = 0;
+    NL.onData(/^\/api\/fleet\/missions$/, (p, d, at) => { missions = trList(d, 'missions'); missionsAt = at || Date.now(); changed(); });
+    NL.onData(/^\/api\/outposts$/, (p, d, at) => { if (d && Array.isArray(d.outposts)) { keep('outposts', d, at); changed(); } });
+    NL.onData(/^\/api\/logistics\/routes$/, (p, d, at) => { if (d && Array.isArray(d.routes)) { keep('routes', d.routes, at); changed(); } });
+    NL.onData(/^\/api\/logistics\/hub-levels$/, (p, d, at) => { if (d && Array.isArray(d.hubLevels)) { keep('hubs', d.hubLevels, at); changed(); } });
+    NL.onData(/^\/api\/logistics\/collectible-sources$/, (p, d, at) => { if (d && Array.isArray(d.outposts)) { keep('sources', d, at); changed(); } });
+    // moons: stock, rates, caps (empire-resources moons[] or a moon page), newest per moon, as MO-008
+    const moonCap = (src, k) => { if (src == null) return 0; if (typeof src === 'object') return trN(src[k] != null ? src[k] : TR_BASE.includes(TR_RES.find((r) => r[1] === k)[0]) ? 0 : src.rare); return trN(src); };
+    function putMoon(id, v) { const all = st.get('moons', {}); const k = String(id); if (!all[k] || (all[k].at || 0) <= v.at) { all[k] = { ...(all[k] || {}), ...v }; st.set('moons', all); } }
+    NL.onData(/^\/api\/command-center\/empire-resources/, (p, d, at) => {
+      const t = Math.min(Date.parse(d && d.serverNow) || at || Date.now(), at || Date.now());
+      for (const m of (d && d.moons) || []) {
+        if (!m || m.id == null) continue;
+        const res = {}, rate = {}, cap = {};
+        for (const [, c] of TR_RES) {
+          res[c] = m[c]; rate[c] = m[c + 'Rate'];
+          cap[c] = m[c + 'Storage'] != null ? trN(m[c + 'Storage']) : TR_BASE.includes(trSnake(c)) ? moonCap(m.storage, c) : trN(m.rareResourceStorage != null ? (typeof m.rareResourceStorage === 'object' ? m.rareResourceStorage[c] : m.rareResourceStorage) : moonCap(m.storage, c));
+        }
+        putMoon(m.id, { at: t, name: trClean(m.name), planetId: m.planetId != null ? Number(m.planetId) : undefined, res, rate, cap });
+      }
+      changed();
+    });
+    NL.onData(/^\/api\/moons\/\d+$/, (p, d, at) => {
+      const s = d && d.resourceSnapshot;
+      if (!s || !s.resources) return;
+      const cap = {};
+      for (const [, c] of TR_RES) cap[c] = moonCap(s.storage, c);
+      const m = d.moon || {};
+      putMoon(p.split('/').pop(), { at: Math.min(Date.parse(s.resourcesUpdatedAt || s.serverNow) || at || Date.now(), at || Date.now()), name: trClean(m.name) || undefined,
+        planetId: m.planetId != null ? Number(m.planetId) : undefined, res: s.resources, rate: s.productionRates || {}, cap });
+      changed();
+    });
+    // places: planets (systemId for distances), moons' parent planets (activity summary)
+    NL.onData(/^\/api\/planets$/, (p, d) => {
+      const l = trList(d, 'planets', 'items'); if (!l.length) return;
+      st.set('planets', l.map((x) => ({ id: Number(x.id), name: trClean(x.name), systemId: x.systemId, sortOrder: trN(x.sortOrder) })));
+      changed();
+    });
+    NL.onData(/^\/api\/planets\/activity-summary$/, (p, d) => {
+      const all = st.get('moons', {}); let any = false;
+      for (const pl of (d && d.planets) || []) for (const m of pl.moons || []) {
+        if (!m || m.id == null) continue;
+        const k = String(m.id), pid = Number(pl.planetId != null ? pl.planetId : pl.id);
+        if (!all[k]) all[k] = { at: 0 };
+        if (all[k].planetId !== pid || all[k].name !== trClean(m.name)) { all[k].planetId = pid; all[k].name = trClean(m.name); any = true; }
+      }
+      if (any) { st.set('moons', all); changed(); }
+    });
+    // Build Next costs (first item per planet) and each planet's transports, from the game's own planet / fleet reads
+    NL.onData(/^\/api\/planets\/\d+$/, (p, d) => {
+      if (!d || !Array.isArray(d.buildings)) return;
+      const pid = p.split('/').pop(), costs = st.get('costs', {}), mine = {};
+      for (const b of d.buildings) {
+        const def = b && b.definition; if (!def || !def.key || !b.previewUpgradeCost) continue;
+        const c = {}; for (const [k, v] of Object.entries(b.previewUpgradeCost)) { const s = trSnake(k); if (s && trN(v) > 0) c[s] = trN(v); }
+        mine[def.key] = { name: def.name || def.key, level: trN(b.level) + 1, cost: c };
+      }
+      costs[pid] = { at: Date.now(), b: mine }; st.set('costs', costs); changed();
+    });
+    NL.onData(/^\/api\/(planets|moons)\/\d+\/fleet$/, (p, d) => {
+      const m = /^\/api\/(planets|moons)\/(\d+)\/fleet$/.exec(p), ships = st.get('ships', {}), out = [];
+      for (const s of trList(d, 'fleet', 'ships')) {
+        const def = s && s.definition; if (!def || !TR_TRANSPORTS.includes(def.key)) continue;
+        const ok = trN(s.quantity) - trN(s.damagedQuantity), bonus = trN(d.cargoBonus) + (def.key === 'transport_shuttle' ? trN(d.shuttleCargoBonus) : 0);
+        const cargo = Math.floor(trN(def.cargoCapacity) * (1 + bonus));
+        if (cargo > 0) out.push({ name: def.name || def.key, cargo, have: Math.max(0, ok) });
+      }
+      ships[m[1][0] + m[2]] = out; st.set('ships', ships); changed();
+    });
+    if (NL.buStorage && NL.buStorage.onChange) NL.buStorage.onChange(() => changed());
+
+    // ------------------------------------------------------------ helpers over the saved data
+    const pct = () => { const v = NL.opt ? +NL.opt('bu-storage.pct') : NaN; return isFinite(v) && v > 0 ? v / 100 : 0.9; };
+    const planets = () => {
+      const l = st.get('planets', null);
+      if (l && l.length) return l;
+      const snap = NL.store('bu-storage.').get('snap', null);
+      return snap ? snap.planets.map((x, i) => ({ id: Number(x.id), name: trClean(x.name), systemId: x.systemId, sortOrder: i })) : [];
+    };
+    const planetById = (id) => planets().find((p) => p.id === Number(id)) || null;
+    const xy = (systemId) => { try { const c = JSON.parse(localStorage.getItem('nxsMapCache') || 'null'), o = c && c.origins && c.origins[systemId]; return o && Number.isFinite(+o.x) ? { x: +o.x, y: +o.y } : null; } catch (e) { return null; } };
+    const ly = (pa, pb) => { const a = pa && xy(pa.systemId), b = pb && xy(pb.systemId); return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : null; };
+    const byNear = (from) => (a, b) => { const x = ly(from, a), y = ly(from, b); return (x != null && y != null ? x - y : x != null ? -1 : y != null ? 1 : 0) || trN(a.sortOrder) - trN(b.sortOrder); };
+    const moonsAll = () => Object.entries(st.get('moons', {})).map(([id, m]) => ({ id: Number(id), ...m })).filter((m) => m.name);
+    const live = (mi) => mi && !TR_DONE.has(mi.status);
+    const enRoute = (fn) => missions.find((mi) => live(mi) && fn(mi)) || null;
+    const homeAt = (mi) => trTs(mi.returnArrivesAt) || trTs(mi.arrivesAt);
+    // stock now = stock + rate x hours since the reading, capped at storage
+    const proj = (have, rate, cap, at) => Math.min(cap, trN(have) + trN(rate) * Math.max(0, Date.now() - (at || Date.now())) / 3600000);
+    const fillOf = (res, rate, cap, at, skip) => {   // [{k, now, cap, f, rate}] for produced resources at/over the threshold, fullest first
+      const lim = pct(), out = [];
+      for (const [k, c] of TR_RES) {
+        if (skip && skip.includes(k)) continue;
+        const r = trN(rate[c] != null ? rate[c] : rate[k]), cp = trN(cap[c] != null ? cap[c] : cap[k]);
+        if (r <= 0 || cp <= 0) continue;
+        const now = proj(res[c] != null ? res[c] : res[k], r, cp, at);
+        out.push({ k, now, cap: cp, f: now / cp, rate: r, hot: now / cp >= lim });
+      }
+      return out.sort((a, b) => b.f - a.f);
+    };
+    const fullIn = (rows) => Math.min(...rows.map((x) => (x.now >= x.cap ? 0 : (x.cap - x.now) / x.rate * 3600)));
+    const hubs = () => (saved('hubs') || {}).d || [];
+    const freeHubs = () => hubs().filter((h) => trN(h.hubLevel) - trN(h.routeCount) > 0);
+    const routes = () => (saved('routes') || {}).d || [];
+    const rk = (r) => trSnake(r.resourceType) || trSnake(String(r.resourceType || '').toLowerCase().replace(/[\s-]+/g, '_'));
+    const shipsFor = (key, total) => {           // estimated transports: the biggest one the place has
+      const l = (st.get('ships', {})[key] || []).filter((s) => s.cargo > 0).sort((a, b) => b.cargo - a.cargo);
+      if (!l.length || total <= 0) return null;
+      const s = l.find((x) => x.have * x.cargo >= total) || l[0], n = Math.ceil(total / s.cargo);
+      return { text: n + ' ' + s.name, short: n > s.have, have: s.have };
+    };
+
+    // ------------------------------------------------------------ the tasks
+    function tasks() {
+      const out = [];
+      // Move out: planets (Buildings' snapshot, kept current by BU-010)
+      const snap = NL.store('bu-storage.').get('snap', null);
+      for (const pl of (snap && snap.planets) || []) {
+        const cap = {}, rate = {};
+        for (const [k, c] of TR_RES) { rate[c] = pl[c + 'Rate']; cap[c] = TR_BASE.includes(k) ? trN(pl[c + 'Storage']) : trN(pl[c + 'Storage']) || (pl.rareResourceStorage && typeof pl.rareResourceStorage === 'object' ? trN(pl.rareResourceStorage[c]) : trN(pl.rareResourceStorage)); }
+        const rows = fillOf(pl, rate, cap, pl._at || snap.at), hot = rows.filter((x) => x.hot);
+        if (!hot.length) continue;
+        const me = planetById(pl.id) || { id: Number(pl.id), name: trClean(pl.name) };
+        const res = Object.fromEntries(hot.map((x) => [x.k, Math.max(0, Math.floor(x.now - x.cap * 0.5))]));
+        out.push({ key: 'p' + pl.id, kind: 'move', task: 'Move out', from: { t: 'planet', id: me.id, name: me.name }, to: moveTarget(me, res), res, rows: hot,
+          due: fullIn(hot), at: pl._at || snap.at, why: hot.map((x) => trName(x.k) + ' ' + Math.floor(x.f * 100) + '%').join(', '),
+          ships: shipsFor('p' + me.id, Object.values(res).reduce((a, b) => a + b, 0)),
+          go: (mi) => mi.sourcePlanetId === me.id && ['transfer', 'deliver'].includes(mi.missionType) && mi.status === 'outbound' && !mi.sourceMoonId });
+      }
+      // Collect: moons
+      for (const m of moonsAll()) {
+        if (!m.res) continue;
+        const rows = fillOf(m.res, m.rate || {}, m.cap || {}, m.at), hot = rows.filter((x) => x.hot);
+        if (!hot.length) continue;
+        const par = planetById(m.planetId);
+        out.push({ key: 'm' + m.id, kind: 'moon', task: 'Collect', from: { t: 'moon', id: m.id, name: m.name }, to: par ? { t: 'planet', id: par.id, name: par.name } : null,
+          res: Object.fromEntries(hot.map((x) => [x.k, Math.floor(x.now)])), rows: hot, due: fullIn(hot), at: m.at,
+          why: hot.map((x) => trName(x.k) + ' ' + Math.floor(x.f * 100) + '%').join(', '), ships: shipsFor('m' + m.id, hot.reduce((a, x) => a + x.now, 0)),
+          go: (mi) => Number(mi.sourceMoonId) === m.id && mi.status === 'outbound' });
+      }
+      // Collect: outposts (hydrogen left out, as OU-004)
+      const ou = saved('outposts');
+      if (ou && ou.d) {
+        const snaps = trList(ou.d, 'resourceSnapshots');
+        for (const op of trList(ou.d, 'outposts')) {
+          if (!op || op.id == null) continue;
+          const sn = snaps.find((s) => s && s.locationType !== 'planet' && +s.locationId === +op.id);
+          const res = (sn && sn.resources) || op, rate = (sn && sn.productionRates) || {}, stor = (sn && sn.storage) || {};
+          const cap = {}, rt = {};
+          for (const [k, c] of TR_RES) { cap[c] = TR_BASE.includes(k) ? trN(stor[c] != null ? stor[c] : op.basicStorage) : trN(stor.rare != null ? stor.rare : op.rareStorage); rt[c] = rate[c] != null ? rate[c] : op[c + 'Rate']; }
+          const upd = trTs((sn && sn.resourcesUpdatedAt) || op.resourcesUpdatedAt), srv = trTs(sn && sn.serverNow);
+          const at = upd != null ? ou.at - ((srv != null ? srv : ou.at) - upd) : ou.at;
+          const rows = fillOf(res, rt, cap, at, ['hydrogen']), hot = rows.filter((x) => x.hot);
+          if (!hot.length) continue;
+          const name = String(op.name || ('Outpost ' + op.id)), fieldId = op.asteroidFieldId;
+          out.push({ key: 'o' + op.id, kind: 'outpost', task: 'Collect', from: { t: 'outpost', id: Number(op.id), name }, to: null,
+            res: Object.fromEntries(hot.map((x) => [x.k, Math.floor(x.now)])), rows: hot, due: fullIn(hot), at: ou.at,
+            why: hot.map((x) => trName(x.k) + ' ' + Math.floor(x.f * 100) + '%').join(', '), ships: null, toLabel: 'Picked in the dialog',
+            go: (mi) => mi.missionType === 'collect' && ((fieldId != null && +mi.targetFieldId === +fieldId) || (mi.raidParams && +mi.raidParams.outpostId === +op.id)) });
+        }
+      }
+      // Bring in: first Build Next item per planet, short on the planet's own stock
+      const next = NL.store('bu-roi.').get('next', {}), costs = st.get('costs', {});
+      for (const [pid, list] of Object.entries(next || {})) {
+        const key = (list || [])[0], c = key && costs[pid] && costs[pid].b[key];
+        const pl = snap && snap.planets.find((x) => String(x.id) === String(pid));
+        if (!c || !pl) continue;
+        const miss = {};
+        for (const [k, need] of Object.entries(c.cost)) {
+          const camel = (TR_RES.find((r) => r[0] === k) || [])[1], have = proj(pl[camel], pl[camel + 'Rate'], Infinity, pl._at || snap.at);
+          if (need > have) miss[k] = Math.ceil(need - have);
+        }
+        if (!Object.keys(miss).length) continue;
+        const me = planetById(pid) || { id: Number(pid), name: trClean(pl.name) };
+        const from = bringSource(me, miss, snap);
+        out.push({ key: 'b' + pid, kind: 'bring', task: 'Bring in', from, to: { t: 'planet', id: me.id, name: me.name }, res: miss, due: 0, at: pl._at || snap.at,
+          why: 'Short for Build Next: ' + c.name + ' ' + c.level, building: c.name, ships: from ? shipsFor('p' + from.id, Object.values(miss).reduce((a, b) => a + b, 0)) : null,
+          go: (mi) => Number(mi.targetPlanetId) === me.id && ['transfer', 'deliver'].includes(mi.missionType) && mi.status === 'outbound' });
+      }
+      // routes that cover a task take its resources off; a task with nothing left is shown under Covered by a route
+      for (const t of out) {
+        t.covered = routes().filter((r) => covers(r, t));
+        const left = Object.keys(t.res).filter((k) => !t.covered.some((r) => rk(r) === k));
+        t.done = t.covered.length > 0 && !left.length;
+        t.mission = enRoute(t.go);
+      }
+      return out;
+    }
+    function covers(r, t) {
+      const k = rk(r); if (!k || !(k in t.res)) return false;
+      if (t.kind === 'outpost') return r.routeMode === 'collect_outpost' && +r.sourceOutpostId === t.from.id;
+      if (t.kind === 'moon') return r.routeMode === 'collect_moon' && +r.sourceMoonId === t.from.id;
+      if (t.kind === 'move') return r.routeMode === 'supply' && +r.sourcePlanetId === t.from.id || r.routeMode === 'supply_moon' && +r.sourcePlanetId === t.from.id;
+      if (t.kind === 'bring') return r.routeMode === 'supply' && +r.destinationPlanetId === t.to.id;
+      return false;
+    }
+    // Move out target: this planet's moon first, then own planets nearest first, then other moons; the first with room for the fullest resource
+    function moveTarget(me, res) {
+      const snap = NL.store('bu-storage.').get('snap', null), lim = pct();
+      const ms = moonsAll(), list = [];
+      for (const m of ms.filter((x) => x.planetId === me.id)) list.push({ t: 'moon', id: m.id, name: m.name, sortOrder: -1, m });
+      for (const p of planets().filter((x) => x.id !== me.id).sort(byNear(me))) list.push({ t: 'planet', id: p.id, name: p.name, p });
+      for (const m of ms.filter((x) => x.planetId !== me.id)) list.push({ t: 'moon', id: m.id, name: m.name, m });
+      const [k, amt] = Object.entries(res).sort((a, b) => b[1] - a[1])[0] || [];
+      const camel = k && (TR_RES.find((r) => r[0] === k) || [])[1];
+      const room = (c) => {
+        if (!camel) return true;
+        if (c.t === 'moon') { const cap = trN(c.m.cap && c.m.cap[camel]); return !cap || cap * lim - proj(c.m.res && c.m.res[camel], c.m.rate && c.m.rate[camel], cap, c.m.at) >= amt; }
+        const pl = snap && snap.planets.find((x) => String(x.id) === String(c.id)); if (!pl) return true;
+        const cap = trN(pl[camel + 'Storage']) || trN(typeof pl.rareResourceStorage === 'object' && pl.rareResourceStorage ? pl.rareResourceStorage[camel] : pl.rareResourceStorage);
+        return !cap || cap * lim - proj(pl[camel], pl[camel + 'Rate'], cap, pl._at || snap.at) >= amt;
+      };
+      const pick = list.find(room) || list[0] || null;
+      return pick ? { t: pick.t, id: pick.id, name: pick.name, list } : null;
+    }
+    // Bring in source: the nearest own planet holding all of it, else the one holding the most
+    function bringSource(me, miss, snap) {
+      const cand = planets().filter((p) => p.id !== me.id).sort(byNear(me)).map((p) => {
+        const pl = snap.planets.find((x) => String(x.id) === String(p.id)); if (!pl) return null;
+        let got = 0, all = true;
+        for (const [k, v] of Object.entries(miss)) { const c = (TR_RES.find((r) => r[0] === k) || [])[1], h = proj(pl[c], pl[c + 'Rate'], Infinity, pl._at || snap.at); got += Math.min(h, v); if (h < v) all = false; }
+        return { p, got, all };
+      }).filter(Boolean);
+      const w = cand.find((x) => x.all) || cand.sort((a, b) => b.got - a.got)[0];
+      return w ? { t: 'planet', id: w.p.id, name: w.p.name } : null;
+    }
+    // Make route values (David 'defaults' 3 Nov): fullest resource, trigger 90% / send 40% of its storage, To = nearest hub planet with a slot
+    function routePlan(t) {
+      if (t.kind === 'bring' || !t.rows || !t.rows.length) return null;
+      const x = t.rows[0], free = freeHubs();
+      if (t.kind === 'move') {
+        const hub = free.find((h) => +h.planetId === t.from.id); if (!hub) return null;
+        const me = planetById(t.from.id), to = planets().filter((p) => p.id !== t.from.id).sort(byNear(me))[0];
+        return to ? { mode: 'Planet → Planet', from: t.from, to: { id: to.id, name: to.name }, k: x.k, trig: Math.round(x.cap * 0.9), amt: Math.round(x.cap * 0.4) } : null;
+      }
+      const base = t.kind === 'moon' ? planetById(t.to && t.to.id) : null;
+      const hp = free.map((h) => planetById(h.planetId) || { id: +h.planetId, name: trClean(h.planetName) }).sort(base ? byNear(base) : (a, b) => trN(a.sortOrder) - trN(b.sortOrder));
+      return hp[0] ? { mode: t.kind === 'moon' ? 'Collect Moon' : 'Collect Outpost', from: t.from, to: { id: hp[0].id, name: hp[0].name }, k: x.k, trig: Math.round(x.cap * 0.9), amt: Math.round(x.cap * 0.4) } : null;
+    }
+
+    // ------------------------------------------------------------ hiding (per task, 24 h / 7 d / indefinitely)
+    const hidden = (t) => { const h = st.get('hide', {})[t.key]; return h != null && (h < 0 || h > Date.now()); };
+    const hide = (t, ms) => { const h = st.get('hide', {}); if (ms == null) delete h[t.key]; else h[t.key] = ms < 0 ? -1 : Date.now() + ms; st.set('hide', h); changed(); };
+
+    // ------------------------------------------------------------ badge: Fleet menu and the tab (en-route, covered and hidden rows not counted)
+    let lastBadge = '';
+    function badge(list) {
+      const act = list.filter((t) => !t.done && !t.mission && !hidden(t));
+      const tip = act.map((t) => t.task + ': ' + t.from.name + (t.kind === 'bring' ? ' → ' + t.to.name : '') + ' (' + t.why + ')').join('\n');
+      const key = act.length + '|' + tip;
+      if (key !== lastBadge) {
+        lastBadge = key;
+        ((NL.navBadges = NL.navBadges || {})['/fleet'] = NL.navBadges['/fleet'] || {}).transfer = { n: act.length, tip: act.length ? tip : '' };
+        if (NL.navBadgeChanged) NL.navBadgeChanged('/fleet');
+      }
+      return act.length;
+    }
+
+    // ------------------------------------------------------------ own reads: only on the Transfer tab's open, for what is missing or stale
+    let reading = false;
+    async function readOnOpen() {
+      if (reading) return; reading = true;
+      try {
+        for (const [k, path, max] of [['routes', '/api/logistics/routes', ROUTE_FRESH], ['hubs', '/api/logistics/hub-levels', ROUTE_FRESH]]) {
+          const s = saved(k);
+          if (s && Date.now() - s.at < max) continue;
+          await NL.getJson(path, ctx);            // teed: the onData above keeps it
+          await trSleep(1000);
+        }
+      } finally { reading = false; }
+    }
+
+    // ------------------------------------------------------------ actions
+    const until = async (fn, ms = 8000) => { for (let t = 0; t < ms; t += 150) { const v = fn(); if (v) return v; await trSleep(150); } return null; };
+    const nav = (path) => { const a = document.querySelector(`a[href="${path}"]`); if (a) { a.click(); return true; } location.href = path; return false; };
+    async function act(t, btn) {
+      btn.setAttribute('data-nl2-busy', '1');
+      try {
+        if (t.kind === 'move') await moveOut(t, btn);
+        else if (t.kind === 'outpost') {
+          if (NL.openOutpost) NL.openOutpost(t.from.id);
+          else { const g = document.querySelector(`.sidebar-nav [data-nl2-outpost="${t.from.id}"]`); if (g) g.click(); else nav('/mining'); }
+          const b = await until(() => document.querySelector('.nl2-ou-collect:not([disabled])')); if (b) b.click();
+        } else if (t.kind === 'moon') {
+          if (NL.openMoon) await NL.openMoon(t.from.name, 'overview');
+          const b = await until(() => document.querySelector('.nl2-mo-coll:not([disabled])')); if (b) b.click();
+        } else if (t.kind === 'bring') {
+          if (NL.openPlanet) await NL.openPlanet(t.to.name, '/buildings');
+          const b = await until(() => { const h = [...document.querySelectorAll('.building-card h4')].find((x) => x.textContent.trim() === t.building); const c = h && h.closest('.building-card'); return c && [...c.querySelectorAll('button')].find((x) => /bring missing resources/i.test(x.textContent || '')); });
+          if (b) { b.scrollIntoView({ block: 'center' }); b.click(); }
+        }
+      } catch (e) { ctx.log('transfer action failed', e); }
+      btn.removeAttribute('data-nl2-busy');
+    }
+    // Move out: our Collection dialog (transports fitted the game's way), the target list as FL-001; every field can be changed
+    let lastRead = 0;
+    async function read(path) { const w = lastRead + 1000 - Date.now(); if (w > 0) await trSleep(w); lastRead = Date.now(); return NL.getJson(path, ctx); }
+    const fresh = (path) => { const c = NL.cache.latest(new RegExp('^' + path.replace(/[/]/g, '\\/') + '$')); return c && Date.now() - c.at < FRESH ? c.data : null; };
+    async function moveOut(t, btn) {
+      if (!NL.fleet) return;
+      const src = t.from.id, list = (t.to && t.to.list) || [];
+      const first = list.findIndex((c) => c.t === t.to.t && c.id === t.to.id);
+      const targets = (first > 0 ? [list[first], ...list.filter((c, i) => i !== first)] : list).map((c) => ({ id: c.id, label: c.name + (c.t === 'moon' ? ' (moon)' : ''), kind: c.t }));
+      if (!targets.length) return;
+      const shipsBody = (s) => (s.ships || []).filter((x) => trN(x.qty) > 0).map((x) => ({ shipDefId: Number(x.key), quantity: trN(x.qty) }));
+      const route = (s) => {
+        const tg = s.target || {}, base = { useHighway: false, missionType: 'transfer', ships: shipsBody(s), ...(trN(s.speed) > 0 && trN(s.speed) < 100 ? { speedFactor: trN(s.speed) / 100 } : {}) };
+        return tg.kind === 'moon' ? { est: ['POST /moons/:id/send-estimate', tg.id], go: '/api/moons/' + tg.id + '/send', body: { ...base, sourcePlanetId: Number(s.sourceId) } }
+          : { est: ['POST /fleet/fuel-estimate', null], go: '/api/fleet/dispatch', body: { ...base, sourcePlanetId: Number(s.sourceId), targetPlanetId: Number(tg.id) } };
+      };
+      await NL.fleet.open({
+        kind: 'fl-transfer-move', type: 'collection', title: 'Move out · ' + t.from.name, button: btn, template: false, sendLabel: 'Launch',
+        fields: ['source', 'target', 'ships', 'resources', 'speed', 'eta'], speed: 100, targets,
+        sources: async () => [{ id: src, name: t.from.name }],
+        prepare: async (sid) => {
+          const f = fresh('/api/planets/' + sid + '/fleet') || (await read('/api/planets/' + sid + '/fleet'));
+          if (!f) return null;
+          const ships = [];
+          for (const s of trList(f, 'fleet', 'ships')) {
+            const d = s && s.definition; if (!d) continue;
+            const ok = trN(s.quantity) - trN(s.damagedQuantity), bonus = trN(f.cargoBonus) + (d.key === 'transport_shuttle' ? trN(f.shuttleCargoBonus) : 0);
+            if (ok > 0) ships.push({ key: String(d.id != null ? d.id : s.shipDefId), type: d.key, name: d.name || d.key, have: ok, cargo: Math.floor(trN(d.cargoCapacity) * (1 + bonus)), allowedCargo: d.allowedCargo || [] });
+          }
+          const stock = (f.resourceSnapshot && f.resourceSnapshot.resources) || f.resources || {}, resources = {};
+          for (const [k, c, name] of TR_RES) { const have = Math.floor(trN(stock[c] != null ? stock[c] : stock[k])); if (have > 0 && t.res[k] > 0) resources[k] = { have, amount: Math.min(have, t.res[k]), name }; }
+          return { ships, resources };
+        },
+        estimate: async (s, signal) => {
+          const rt = route(s); if (!rt.body.ships.length || !NL.transportPost) return null;
+          let e = null; try { e = await NL.transportPost(rt.est[0], rt.est[1], rt.body, signal); } catch (err) { return null; }
+          return e && e.fuelCost != null ? { fuel: trN(e.fuelCost), travelSec: trN(e.travelTime), hydrogenAvailable: e.hydrogenAvailable != null ? trN(e.hydrogenAvailable) : undefined } : null;
+        },
+        send: async (s) => {
+          const rt = route(s), cargo = {};
+          for (const [k, v] of Object.entries(s.resources || {})) { const a = Math.floor(trN(v && typeof v === 'object' ? v.amount : v)); if (a > 0) cargo[k] = a; }
+          try {
+            const res = await NL.rawFetch(rt.go, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: new Blob([JSON.stringify({ ...rt.body, cargo, confirmStorageOverflow: true })], { type: 'application/json' }) });
+            const j = await res.json().catch(() => null);
+            if (!res.ok) return { ok: false, message: (j && (j.error || j.message)) || ('The game refused the transfer (HTTP ' + res.status + ').') };
+            setTimeout(async () => { await read('/api/fleet/missions'); await read('/api/planets/' + s.sourceId + '/fleet'); }, 1000);
+            return { ok: true, message: 'Transfer sent to ' + ((s.target && s.target.label) || 'the target') + '.' };
+          } catch (e) { return { ok: false, message: 'Could not reach the game: ' + e.message }; }
+        },
+      });
+    }
+    // Make route: the game's own Logistics form, filled in; never presses Create Route
+    const setVal = (el, v) => {
+      const proto = el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, String(v));
+      el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+      if (el.tagName !== 'SELECT') el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    async function pickIn(btnEl, test) {
+      btnEl.click(); await trSleep(250);
+      const opts = [...document.querySelectorAll('.location-select-option')], o = test(opts);
+      if (o) { o.click(); await trSleep(200); return true; }
+      btnEl.click(); return false;
+    }
+    async function makeRoute(t, btn) {
+      const plan = routePlan(t); if (!plan) return;
+      btn.setAttribute('data-nl2-busy', '1');
+      try {
+        if (location.pathname !== '/logistics') nav('/logistics');
+        const sec = await until(() => { const c = document.querySelector('.logi-create-btn'), s = document.querySelector('.logi-mode-pill'); return c && s && s.closest('.logi-section'); }, 10000);
+        if (!sec) return;
+        const pill = [...sec.querySelectorAll('.logi-mode-pill')].find((b) => b.textContent.trim() === plan.mode);
+        if (pill && !pill.classList.contains('active')) { pill.click(); await trSleep(300); }
+        const pk = [...sec.querySelectorAll('.location-select-button')];
+        const txt = (o) => (o.textContent || '').replace(/\s+/g, ' ').trim();
+        if (pk[0]) {
+          if (t.kind === 'outpost') {
+            const srcs = trList((saved('sources') || {}).d, 'outposts'), i = srcs.findIndex((o) => +o.id === t.from.id);
+            await pickIn(pk[0], (os) => (i >= 0 && os.length === srcs.length && txt(os[i]).startsWith(t.from.name) ? os[i] : os.find((o) => txt(o) === t.from.name)));
+          } else await pickIn(pk[0], (os) => os.find((o) => txt(o) === plan.from.name || txt(o).startsWith(plan.from.name + ' (')));
+        }
+        const sel = sec.querySelector('select');
+        if (sel) { const o = [...sel.options].find((x) => trSnake(x.value) === plan.k || x.textContent.trim() === trName(plan.k)); if (o) setVal(sel, o.value); }
+        const nums = [...sec.querySelectorAll('input[type=number]')];
+        if (nums[0]) setVal(nums[0], plan.trig);
+        if (nums[1]) setVal(nums[1], plan.amt);
+        const pk2 = [...sec.querySelectorAll('.location-select-button')];
+        if (pk2[1]) await pickIn(pk2[1], (os) => os.find((o) => txt(o) === plan.to.name || txt(o).startsWith(plan.to.name + ' (')));
+        sec.scrollIntoView({ block: 'center' });
+        sec.setAttribute('data-nl2-ftr-route', ''); setTimeout(() => sec.removeAttribute('data-nl2-ftr-route'), 4000);
+      } catch (e) { ctx.log('make route failed', e); } finally { btn.removeAttribute('data-nl2-busy'); }
+    }
+
+    // ------------------------------------------------------------ the tab and its panel
+    NL.css('fl-transfer', `
+      .fleet-page[data-nl2-ftr] .fleet-command-navigation .fleet-tab.active:not(.nl2-ftr-tab){color:rgb(241,246,255)!important;background:rgba(8,16,32,.94)!important;border-color:rgb(25,82,107)!important;box-shadow:none!important;font-weight:600!important}
+      .fleet-page .fleet-command-navigation .fleet-tab.nl2-ftr-tab.active{color:rgb(140,220,255)!important;background:rgba(126,212,255,.16)!important;border-color:rgb(92,217,246)!important;box-shadow:inset 0 -2px 0 rgb(92,217,246)!important;font-weight:700!important}
+      .fleet-page[data-nl2-ftr] > .fleet-tab-content > :not(.nl2-ftr){display:none!important}
+      .fleet-page:not([data-nl2-ftr]) .nl2-ftr{display:none!important}
+      .nl2-ftr{font:15px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7}
+      .nl2-ftr-sec{display:flex;align-items:center;gap:8px;font:700 15px Rajdhani,"Exo 2",sans-serif;color:#cfe3f7;padding:8px 4px 4px;cursor:pointer;user-select:none}
+      .nl2-ftr-sec .nl2-ftr-n{color:#8aa;font-weight:500}.nl2-ftr-sec .nl2-ftr-sub{color:#7f93a8;font-size:12.5px;font-weight:500}
+      .nl2-ftr-sec .nl2-ftr-ar{display:inline-block;width:14px;color:#7ed4ff}
+      .nl2-ftr-box{background:rgb(11,21,37);border:.8px solid rgba(120,200,255,.12);border-radius:8px;padding:6px 8px;margin:4px 0 14px}
+      .nl2-ftr table{border-collapse:collapse;width:100%;table-layout:fixed}
+      .nl2-ftr th,.nl2-ftr td{padding:5px 9px;border-bottom:1px solid rgba(120,200,255,.1);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .nl2-ftr th{color:#8fb3d9;font-weight:600;font-size:12px;cursor:pointer}.nl2-ftr th.nl2-ftr-nos{cursor:default}
+      .nl2-ftr th + th,.nl2-ftr td + td{border-left:1px solid rgba(120,200,255,.1)}
+      .nl2-ftr tbody tr:nth-child(even) td{background:rgba(255,255,255,.035)}
+      .nl2-ftr .nl2-ftr-r{text-align:right}
+      .nl2-ftr a.nl2-ftr-l{color:#7fd4ff;text-decoration:none;cursor:pointer}.nl2-ftr a.nl2-ftr-l:hover{text-decoration:underline}
+      .nl2-ftr img.nl2-ftr-ic{width:16px;height:16px;vertical-align:-3px;margin-right:3px}
+      .nl2-ftr .nl2-ftr-rs{margin-right:10px}
+      .nl2-ftr .nl2-ftr-t{color:#fbbf24;font-weight:700}
+      .nl2-ftr .nl2-ftr-est{font-style:italic;color:#c9d6e6}
+      .nl2-ftr .nl2-ftr-d{color:#56657a}
+      .nl2-ftr .nl2-ftr-short{color:#f87171}
+      .nl2-ftr .nl2-ftr-st{display:inline-block;border:1px solid;border-radius:3px;font-size:11.5px;font-weight:700;padding:0 5px;text-transform:uppercase}
+      .nl2-ftr .nl2-ftr-trav{border-color:#60a5fa;color:#93c5fd}.nl2-ftr .nl2-ftr-in{border-color:#22c55e;color:#86efac}.nl2-ftr .nl2-ftr-oth{border-color:#64748b;color:#cbd5e1}
+      .nl2-ftr tr.nl2-ftr-enr td{color:#6b7a90}.nl2-ftr tr.nl2-ftr-enr a.nl2-ftr-l{color:#4f7d99}.nl2-ftr tr.nl2-ftr-enr img{opacity:.45}
+      .nl2-ftr tr.nl2-ftr-tot td{color:#fbbf24;font-weight:700}
+      .nl2-ftr button{font:600 13px Rajdhani,"Exo 2",sans-serif;border-radius:4px;padding:2px 9px;margin-right:4px;cursor:pointer}
+      .nl2-ftr .nl2-ftr-hb{background:none;color:#9fb3d1;border:1px solid rgba(120,200,255,.25)}
+      .nl2-ftr-menu{position:fixed;z-index:10000;background:rgb(11,21,37);border:1px solid rgba(120,200,255,.3);border-radius:6px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+      .nl2-ftr-menu button{display:block;width:100%;text-align:left;background:none;border:0;color:#d9e6f7;font:500 14px Rajdhani,"Exo 2",sans-serif;padding:4px 10px;cursor:pointer}
+      .nl2-ftr-menu button:hover{background:rgba(56,189,248,.12)}
+      .nl2-ftr-empty{color:#7f93a8;padding:8px 6px}
+      .fleet-page .nl2-ftr-tab .nl2-ftr-badge{background:#f59e0b!important;color:#111!important}
+      .fleet-page[data-nl2-ftr] .nl2-flc-tv{display:none!important}
+      .logi-section[data-nl2-ftr-route]{outline:2px solid #f59e0b;outline-offset:4px;border-radius:6px}`);
+
+    const icon = (k) => NL.h('img', { class: 'nl2-ftr-ic', src: '/images/resources/' + k + '.webp', alt: '', 'data-nl2-tip': trName(k) });
+    const resCell = (res) => NL.h('td', { 'data-nl2-tip': Object.entries(res).map(([k, v]) => trName(k) + ': ' + trFmt(v)).join('\n') },
+      ...Object.entries(res).filter(([, v]) => v > 0).map(([k, v]) => NL.h('span', { class: 'nl2-ftr-rs' }, icon(k), trFmt(v))));
+    const place = (p) => {
+      if (!p) return NL.h('span', { class: 'nl2-ftr-d' }, '—');
+      const go = p.t === 'moon' ? () => NL.openMoon && NL.openMoon(p.name, 'fleet') : p.t === 'outpost' ? () => { if (NL.openOutpost) NL.openOutpost(p.id); else { const g = document.querySelector(`.sidebar-nav [data-nl2-outpost="${p.id}"]`); if (g) g.click(); } } : () => NL.openPlanet && NL.openPlanet(p.name, '/shipyard');
+      return NL.h('a', { class: 'nl2-ftr-l', onclick: (e) => { e.preventDefault(); go(); } }, p.name);
+    };
+    const cd = (at) => NL.h('span', { class: 'nl2-ftr-t', 'data-nl2-ftr-cd': String(at), 'data-nl2-tip': trClock(at) }, trDur((at - Date.now()) / 1000));
+    let menu = null;
+    const closeMenu = () => { if (menu) { menu.remove(); menu = null; } };
+    function hideMenu(t, b) {
+      closeMenu();
+      const r = b.getBoundingClientRect();
+      menu = NL.h('div', { class: 'nl2-ftr-menu', style: `left:${Math.round(r.left)}px;top:${Math.round(r.bottom + 2)}px` },
+        ...[['Hide for 24 hours', 864e5], ['Hide for 7 days', 7 * 864e5], ['Hide indefinitely', -1]].map(([l, ms]) => NL.h('button', { type: 'button', onclick: () => { closeMenu(); hide(t, ms); } }, l)));
+      document.body.appendChild(menu);
+      setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+    }
+    const LABEL = { move: 'Transfer', outpost: 'Collect', moon: 'Collect', bring: 'Bring resources' };
+    const COLS = [['Task', '110px', (t) => t.task], ['From', '150px', (t) => t.from && t.from.name], ['To', '150px', (t) => t.to && t.to.name], ['Resources', '', (t) => -Object.values(t.res).reduce((a, b) => a + b, 0)],
+      ['Ships', '170px', (t) => t.ships && t.ships.text], ['Trip time', '100px', (t) => (t.mission ? homeAt(t.mission) : Infinity)], ['Why', '280px', (t) => t.due], ['Status', '100px', (t) => (t.mission ? 0 : 1)], ['', '290px', null]];
+    function activeTable(list) {
+      const sort = st.get('sort', { c: 6, d: 1 });
+      const col = COLS[sort.c] || COLS[6];
+      const rows = list.slice().sort((a, b) => (!!a.mission - !!b.mission) || ((col[2](a) > col[2](b) ? 1 : col[2](a) < col[2](b) ? -1 : 0) * sort.d) || a.due - b.due);
+      const head = NL.h('tr', null, ...COLS.map(([l, , f], i) => NL.h('th', { class: (i === 5 ? 'nl2-ftr-r' : '') + (f ? '' : ' nl2-ftr-nos'), onclick: f ? () => { st.set('sort', { c: i, d: sort.c === i ? -sort.d : 1 }); changed(); } : null }, l + (sort.c === i ? (sort.d > 0 ? ' ▴' : ' ▾') : ''))));
+      const body = rows.map((t) => {
+        const plan = routePlan(t), why = [t.why];
+        if (t.kind !== 'bring' && isFinite(t.due)) why.push(' · ', t.due <= 0 ? NL.h('span', { class: 'nl2-ftr-t' }, 'full') : NL.h('span', null, 'full in ', NL.h('span', { class: 'nl2-ftr-t nl2-ftr-est', 'data-nl2-tip': trClock(Date.now() + t.due * 1000) }, trDur(t.due))));
+        const actBtn = NL.h('button', { type: 'button', class: 'nl2-c-blue', disabled: !!t.mission, onclick: (e) => act(t, e.currentTarget) }, LABEL[t.kind]);
+        const routeBtn = plan ? NL.h('button', { type: 'button', class: 'nl2-c-blue', 'data-nl2-tip': plan.mode + ': ' + trName(plan.k) + ' from ' + plan.from.name + ' to ' + plan.to.name + ', when ≥ ' + trFmt(plan.trig) + ', send ' + trFmt(plan.amt), onclick: (e) => makeRoute(t, e.currentTarget) }, 'Make route') : null;
+        const sh = t.ships ? NL.h('td', { class: 'nl2-ftr-est' + (t.ships.short ? ' nl2-ftr-short' : ''), 'data-nl2-tip': t.ships.short ? 'Only ' + t.ships.have + ' there' : 'Estimate: the dialog fits the ships' }, t.ships.text) : NL.h('td', { class: 'nl2-ftr-d', 'data-nl2-tip': t.toLabel || '' }, '—');
+        return NL.h('tr', { class: t.mission ? 'nl2-ftr-enr' : null, 'data-nl2-ftr-key': t.key },
+          NL.h('td', null, t.task), NL.h('td', null, place(t.from)), NL.h('td', { 'data-nl2-tip': t.toLabel || null }, t.to ? place(t.to) : NL.h('span', { class: 'nl2-ftr-d' }, '—')),
+          resCell(t.res), sh, NL.h('td', { class: 'nl2-ftr-r' }, t.mission && homeAt(t.mission) ? cd(homeAt(t.mission)) : NL.h('span', { class: 'nl2-ftr-d' }, '—')),
+          NL.h('td', { 'data-nl2-tip': t.why + (t.at ? '\nData ' + trAge(t.at) : '') }, ...why),
+          NL.h('td', null, t.mission ? NL.h('span', { class: 'nl2-ftr-st nl2-ftr-trav' }, 'en route') : ''),
+          NL.h('td', null, actBtn, routeBtn, NL.h('button', { type: 'button', class: 'nl2-ftr-hb', onclick: (e) => { e.stopPropagation(); hideMenu(t, e.currentTarget); } }, 'Hide ▾')));
+      });
+      if (rows.length > 1) {
+        const tot = {}; for (const t of rows) for (const [k, v] of Object.entries(t.res)) tot[k] = (tot[k] || 0) + v;
+        body.push(NL.h('tr', { class: 'nl2-ftr-tot' }, NL.h('td', null, 'Total'), NL.h('td'), NL.h('td'), resCell(tot), NL.h('td'), NL.h('td'), NL.h('td'), NL.h('td'), NL.h('td')));
+      }
+      return NL.h('table', null, NL.h('colgroup', null, ...COLS.map(([, w]) => NL.h('col', { style: w ? 'width:' + w : null }))), NL.h('thead', null, head), NL.h('tbody', null, ...body));
+    }
+    const MODE = { supply: 'Planet → Planet', collect_outpost: 'Collect Outpost', collect_moon: 'Collect Moon', collect_station: 'Collect Station', supply_outpost: 'Supply Outpost', supply_moon: 'Supply Moon' };
+    function routeTable(list) {
+      const srcs = (saved('sources') || {}).d || {}, nm = (arr, id) => { const x = trList(srcs, arr).find((o) => +o.id === +id); return x ? trClean(x.name) : null; };
+      const moonName = (id) => nm('moons', id) || ((st.get('moons', {})[id] || {}).name) || 'Moon ' + id;
+      const pName = (id) => (planetById(id) || {}).name || (hubs().find((h) => +h.planetId === +id) || {}).planetName || 'Planet ' + id;
+      const ou = trList((saved('outposts') || {}).d, 'outposts'), ouName = (id) => nm('outposts', id) || (ou.find((o) => +o.id === +id) || {}).name || 'Outpost ' + id;
+      const rows = routes().map((r) => {
+        const from = r.sourceOutpostId != null ? { t: 'outpost', id: +r.sourceOutpostId, name: ouName(r.sourceOutpostId) } : r.sourceMoonId != null ? { t: 'moon', id: +r.sourceMoonId, name: moonName(r.sourceMoonId) }
+          : r.sourceStationId != null ? null : r.sourcePlanetId != null ? { t: 'planet', id: +r.sourcePlanetId, name: pName(r.sourcePlanetId) } : null;
+        const to = r.destinationPlanetId != null ? { t: 'planet', id: +r.destinationPlanetId, name: pName(r.destinationPlanetId) } : r.destinationMoonId != null ? { t: 'moon', id: +r.destinationMoonId, name: moonName(r.destinationMoonId) }
+          : r.destinationOutpostId != null ? { t: 'outpost', id: +r.destinationOutpostId, name: ouName(r.destinationOutpostId) } : null;
+        const hubPid = /^collect_/.test(r.routeMode) ? r.destinationPlanetId : r.sourcePlanetId, hub = hubs().find((h) => +h.planetId === +hubPid);
+        const cov = list.filter((t) => covers(r, t)), k = rk(r);
+        const paused = r.isPaused === true || r.paused === true || r.isActive === false || r.enabled === false || /pause/i.test(String(r.status || ''));
+        return NL.h('tr', null, NL.h('td', null, MODE[r.routeMode] || String(r.routeMode || '—')), NL.h('td', null, place(from)), NL.h('td', null, place(to)),
+          NL.h('td', null, k ? icon(k) : '', k ? trName(k) : String(r.resourceType || '—')), NL.h('td', { class: 'nl2-ftr-r' }, trFmt(r.threshold)), NL.h('td', { class: 'nl2-ftr-r' }, trFmt(r.amount)),
+          NL.h('td', null, hub ? trClean(hub.planetName) + ' (' + trN(hub.routeCount) + '/' + trN(hub.hubLevel) + ')' : '—'),
+          NL.h('td', null, cov.length ? cov.map((t) => t.task + ' ' + t.from.name + ' (' + t.why + ')').join('; ') : NL.h('span', { class: 'nl2-ftr-d' }, '—')),
+          NL.h('td', null, NL.h('span', { class: 'nl2-ftr-st ' + (paused ? 'nl2-ftr-oth' : 'nl2-ftr-in') }, paused ? 'paused' : 'active')));
+      });
+      return NL.h('table', null, NL.h('colgroup', null, ...['130px', '150px', '150px', '160px', '110px', '110px', '150px', '', '100px'].map((w) => NL.h('col', { style: w ? 'width:' + w : null }))),
+        NL.h('thead', null, NL.h('tr', null, ...['Route', 'From', 'To', 'Resource', 'Trigger ≥', 'Send', 'Hub', 'Covers', 'Status'].map((l, i) => NL.h('th', { class: 'nl2-ftr-nos' + (i === 4 || i === 5 ? ' nl2-ftr-r' : '') }, l)))),
+        NL.h('tbody', null, ...rows));
+    }
+    function section(key, title, n, sub, content) {
+      const shut = !!st.get('collapsed', {})[key];
+      const h = NL.h('div', { class: 'nl2-ftr-sec', onclick: () => { const c = { ...st.get('collapsed', {}) }; c[key] = !shut; st.set('collapsed', c); changed(); } },
+        NL.h('span', { class: 'nl2-ftr-ar' }, shut ? '▸' : '▾'), title, NL.h('span', { class: 'nl2-ftr-n' }, '(' + n + ')'), sub ? NL.h('span', { class: 'nl2-ftr-sub' }, '· ' + sub) : '');
+      return [h, shut ? '' : NL.h('div', { class: 'nl2-ftr-box' }, content)];
+    }
+    function panel(list) {
+      const vis = list.filter((t) => !t.done && !hidden(t)), hid = list.filter((t) => !t.done && hidden(t)), enr = vis.filter((t) => t.mission).length;
+      const snap = NL.store('bu-storage.').get('snap', null);
+      const sub = [enr ? enr + ' en route, not counted' : '', 'storage data ' + trAge(snap && snap.at)].filter(Boolean).join(' · ');
+      const out = [...section('active', 'Active', vis.length, sub, vis.length ? activeTable(vis) : NL.h('div', { class: 'nl2-ftr-empty' }, 'Nothing to move right now.'))];
+      if (hid.length) {
+        const shut = st.get('collapsed', {}).hidden !== false;      // Hidden bars start collapsed (STYLE)
+        out.push(NL.h('div', { class: 'nl2-ftr-sec', onclick: () => { const c = { ...st.get('collapsed', {}) }; c.hidden = !shut; st.set('collapsed', c); changed(); } },
+          NL.h('span', { class: 'nl2-ftr-ar' }, shut ? '▸' : '▾'), 'Hidden', NL.h('span', { class: 'nl2-ftr-n' }, '(' + hid.length + ')')));
+        if (!shut) out.push(NL.h('div', { class: 'nl2-ftr-box' }, NL.h('table', null, NL.h('tbody', null, ...hid.map((t) => {
+          const h = st.get('hide', {})[t.key];
+          return NL.h('tr', null, NL.h('td', null, t.task + ' · ' + t.from.name), NL.h('td', null, t.why), NL.h('td', null, h < 0 ? 'Hidden indefinitely' : 'Hidden until ' + trClock(h)),
+            NL.h('td', null, NL.h('button', { type: 'button', class: 'nl2-ftr-hb', onclick: () => hide(t, null) }, 'Show again')));
+        })))));
+      }
+      const rs = routes(), rsAt = (saved('routes') || {}).at;
+      out.push(...section('routes', 'Covered by a route', rs.length, 'not counted in the badge' + (rsAt ? ' · routes ' + trAge(rsAt) : ''), rs.length ? routeTable(list) : NL.h('div', { class: 'nl2-ftr-empty' }, rsAt ? 'No Logistics routes yet.' : 'Routes load when this tab opens.')));
+      return out;
+    }
+
+    // ------------------------------------------------------------ wiring: tab button, open/close, repaint
+    let on = st.get('open', false), sig = '', cdTimer = null, cache = null, cacheAt = 0;
+    function changed() { sig = ''; cache = null; NL._kick(); }
+    // the Fleet page redraws often (its own countdowns): work the list out again only after a data change, or each 30 s
+    const current = () => { if (!cache || Date.now() - cacheAt > 30000) { cache = tasks(); cacheAt = Date.now(); } return cache; };
+    const labelOf = (b) => { const n = b.querySelector('.fleet-activity-label > span'); return ((n ? n.textContent : [...b.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join('')) || '').trim().toLowerCase(); };
+    function setOpen(v, pg) {
+      on = v; st.set('open', v);
+      if (pg) { if (v) pg.setAttribute('data-nl2-ftr', ''); else pg.removeAttribute('data-nl2-ftr'); }
+      if (v) readOnOpen();
+      changed();
+    }
+    NL.watch('.fleet-page', (pg) => {
+      const act = pg.querySelector('.fleet-command-navigation .fleet-command-activities'), content = pg.querySelector(':scope > .fleet-tab-content');
+      if (!act || !content) return;
+      let tab = act.querySelector('.nl2-ftr-tab');
+      if (!tab) {
+        tab = NL.h('button', { type: 'button', class: 'fleet-tab nl2-ftr-tab' }, 'Transfer', NL.h('span', { class: 'unread-badge nl2-ftr-badge' }));
+        tab.addEventListener('click', (e) => { e.stopPropagation(); setOpen(true, pg); });
+        // any game tab closes ours (capture, so the game's own click still runs)
+        pg.querySelector('.fleet-command-navigation').addEventListener('click', (e) => { const b = e.target.closest('.fleet-tab'); if (b && !b.classList.contains('nl2-ftr-tab') && on) setOpen(false, pg); }, true);
+      }
+      const surveys = [...act.querySelectorAll('.fleet-tab:not(.nl2-ftr-tab)')].find((b) => labelOf(b).startsWith('surveys'));
+      if (surveys && surveys.nextElementSibling !== tab) surveys.after(tab); else if (!surveys && !tab.isConnected) act.appendChild(tab);
+      if (on !== pg.hasAttribute('data-nl2-ftr')) { if (on) { pg.setAttribute('data-nl2-ftr', ''); readOnOpen(); } else pg.removeAttribute('data-nl2-ftr'); }
+      tab.classList.toggle('active', on);
+      const list = current(), n = badge(list), bd = tab.querySelector('.nl2-ftr-badge');
+      if (bd.textContent !== (n ? String(n) : '')) bd.textContent = n ? String(n) : '';
+      bd.style.display = n ? '' : 'none';
+      let box = content.querySelector(':scope > .nl2-ftr');
+      if (!box) { box = NL.h('div', { class: 'nl2-ftr' }); content.appendChild(box); sig = ''; }
+      if (!on) return;
+      const s = JSON.stringify([list.map((t) => [t.key, t.res, t.why, !!t.mission, t.mission && homeAt(t.mission), t.done, hidden(t), t.to && t.to.id, t.from && t.from.id, t.ships && t.ships.text, !!routePlan(t), Math.round(t.due / 60)]),
+        routes().length, (saved('routes') || {}).at, st.get('collapsed', {}), st.get('sort', null), Math.floor(Date.now() / 60000)]);
+      if (s === sig && box.firstChild) return;
+      sig = s;
+      box.replaceChildren(...panel(list).filter(Boolean));
+      if (!cdTimer) cdTimer = setInterval(() => {         // countdowns tick each second while on screen (text only, no reads)
+        const els = document.querySelectorAll('.nl2-ftr [data-nl2-ftr-cd]');
+        if (!els.length || !document.querySelector('.fleet-page[data-nl2-ftr]')) { clearInterval(cdTimer); cdTimer = null; return; }
+        for (const el of els) { const t = trDur((+el.getAttribute('data-nl2-ftr-cd') - Date.now()) / 1000); if (el.textContent !== t) el.textContent = t; }
+      }, 1000);
+    });
+    // the menu badge is kept current off the Fleet page too (from the same saved data, no reads)
+    setTimeout(() => badge(tasks()), 4000);
+    setInterval(() => { if (!document.querySelector('.fleet-page')) badge(tasks()); }, 60000);
   },
 });
 
@@ -8428,14 +9233,23 @@ function nxsMain() {
     const sig = tplSig(zone, tpl), b = lsGet(BAD_KEY, {})[sig];
     return !!b && !!b.worst && lossIgnoredAt(b, sig) && !!badFor(zone, tpl, true);
   }
+  // GL-046 (David 3 Nov): wormhole and expedition dialogs get a plain note instead of the loss warning:
+  // "Worst loss in the last N runs: 12 Fighter, 3 Scout (4% of the fleet, 2h ago)", or "No ships lost in the last N runs"; nothing before any run
+  function lossNote(zone, tpl) {
+    if (!/^(wh|ex):/.test(String(zone))) return '';
+    const b = lsGet(BAD_KEY, {})[tplSig(zone, tpl)], last = b && Array.isArray(b.last) ? b.last : [];
+    if (!last.length) return '';
+    const N = last.length + ' run' + (last.length > 1 ? 's' : '');
+    const w = last.reduce((x, r) => (num(r.total) > num(x.total) ? r : x), last[0]);
+    if (!(num(w.total) > 0)) return '<span class="nxs-dim">No ships lost in the last ' + N + '</span>';
+    const pct = num(w.sent) > 0 ? Math.round(num(w.total) / num(w.sent) * 100) + '% of the fleet, ' : '';
+    return '<span class="nxs-dim">Worst loss in the last ' + N + ': ' + esc((w.lost || []).map((x) => fmt(x.n) + ' ' + x.name).join(', ')) + ' (' + pct + fmtAgo(Date.now() - w.at) + ' ago)</span>';
+  }
   function badFor(zone, tpl, all) {
     const sig = tplSig(zone, tpl), b = lsGet(BAD_KEY, {})[sig];
     if (!b || !b.worst) return null;
     if (!all && lossIgnoredAt(b, sig)) return null;
-    if (/^(wh|ex):/.test(String(zone))) {               // wormholes and expeditions always cost a few ships: flag only losses of the Loss flag share (default 15%) of the fleet sent
-      const sent = Object.values(b.tpl || tpl || {}).reduce((a, n) => a + num(n), 0);
-      if (sent > 0 && b.worst.total < whBadFrac() * sent) return null;
-    }
+    if (/^(wh|ex):/.test(String(zone))) return null;      // GL-046 (David 3 Nov): no loss highlight or dismissal for wormholes and expeditions; lossNote() instead
     return b;
   }
   // when will the leader be usable again? (latest of travel / recovery / return of its mission)
@@ -9608,6 +10422,9 @@ function nxsMain() {
     const bad = lsGet(BAD_KEY, {}), b = bad[sig] || (bad[sig] = { zone: tplKey, tpl, runs: 0, clean: 0, worst: null });
     b.runs++;
     if (total > 0) { b.lastLossAt = at; if (!b.worst || total >= b.worst.total) b.worst = { total, lost, at, reportId: refId }; } else b.clean++;
+    // GL-046: the last 10 results, newest first (sent = ships in the template), for the worst-of-last-N note
+    const sent = Object.values(tpl || {}).reduce((a, n) => a + num(n), 0);
+    b.last = [{ total, lost, at, sent }].concat(Array.isArray(b.last) ? b.last : []).slice(0, 10);
     lsSet(BAD_KEY, bad);
   }
   function resolveFleetLog() {
@@ -9769,6 +10586,8 @@ function nxsMain() {
       const extra = cfg.notes ? cfg.notes(st) : '';
       const ck = cfg.check ? cfg.check(st.ships.filter((x) => st.act[x.key] > 0).map((x) => ({ key: x.key, n: st.act[x.key] }))) : '';      // game rules the launch must meet (expeditions)
       msg.innerHTML = (miss.length ? '<span class="nxs-y">⚠ ' + esc((srcPlanet() || {}).name || 'The planet') + ' cannot fill the ' + cfg.tplName + ' template. Short: ' + esc(miss.join(' · ')) + '.</span>' : '') + badMsg + cargoMsg + cpMsg() + (extra ? '<br>' + extra : '') + (ck ? '<br><span class="nxs-r">✖ ' + esc(ck) + '</span>' : '');
+      const ln = cfg.noTpl ? '' : lossNote(tplKey, tplZone());
+      if (ln) msg.innerHTML += (msg.innerHTML ? '<br>' : '') + ln;
       const cpEl = ov.querySelector('.nxs-cp');
       if (cpEl && cfg.cp) {
         const used = cpUsed(), av = cpAvail();
@@ -10346,8 +11165,6 @@ function nxsMain() {
   const sysLinkHtml = (id, name) => (id != null ? '<a class="nxs-sys" href="/galaxy?system=' + id + '" data-nav>' + esc(name || ('System #' + id)) + '</a>' : esc(name || '—'));
   const dashCell = '<span class="nxs-dim">—</span>';
   const WH_AUTO_MS = 10 * 60 * 1000;          // measured: the game continues by itself 10:00 after the stage starts (5:00 stage + 5:00 wait)
-  const WH_LOSS_PCTS = [5, 10, 15, 20], WH_LOSS_KEY = 'nxsWhLossPct';
-  const whLossPct = () => { const v = +lsGet(WH_LOSS_KEY, 15); return WH_LOSS_PCTS.includes(v) ? v : 15; };
   const WHIDE_KEY = 'nxsWhHide';      // wormholes you hid: id -> when to forget it (its expiry); not cleared by Refresh
   function whHiddenMap() {
     const m = lsGet(WHIDE_KEY, {}) || {}, now = Date.now(); let dirty = false;
@@ -10355,7 +11172,6 @@ function nxsMain() {
     if (dirty) lsSet(WHIDE_KEY, m);
     return m;
   }
-  const whBadFrac = () => whLossPct() / 100;      // a wormhole template is flagged only when a run lost this share of its ships (default 15%, set in the Loss flag dialog)
   function decideText(r, w) {
     const peek = r.scoutPeek && r.scoutPeek._prerolled, lost = (r.totalShipsLost || []).reduce((a, x) => a + num(x.quantity), 0);
     const auto = r.encounterStartedAt ? new Date(r.encounterStartedAt).getTime() + WH_AUTO_MS : null;
@@ -10464,9 +11280,6 @@ function nxsMain() {
     const txt = nOpen + ' open' + (rows.length - nOpen ? ' · ' + (rows.length - nOpen) + ' under way' : '') + (nFilt ? ' · ' + nFilt + ' filtered out' : '') + (nHid ? ' · ' + nHid + ' hidden' : '');
     if (info.textContent !== txt) info.textContent = txt;
     const hb = sec.querySelector('[data-whhidden]'); hb.hidden = !nHid; hb.textContent = 'Hidden (' + nHid + ')';
-    const ls = sec.querySelector('[data-losssel]');
-    if (!ls.options.length) ls.innerHTML = WH_LOSS_PCTS.map((v) => '<option value="' + v + '">' + v + '%</option>').join('');
-    if (ls.value !== String(whLossPct())) ls.value = String(whLossPct());
     const html = rows.length ? rows.map(({ w, near, exp, m, run }) => {
       if (m) {
         const sp = S.planets.find((q) => q.id === +m.sourcePlanetId), ud = underDist(m);      // a run waiting on you is acted on from the banner only
@@ -11168,7 +11981,7 @@ function nxsMain() {
       + '<div class="nxs-scroll"><table class="nxs-table"><thead><tr><th>System</th><th>Type</th><th>Camp</th><th>Loot</th><th>HP</th><th>Nearest Planet</th><th>Distance</th><th></th></tr></thead><tbody class="nxs-tbody"></tbody></table></div></section>'
       + '<section class="nxs-wrap nxs-ruin" hidden><div class="nxs-head"><strong>Survey Ruins</strong><span class="nxs-info"></span><span class="nxs-hbtns"><button type="button" class="nxs-btn nxs-rf" data-refresh="ruin" title="Reload research, missions and leader">Refresh</button></span></div>'
       + '<div class="nxs-scroll"><table class="nxs-table"><thead><tr><th>Moon</th><th>System</th><th>Nearest Planet</th><th>Distance</th><th></th></tr></thead><tbody class="nxs-tbody"></tbody></table></div></section>'
-      + '<section class="nxs-wrap nxs-wh" hidden><div class="nxs-head"><strong>Wormholes</strong><span class="nxs-info"></span><span class="nxs-hbtns"><label class="nxs-lossel" title="Share of ships lost that flags a wormhole fleet">Loss flag <select class="nxs-sel" data-losssel></select></label><button type="button" class="nxs-btn" data-whhidden title="Wormholes you hid" hidden>Hidden (0)</button><button type="button" class="nxs-btn nxs-gfilter" data-gfilter="wh">Filter</button><button type="button" class="nxs-btn nxs-fclear" data-fclear="wh" title="Clear this table’s filters" disabled>Clear</button><button type="button" class="nxs-btn nxs-rf" data-refresh="wh" title="Reload wormholes, runs and leader">Refresh</button></span></div>'
+      + '<section class="nxs-wrap nxs-wh" hidden><div class="nxs-head"><strong>Wormholes</strong><span class="nxs-info"></span><span class="nxs-hbtns"><button type="button" class="nxs-btn" data-whhidden title="Wormholes you hid" hidden>Hidden (0)</button><button type="button" class="nxs-btn nxs-gfilter" data-gfilter="wh">Filter</button><button type="button" class="nxs-btn nxs-fclear" data-fclear="wh" title="Clear this table’s filters" disabled>Clear</button><button type="button" class="nxs-btn nxs-rf" data-refresh="wh" title="Reload wormholes, runs and leader">Refresh</button></span></div>'
       + '<div class="nxs-scroll"><table class="nxs-table"><thead><tr><th>System</th><th>Class</th><th>Wormhole</th><th>CP Used</th><th>Expires</th><th>Nearest Planet</th><th>Distance</th><th class="nxs-hidecell">Hide</th><th></th></tr></thead><tbody class="nxs-tbody"></tbody></table></div></section>'
       + '<section class="nxs-wrap nxs-inv" hidden><div class="nxs-head"><strong>Investigate</strong><span class="nxs-info"></span><span class="nxs-hbtns"><button type="button" class="nxs-btn nxs-gfilter" data-gfilter="inv">Filter</button><button type="button" class="nxs-btn nxs-fclear" data-fclear="inv" title="Clear this table’s filters" disabled>Clear</button><button type="button" class="nxs-btn nxs-rf" data-refresh="inv" title="Reload surveys, missions and leader">Refresh</button></span></div>'
       + '<div class="nxs-scroll"><table class="nxs-table"><thead><tr><th>Location</th><th>Scan</th><th>Zone</th><th>Expires</th><th>Nearest Planet</th><th>Distance</th><th></th></tr></thead><tbody class="nxs-tbody"></tbody></table></div></section>'
@@ -11184,7 +11997,6 @@ function nxsMain() {
     root.addEventListener('change', (e) => {
       const sup = e.target.getAttribute && e.target.getAttribute('data-suppress');
       if (sup) { const m = suppressedMap(); m[sup] = Date.now() + SUPPRESS_MS; lsSet(SUPPRESS_KEY, m); paintStations(); return; }
-      if (e.target.hasAttribute && e.target.hasAttribute('data-losssel')) { const v = +e.target.value; if (WH_LOSS_PCTS.includes(v)) { lsSet(WH_LOSS_KEY, v); paint(); } return; }
       const whh = e.target.getAttribute && e.target.getAttribute('data-whhide');
       if (whh) { const w = S.wormholes.find((x) => String(x.id) === whh), m = whHiddenMap(); m[whh] = w && w.expiresAt ? new Date(w.expiresAt).getTime() : Date.now() + 6048e5; lsSet(WHIDE_KEY, m); paintWormholes(); return; }
       const hid = e.target.getAttribute && e.target.getAttribute('data-hide');
