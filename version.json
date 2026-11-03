@@ -1,43 +1,50 @@
 {
-  "version": "0.5.80",
-  "built": "2026-11-03T19:51:19.021Z",
+  "version": "0.5.81",
+  "built": "2026-11-03T20:21:05.233Z",
   "items": [
-    "GL-060",
-    "GL-061",
-    "GL-062",
-    "GL-063",
-    "GL-064",
-    "MO-017",
-    "FL-055",
-    "FL-056",
-    "BU-015",
-    "GL-065",
-    "GL-066",
-    "EM-021",
-    "GL-067",
-    "GL-068",
-    "GL-069",
-    "OU-008"
+    "FL-057",
+    "FL-058",
+    "FL-060",
+    "FL-061",
+    "FL-062",
+    "SH-012",
+    "GL-070",
+    "GL-071"
   ],
   "notes": {
-    "GL-060": "Tasks hydrogen settings",
-    "GL-061": "Tasks moon supply settings",
-    "GL-062": "Tasks outpost settings",
-    "GL-063": "Tasks Bio uses Bio warning days",
-    "GL-064": "Bio warning days setting",
-    "MO-017": "Moon Collect keeps setting",
-    "FL-055": "Collect outpost at % setting",
-    "FL-056": "Bad run loss % setting",
-    "BU-015": "Build Next list size setting",
-    "GL-065": "PVE settings group",
-    "GL-066": "PVE source not tied to one planet",
-    "EM-021": "Fleet ratio targets start at 0",
-    "GL-067": "Generic example names",
-    "GL-068": "Published script has no comments",
-    "GL-069": "Old dashboard planet links off for new players",
-    "OU-008": "Relocate rows off Fleet Transfer"
+    "FL-057": "Transfer tab update",
+    "FL-058": "Quick Spy distance column",
+    "FL-060": "Fleet badge names each resource",
+    "FL-061": "Moon Call Ships from Transfer",
+    "FL-062": "Launched rows grey out at once",
+    "SH-012": "Shipyard hover says ship repairs",
+    "GL-070": "One format for badge hovers",
+    "GL-071": "Release notes link in the update bar"
   },
   "history": [
+    {
+      "version": "0.5.81",
+      "items": [
+        "FL-057",
+        "FL-058",
+        "FL-060",
+        "FL-061",
+        "FL-062",
+        "SH-012",
+        "GL-070",
+        "GL-071"
+      ],
+      "notes": {
+        "FL-057": "Transfer tab update",
+        "FL-058": "Quick Spy distance column",
+        "FL-060": "Fleet badge names each resource",
+        "FL-061": "Moon Call Ships from Transfer",
+        "FL-062": "Launched rows grey out at once",
+        "SH-012": "Shipyard hover says ship repairs",
+        "GL-070": "One format for badge hovers",
+        "GL-071": "Release notes link in the update bar"
+      }
+    },
     {
       "version": "0.5.80",
       "items": [

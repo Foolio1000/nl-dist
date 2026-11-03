@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.80
+// @version      0.5.81
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.80", features: [] };
+    const NL = window.__nl2 = { version: "0.5.81", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1291,6 +1291,7 @@
         finally {
             quiet--;
         } };
+        NL.routerPush = (p) => routerPush(p);
         NL.quietClick = quietClick;
         function pressQuiet(el) {
             quiet++;
@@ -1625,6 +1626,11 @@
         const moonDockFree = (p) => typeof NL.moonDock === "function" && (p.md || []).some((m) => !m.busy && !moonDockHidden(m.id) && Number(NL.moonDock(m.id)) >= 1);
         const YARD_NAME = { p: "Planetary", o: "Orbital" };
         const yardHidden = (n, k) => { const c = (syChoice.yard || {})[n + "|" + k]; return !!c && (c.until === 0 || c.until > Date.now()); };
+        function dockNames(p) {
+            const free = (p.md || []).filter((m) => !m.busy && !moonDockHidden(m.id) && typeof NL.moonDock === "function" && Number(NL.moonDock(m.id)) >= 1);
+            const nm = free.map((m) => Object.keys(moonIds).find((n) => String(moonIds[n]) === String(m.id))).filter(Boolean);
+            return nm.length ? nm : [p.name + " moon"];
+        }
         function shipyardNames() {
             return actPlanets.flatMap((p) => {
                 const st = idleState.shipyard[p.name];
@@ -1632,9 +1638,9 @@
                     return [];
                 const fr = planetYardsFree(p, st);
                 if (fr === null)
-                    return st === "idle" ? [p.name] : moonDockFree(p) ? [p.name + " (moon)"] : [];
+                    return st === "idle" ? [p.name] : moonDockFree(p) ? dockNames(p) : [];
                 const ks = ["p", "o"].filter((k) => fr[k] && !yardHidden(p.name, k));
-                return ks.length ? ks.map((k) => p.name + " (" + YARD_NAME[k] + ")") : moonDockFree(p) && !fr.p && !fr.o ? [p.name + " (moon)"] : [];
+                return ks.length ? ks.map((k) => p.name + " " + YARD_NAME[k]) : moonDockFree(p) && !fr.p && !fr.o ? dockNames(p) : [];
             });
         }
         function planetYardsFree(p) {
@@ -1715,10 +1721,11 @@
             const idleM = kind === "moons" ? moonIdleNames() : [];
             const ob = items.map((x) => {
                 const mb = kind === "moons" ? menuBadges.moon[x.name] : menuBadges.outpost[String(x.id)], idl = idleM.includes(x.name);
-                const count = (idl ? 1 : 0) + (mb ? mb.count : 0), causes = (idl ? ["build slot free"] : []).concat(mb && mb.tip ? [mb.tip] : []);
+                const parts = mb && mb.tip ? String(mb.tip).split(/,\s*/).filter(Boolean) : [], dry = parts.filter((t) => /belt mined out/i.test(t)), fills = parts.filter((t) => !/belt mined out/i.test(t));
+                const count = (idl ? 1 : 0) + (mb ? mb.count : 0), causes = (idl ? ["Build idle: " + x.name] : []).concat(dry.length ? ["Relocate: " + x.name] : [], fills.length ? ["Storage: " + x.name + " " + fills.join(", ")] : []);
                 return count ? { count, causes } : null;
             });
-            const head = badge(ob.reduce((t, b) => t + (b ? b.count : 0), 0), items.flatMap((x, i) => !ob[i] ? [] : ob[i].causes.length ? ob[i].causes.map((c) => x.name + ": " + c) : [x.name]).join("\n"));
+            const head = badge(ob.reduce((t, b) => t + (b ? b.count : 0), 0), items.flatMap((x, i) => !ob[i] ? [] : ob[i].causes.length ? ob[i].causes : [x.name]).join("\n"));
             return `<button type="button" class="sidebar-link nl2-grp" data-nl2-grp="${kind}" aria-expanded="${open}">${ICON[kind]}<span class="sidebar-link-label">${word}</span>${head}</button>` + (open ? items.map((x, i) => `<button type="button" class="sidebar-link nl2-sub${x.name === cur ? " nl2-cur" : ""}" data-nl2-${kind === "moons" ? "moon" : "outpost"}="${glEsc(kind === "moons" ? x.name : x.id)}"><span class="sidebar-link-label">${glEsc(x.name)}</span>${ob[i] ? badge(ob[i].count, ob[i].causes.join("\n")) : ""}</button>`).join("") : "");
         }
         function ensureSection(nav, key, title) {
@@ -1846,17 +1853,18 @@
                 }
                 const fromAct = actPlanets.length && (k === "shipyard" || k === "buildings");
                 const names = k === "research" ? researchNames() : !fromAct ? (idle.lists && idle.lists[k]) || [] : k === "shipyard" ? shipyardNames() : buildingNames();
-                let n = names.length || (k === "research" || fromAct || idle.lists ? 0 : idle[k] || 0), tip = names.join("\n");
+                const IDLE_WORD = { research: "Research idle: ", buildings: "Build idle: ", shipyard: "Shipyard idle: " };
+                let n = names.length || (k === "research" || fromAct || idle.lists ? 0 : idle[k] || 0), tip = names.map((x) => IDLE_WORD[k] + x).join("\n");
                 const al = BU_STORAGE_BADGE && k === "buildings" && NL.buStorage ? NL.buStorage.alerts() || [] : [];
                 const full = (t) => (String(t).match(/[^,]*?\d+\s*%/g) || []).map((x) => x.trim()).sort((a, b) => parseFloat(b.match(/[\d.]+(?=\s*%)/)) - parseFloat(a.match(/[\d.]+(?=\s*%)/))).join(", ");
                 if (al.length) {
                     n += al.length;
-                    tip = names.concat(al.map((x) => x.name + " (" + full(x.text) + ")")).join("\n");
+                    tip = (tip ? tip.split("\n") : []).concat(al.map((x) => "Storage: " + x.name + " " + full(x.text))).join("\n");
                 }
                 const rp = k === "shipyard" && Array.isArray(NL.shipRepairPlanets) ? NL.shipRepairPlanets : [];
                 if (rp.length) {
                     n += rp.length;
-                    tip = (tip ? tip.split("\n") : []).concat(rp.map((x) => x + " (repairs)")).join("\n");
+                    tip = (tip ? tip.split("\n") : []).concat(rp.map((x) => "Ship repairs: " + x)).join("\n");
                 }
                 setBadge(a, n ? String(n) : "", tip);
             }
@@ -3932,6 +3940,7 @@
             },
         });
         const UPD_BASE = "https://raw.githubusercontent.com/Foolio1000/nl-dist/main/";
+        const UPD_NOTES = "https://github.com/Foolio1000/nl-dist/blob/main/CHANGELOG.md";
         const verNewer = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) {
             if ((x[i] || 0) !== (y[i] || 0))
                 return (x[i] || 0) > (y[i] || 0);
@@ -3943,12 +3952,12 @@
             const all = groups.flatMap((g) => g.rows), titles = all.map((r) => r.t || r.id);
             if (!titles.length)
                 return null;
-            return { text: titles.slice(0, 2).join(", ") + (titles.length > 2 ? ", +" + (titles.length - 2) + " more" : ""), tip: groups.map((g) => "v" + g.v + "\n" + g.rows.map((r) => r.id + (r.t ? " " + r.t : "")).join("\n")).join("\n\n") };
+            return { text: titles.slice(0, 2).join(", ") + (titles.length > 2 ? ", +" + (titles.length - 2) + " more" : ""), tip: groups.map((g) => "v" + g.v + "\n" + g.rows.map((r) => r.t || r.id).join("\n")).join("\n\n") };
         }
         function updShow(v, news) {
             if (document.querySelector(".nl2-updbar"))
                 return;
-            const bar = NL.h("div", { class: "nl2-updbar", role: "status" }, NL.h("span", news ? { "data-nl2-tip": news.tip } : {}, "Nexus Legacy v" + v + " is available (you have v" + NL.version + ")" + (news ? " \u00B7 " + news.text : "")), NL.h("a", { href: UPD_BASE + "nl.user.js", target: "_blank", rel: "noopener", class: "nl2-updnow" }, "Update now"), NL.h("button", { type: "button", class: "nl2-updx", "data-nl2-tip": "Dismiss for this version", "aria-label": "Dismiss" }, "\u00D7"));
+            const bar = NL.h("div", { class: "nl2-updbar", role: "status" }, NL.h("span", news ? { "data-nl2-tip": news.tip } : {}, "Nexus Legacy v" + v + " is available (you have v" + NL.version + ")" + (news ? " \u00B7 " + news.text : "")), NL.h("a", { href: UPD_BASE + "nl.user.js", target: "_blank", rel: "noopener", class: "nl2-updnow" }, "Update now"), NL.h("a", { href: UPD_NOTES, target: "_blank", rel: "noopener", class: "nl2-updnow nl2-updnotes" }, "Release notes"), NL.h("button", { type: "button", class: "nl2-updx", "data-nl2-tip": "Dismiss for this version", "aria-label": "Dismiss" }, "\u00D7"));
             bar.querySelector(".nl2-updx").addEventListener("click", () => { glSave("updDismissed", v); bar.remove(); });
             (document.body || document.documentElement).appendChild(bar);
         }
@@ -7231,7 +7240,7 @@
                     const key = n + "";
                     if (key !== last) {
                         last = key;
-                        ((NL.navBadges = NL.navBadges || {})["/fleet"] = NL.navBadges["/fleet"] || {}).wormhole = { n, tip: n ? "Wormhole: " + n : "" };
+                        ((NL.navBadges = NL.navBadges || {})["/fleet"] = NL.navBadges["/fleet"] || {}).wormhole = { n, tip: n ? "Wormhole: " + n + (n === 1 ? " run" : " runs") + " waiting" : "" };
                         if (NL.navBadgeChanged)
                             NL.navBadgeChanged("/fleet");
                     }
@@ -7422,6 +7431,8 @@
                 const n0 = (v) => (Number.isFinite(+v) ? +v : 0);
                 const fmt = (n) => n0(n).toLocaleString("en-US");
                 let colonies = S.get("ci", null);
+                if (colonies && colonies.list && colonies.list[0] && colonies.list[0].x === undefined)
+                    colonies.at = 0;
                 const sysMoons = S.get("sys", {}) || {};
                 let sent = S.get("sent", {}) || {};
                 let ciBusy = false, ciErr = "", sysBusy = 0, sysToken = 0, lastRead = 0;
@@ -7446,6 +7457,7 @@
       .nl2-fsl th{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0);text-align:left;padding:7px 10px;border-bottom:1px solid rgba(120,200,255,.12)}
       .nl2-fsl td{font-size:15px;padding:5px 10px;border-bottom:1px solid rgba(120,200,255,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-primary,#f1f6ff)}
       .nl2-fsl tr.nl2-fsl-moon td:first-child{padding-left:26px}
+      .nl2-fsl th.nl2-fsl-r,.nl2-fsl td.nl2-fsl-r{text-align:right;padding-right:18px}
       .nl2-fsl a.nl2-fsl-sys{color:#7ed4ff;text-decoration:none;cursor:pointer}.nl2-fsl a.nl2-fsl-sys:hover{text-decoration:underline}
       .nl2-fsl-btn{height:26px;padding:2px 12px;border-radius:6px;font:700 14px Rajdhani,"Exo 2",sans-serif;cursor:pointer;margin-right:6px}
       .nl2-fsl-st{display:inline-block;padding:1px 8px;border-radius:5px;font-size:13px;font-weight:600}
@@ -7462,7 +7474,7 @@
                     NL._kick();
                     try {
                         const d = await NL.transportGet("GET /galaxy/colony-index", null, {});
-                        const list = ((d && d.colonies) || []).map((c) => ({ pid: n0(c.planetId), name: c.planetName || "", pos: n0(c.position), sid: n0(c.systemId), sys: c.systemName || "", oid: n0(c.ownerId), owner: c.ownerName || "", tag: c.allianceTag || "", vac: !!(c.protection && c.protection.vacation) })).filter((c) => c.pid && c.owner);
+                        const list = ((d && d.colonies) || []).map((c) => ({ pid: n0(c.planetId), name: c.planetName || "", pos: n0(c.position), sid: n0(c.systemId), sys: c.systemName || "", x: Number.isFinite(+c.systemX) ? +c.systemX : null, y: Number.isFinite(+c.systemY) ? +c.systemY : null, oid: n0(c.ownerId), owner: c.ownerName || "", tag: c.allianceTag || "", vac: !!(c.protection && c.protection.vacation) })).filter((c) => c.pid && c.owner);
                         if (list.length) {
                             colonies = { at: Date.now(), list };
                             S.set("ci", colonies);
@@ -7579,8 +7591,23 @@
                     }
                 }
                 const planetsOf = (name) => ((colonies && colonies.list) || []).filter((c) => name && c.owner === name);
+                function here() {
+                    const list = (colonies && colonies.list) || [], mine = myIds(), cur = curName();
+                    let p = list.find((c) => mine.has(c.pid) && c.name === cur);
+                    if (!p && typeof NL.moonsOf === "function")
+                        p = list.find((c) => mine.has(c.pid) && (NL.moonsOf(c.name) || []).includes(cur));
+                    return p && p.x != null && p.y != null ? { name: p.name === cur ? cur : cur + " (" + p.name + ")", x: p.x, y: p.y } : null;
+                }
+                function distTo(sid, me) {
+                    if (!me)
+                        return null;
+                    const c = ((colonies && colonies.list) || []).find((x) => x.sid === sid && x.x != null);
+                    return c ? Math.round(Math.hypot(c.x - me.x, c.y - me.y)) : null;
+                }
                 function rows(name) {
-                    const pl = planetsOf(name).slice().sort((a, b) => a.sys.localeCompare(b.sys, undefined, { numeric: true }) || a.pos - b.pos);
+                    const me = here(), far = (r) => (r.dist == null ? Infinity : r.dist);
+                    const pl = planetsOf(name).map((p) => ({ ...p, dist: distTo(p.sid, me) }))
+                        .sort((a, b) => far(a) - far(b) || a.sys.localeCompare(b.sys, undefined, { numeric: true }) || a.pos - b.pos);
                     const out = [], seen = new Set();
                     const moons = [];
                     for (const id of new Set(pl.map((p) => p.sid)))
@@ -7589,15 +7616,15 @@
                                 moons.push({ ...m, sid: id });
                     const sysName = new Map(pl.map((p) => [p.sid, p.sys]));
                     for (const p of pl) {
-                        out.push({ kind: "planet", id: p.pid, name: p.name, sid: p.sid, sys: p.sys, vac: p.vac });
+                        out.push({ kind: "planet", id: p.pid, name: p.name, sid: p.sid, sys: p.sys, vac: p.vac, dist: p.dist });
                         for (const m of moons.filter((x) => x.pid === p.pid).sort((a, b) => a.pos - b.pos)) {
                             seen.add(m.id);
-                            out.push({ kind: "moon", id: m.id, name: m.name, sid: m.sid, sys: p.sys, vac: m.vac });
+                            out.push({ kind: "moon", id: m.id, name: m.name, sid: m.sid, sys: p.sys, vac: m.vac, dist: p.dist });
                         }
                     }
                     for (const m of moons)
                         if (!seen.has(m.id))
-                            out.push({ kind: "moon", id: m.id, name: m.name, sid: m.sid, sys: sysName.get(m.sid) || "", vac: m.vac, loose: true });
+                            out.push({ kind: "moon", id: m.id, name: m.name, sid: m.sid, sys: sysName.get(m.sid) || "", vac: m.vac, loose: true, dist: distTo(m.sid, me) });
                     return out;
                 }
                 const tkey = (r) => (r.kind === "moon" ? "m:" : "p:") + r.id;
@@ -7786,7 +7813,8 @@
                     }
                     let box = tab.querySelector(":scope > .nl2-fsl");
                     const name = player(), list = name ? rows(name) : [], isOpen = S.get("open", true);
-                    const sig = JSON.stringify([name, isOpen, myIds().size, colonies && colonies.at, ciBusy, ciErr, sysBusy, list.map((r) => [r.id, r.kind, r.vac]), list.map((r) => [lastSpied(r), status(r)]), Math.floor(Date.now() / 60000)]);
+                    const me = here();
+                    const sig = JSON.stringify([name, isOpen, myIds().size, me && me.name, list.map((r) => r.dist), colonies && colonies.at, ciBusy, ciErr, sysBusy, list.map((r) => [r.id, r.kind, r.vac]), list.map((r) => [lastSpied(r), status(r)]), Math.floor(Date.now() / 60000)]);
                     if (box && box.dataset.k === sig && tab.firstElementChild === box)
                         return;
                     if (!box)
@@ -7855,7 +7883,7 @@
                     }
                     if (sysBusy)
                         box.append(NL.h("div", { class: "nl2-fsl-note" }, "Looking for moons\u2026 (" + sysBusy + " system" + (sysBusy === 1 ? "" : "s") + " to go)"));
-                    const cols = [["Name", "26%"], ["Type", "8%"], ["System", "10%"], ["Last spied", "11%"], ["Status", "20%"], ["", "25%"]];
+                    const cols = [["Name", "24%"], ["Type", "7%"], ["System", "9%"], ["Distance", "9%"], ["Last spied", "10%"], ["Status", "18%"], ["", "23%"]];
                     const tb = NL.h("tbody");
                     for (const r of list) {
                         const ls = lastSpied(r), st = status(r);
@@ -7864,9 +7892,9 @@
                             b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); launch(b, r, kind); });
                             return b;
                         };
-                        tb.append(NL.h("tr", { class: r.kind === "moon" ? "nl2-fsl-moon" : null }, NL.h("td", { "data-nl2-tip": r.name + (r.loose ? " (orbits another player's planet)" : "") }, r.name), NL.h("td", null, r.kind === "moon" ? "Moon" : "Planet"), NL.h("td", null, sysLink(r)), NL.h("td", { "data-nl2-tip": ls ? new Date(ls).toLocaleString() : "No report for this target" }, ago(ls)), NL.h("td", null, st ? NL.h("span", { class: "nl2-fsl-st nl2-fsl-" + st[1] }, st[0]) : "\u2014"), NL.h("td", null, btn("spy", "Spy"), btn("stealth", "Stealth Deploy"))));
+                        tb.append(NL.h("tr", { class: r.kind === "moon" ? "nl2-fsl-moon" : null }, NL.h("td", { "data-nl2-tip": r.name + (r.loose ? " (orbits another player's planet)" : "") }, r.name), NL.h("td", null, r.kind === "moon" ? "Moon" : "Planet"), NL.h("td", null, sysLink(r)), NL.h("td", { class: "nl2-fsl-r", "data-nl2-tip": r.dist == null ? "Distance unknown" : r.dist.toLocaleString("en-US") + " ly from " + me.name }, r.dist == null ? "\u2014" : r.dist.toLocaleString("en-US") + " ly"), NL.h("td", { "data-nl2-tip": ls ? new Date(ls).toLocaleString() : "No report for this target" }, ago(ls)), NL.h("td", null, st ? NL.h("span", { class: "nl2-fsl-st nl2-fsl-" + st[1] }, st[0]) : "\u2014"), NL.h("td", null, btn("spy", "Spy"), btn("stealth", "Stealth Deploy"))));
                     }
-                    box.append(NL.h("table", null, NL.h("colgroup", null, cols.map(([, w]) => NL.h("col", { style: { width: w } }))), NL.h("thead", null, NL.h("tr", null, cols.map(([c]) => NL.h("th", null, c)))), tb));
+                    box.append(NL.h("table", null, NL.h("colgroup", null, cols.map(([, w]) => NL.h("col", { style: { width: w } }))), NL.h("thead", null, NL.h("tr", null, cols.map(([c]) => NL.h("th", c === "Distance" ? { class: "nl2-fsl-r", "data-nl2-tip": me ? "Light years from " + me.name : "Select one of your planets to see distances" } : null, c)))), tb));
                 }
                 NL.watch(".fleet-tab-content .espionage-tab", paint);
                 for (const [k, v] of Object.entries(sent))
@@ -7930,6 +7958,10 @@
                     keep("hubs", d.hubLevels, at);
                     changed();
                 } });
+                NL.onData(/^\/api\/market\/my-balances(\?|$)/, (p, d, at) => { if (d)
+                    keep("mkbal", d, at); });
+                NL.onData(/^\/api\/market\/hubs(\?|$)/, (p, d, at) => { if (d)
+                    keep("mkhubs", Array.isArray(d) ? d : d.hubs || d.items || [], at); });
                 NL.onData(/^\/api\/logistics\/collectible-sources$/, (p, d, at) => { if (d && Array.isArray(d.outposts)) {
                     keep("sources", d, at);
                     changed();
@@ -8108,7 +8140,7 @@
                             continue;
                         const par = planetById(m.planetId), res = Object.fromEntries(hot.map((x) => [x.k, Math.max(0, Math.floor(x.now - TR_MOON_KEEP(x.k)))]));
                         const fl = st.get("ships", {})["m" + m.id];
-                        out.push({ key: "m" + m.id, kind: "moon", task: "Collect", from: { t: "moon", id: m.id, name: m.name }, to: par ? { t: "planet", id: par.id, name: par.name } : null, res, rows: hot, prod, due: Infinity, at: m.at, noShips: Array.isArray(fl) && !fl.some((x) => x.have > 0), why: hot.map((x) => trName(x.k) + " " + trFmt(x.now)).join(" \u00B7 "), ships: shipsFor("m" + m.id, Object.values(res).reduce((a, b) => a + b, 0)), go: (mi) => Number(mi.sourceMoonId) === m.id && mi.status === "outbound" });
+                        out.push({ key: "m" + m.id, kind: "moon", task: "Collect", from: { t: "moon", id: m.id, name: m.name }, to: par ? { t: "planet", id: par.id, name: par.name } : null, res, rows: hot, prod, due: Infinity, at: m.at, noShips: Array.isArray(fl) && !fl.some((x) => x.have > 0), why: hot.map((x) => trName(x.k) + " " + trFmt(x.now)).join(" \u00B7 "), ships: shipsFor("m" + m.id, Object.values(res).reduce((a, b) => a + b, 0)), go: (mi) => mi.status === "outbound" && (Number(mi.sourceMoonId) === m.id || (Number(mi.targetMoonId) === m.id && mi.missionType === "transfer")) });
                     }
                     const ou = saved("outposts");
                     if (ou && ou.d) {
@@ -8239,7 +8271,10 @@
                 let lastBadge = "";
                 function badge(list) {
                     const act = list.filter((t) => !t.done && !t.mission && !hidden(t) && t.kind !== "relocate");
-                    const pctOf = (t) => { const f = Math.max(-1, ...(t.rows || []).filter((x) => x.cap > 0 && isFinite(x.cap)).map((x) => Math.floor((100 * x.now) / x.cap))); return f >= 0 ? " " + f + "%" : ""; };
+                    const pctOf = (t) => {
+                        const l = (t.rows || []).filter((x) => x.cap > 0 && isFinite(x.cap)).map((x) => ({ n: trName(x.k), p: Math.floor((100 * x.now) / x.cap) })).sort((a, b) => b.p - a.p);
+                        return l.length ? " " + l.map((x) => x.n + " " + x.p + "%").join(", ") : "";
+                    };
                     const tip = act.map((t) => t.task + ": " + t.from.name + (t.kind === "bring" ? " \u2192 " + t.to.name : pctOf(t))).join("\n");
                     const key = act.length + "|" + tip;
                     if (key !== lastBadge) {
@@ -8308,6 +8343,10 @@
                             if (b)
                                 b.click();
                         }
+                        else if (t.kind === "moon" && t.noShips && NL.moonCallShips) {
+                            btn.removeAttribute("data-nl2-busy");
+                            await NL.moonCallShips(t.from.id, btn);
+                        }
                         else if (t.kind === "moon") {
                             if (NL.openMoon)
                                 await NL.openMoon(t.from.name, "overview");
@@ -8334,6 +8373,134 @@
                 async function read(path) { const w = lastRead + 1000 - Date.now(); if (w > 0)
                     await trSleep(w); lastRead = Date.now(); return NL.getJson(path, ctx); }
                 const fresh = (path) => { const c = NL.cache.latest(new RegExp("^" + path.replace(/[/]/g, "\\/") + "$")); return c && Date.now() - c.at < FRESH ? c.data : null; };
+                async function hubTargets(from) {
+                    for (const [k, path] of [["mkbal", "/api/market/my-balances"], ["mkhubs", "/api/market/hubs"]]) {
+                        const sv = saved(k);
+                        if (sv && Date.now() - sv.at < ROUTE_FRESH)
+                            continue;
+                        try {
+                            await NL.getJson(path, ctx);
+                        }
+                        catch (e) { }
+                    }
+                    const bal = (saved("mkbal") || {}).d, list = (saved("mkhubs") || {}).d || [], have = new Map();
+                    const rows = Array.isArray(bal) ? bal : bal && (bal.balances || bal.items || bal.data) || [];
+                    for (const b of Array.isArray(rows) ? rows : []) {
+                        const id = b && (b.hubId != null ? b.hubId : b.hub && b.hub.id);
+                        if (id == null)
+                            continue;
+                        if (trN(b.available != null ? b.available : b.amount != null ? b.amount : b.balance) > 0)
+                            have.set(String(id), (b.hubName || (b.hub && b.hub.name)) || "");
+                    }
+                    const a = from && xy(from.systemId);
+                    return [...have].map(([id, nm0]) => {
+                        const m = list.find((x) => String(x.id) === id) || {}, name = trClean(m.name || m.hubName || nm0 || "Hub " + id);
+                        const b = Number.isFinite(+m.systemX) && m.systemX != null ? { x: +m.systemX, y: +m.systemY } : m.systemId != null ? xy(m.systemId) : null;
+                        const d = a && b ? Math.round(Math.hypot(a.x - b.x, a.y - b.y)) : null;
+                        return { id: "hub:" + id, hubId: id, kind: "hub", name, d, label: "Hub: " + name + (d != null ? " \u00B7 " + d.toLocaleString("en-US") + " ly" : "") };
+                    }).sort((x, y) => (x.d == null) - (y.d == null) || (x.d || 0) - (y.d || 0));
+                }
+                function hubLabel() {
+                    let n = 0;
+                    const tick = () => {
+                        const d = document.querySelector(".nl2-fleet"), sel = d && [...d.querySelectorAll("select")].find((x) => [...x.options].some((o) => /^Hub: /.test(o.textContent)));
+                        if (!d) {
+                            if (++n < 60)
+                                setTimeout(tick, 150);
+                            return;
+                        }
+                        if (!sel || sel.dataset.nl2FtrHub)
+                            return;
+                        sel.dataset.nl2FtrHub = "1";
+                        const go = () => { const b = d.querySelector(".nl2-fleet-foot .nl2-fleet-btn:not(.nl2-sec)"), hub = /^Hub: /.test((sel.selectedOptions[0] || {}).textContent || ""); if (b)
+                            b.textContent = hub ? "Prepare delivery \u2192" : "Launch"; };
+                        sel.addEventListener("change", go);
+                        go();
+                    };
+                    setTimeout(tick, 0);
+                }
+                function hubGo(req) {
+                    try {
+                        sessionStorage.setItem("nl2FtrDeliver", JSON.stringify(req));
+                    }
+                    catch (e) { }
+                    setTimeout(() => { if (!(NL.routerPush && NL.routerPush("/market")))
+                        nav("/market"); NL._kick(); }, 950);
+                }
+                const hubNorm = (x) => String(x || "").toLowerCase().replace(/[^a-z]/g, "");
+                const hubSet = (i, v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, String(v)); i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); };
+                let hubBusy = false;
+                async function hubDeliverStep() {
+                    let req = null;
+                    try {
+                        req = JSON.parse(sessionStorage.getItem("nl2FtrDeliver") || "null");
+                    }
+                    catch (e) { }
+                    if (!req || hubBusy || location.pathname !== "/market")
+                        return;
+                    if (Date.now() - req.at > 20000) {
+                        sessionStorage.removeItem("nl2FtrDeliver");
+                        return;
+                    }
+                    hubBusy = true;
+                    try {
+                        let modal = document.querySelector(".hub-deliver-modal");
+                        if (!modal) {
+                            const tab = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Hub Inventory");
+                            if (tab && !tab.classList.contains("active")) {
+                                tab.click();
+                                await trSleep(400);
+                            }
+                            const card = [...document.querySelectorAll(".market-hub-card")].find((c) => ((c.querySelector(".market-hub-name") || {}).textContent || "").trim().toLowerCase() === String(req.hub).toLowerCase());
+                            const dv = card && [...card.querySelectorAll("button")].find((b) => b.textContent.trim() === "Deliver");
+                            if (!dv)
+                                return;
+                            dv.click();
+                            modal = await until(() => document.querySelector(".hub-deliver-modal"), 3000);
+                            if (!modal)
+                                return;
+                        }
+                        sessionStorage.removeItem("nl2FtrDeliver");
+                        const lb = modal.querySelector(".location-select-button");
+                        const lab = (o) => ((o.querySelector(".location-select-row-label") || o).textContent || "").trim();
+                        if (lb && lab(lb) !== req.from) {
+                            lb.click();
+                            await trSleep(200);
+                            const opt = [...document.querySelectorAll(".location-select-option")].find((o) => !o.classList.contains("nested") && lab(o) === req.from);
+                            if (opt) {
+                                opt.click();
+                                await trSleep(500);
+                            }
+                            else
+                                lb.click();
+                        }
+                        await until(() => modal.querySelector(".hub-deliver-ship-row"), 3000);
+                        for (const r of modal.querySelectorAll(".hub-deliver-ship-row")) {
+                            const nm = ((r.querySelector(".ship-select-copy span") || r.querySelector(".ship-select-name") || {}).textContent || "").trim(), i = r.querySelector("input[type=number]");
+                            const want = req.ships.find((x) => hubNorm(x.name) === hubNorm(nm));
+                            if (i)
+                                hubSet(i, want ? Math.min(want.qty, Number(i.max) || want.qty) : 0);
+                        }
+                        await until(() => modal.querySelector(".hub-deliver-resource-row"), 3000);
+                        await trSleep(150);
+                        for (const r of modal.querySelectorAll(".hub-deliver-resource-row")) {
+                            const k = (TR_RES.find((x) => hubNorm(x[2]) === hubNorm((r.querySelector(".ship-select-name") || {}).textContent)) || [])[0], i = r.querySelector("input[type=number]");
+                            if (i)
+                                hubSet(i, k && req.cargo[k] ? Math.min(req.cargo[k], Number(i.max) || req.cargo[k]) : 0);
+                        }
+                        const sp = modal.querySelector("input[type=range]");
+                        if (sp)
+                            hubSet(sp, Math.max(1, Math.min(10, Math.round(req.speed / 10))));
+                    }
+                    catch (e) {
+                        ctx.log("hub delivery fill failed", e);
+                    }
+                    finally {
+                        hubBusy = false;
+                    }
+                }
+                NL.watch("body", () => { if (location.pathname === "/market")
+                    hubDeliverStep(); });
                 async function moveOut(t, btn) {
                     if (!NL.fleet)
                         return;
@@ -8342,12 +8509,15 @@
                     const targets = (first > 0 ? [list[first], ...list.filter((c, i) => i !== first)] : list).map((c) => ({ id: c.id, label: c.name + (c.t === "moon" ? " (moon)" : ""), kind: c.t }));
                     if (!targets.length)
                         return;
+                    for (const h of await hubTargets(planetById(src) || { id: src }))
+                        targets.push(h);
                     const shipsBody = (s) => (s.ships || []).filter((x) => trN(x.qty) > 0).map((x) => ({ shipDefId: Number(x.key), quantity: trN(x.qty) }));
                     const route = (s) => {
                         const tg = s.target || {}, base = { useHighway: false, missionType: "transfer", ships: shipsBody(s), ...(trN(s.speed) > 0 && trN(s.speed) < 100 ? { speedFactor: trN(s.speed) / 100 } : {}) };
                         return tg.kind === "moon" ? { est: ["POST /moons/:id/send-estimate", tg.id], go: "/api/moons/" + tg.id + "/send", body: { ...base, sourcePlanetId: Number(s.sourceId) } }
                             : { est: ["POST /fleet/fuel-estimate", null], go: "/api/fleet/dispatch", body: { ...base, sourcePlanetId: Number(s.sourceId), targetPlanetId: Number(tg.id) } };
                     };
+                    hubLabel();
                     await NL.fleet.open({
                         kind: "fl-transfer-move",
                         type: "collection",
@@ -8381,6 +8551,8 @@
                             return { ships, resources };
                         },
                         estimate: async (s, signal) => {
+                            if (s.target && s.target.kind === "hub")
+                                return null;
                             const rt = route(s);
                             if (!rt.body.ships.length || !NL.transportPost)
                                 return null;
@@ -8394,6 +8566,16 @@
                             return e && e.fuelCost != null ? { fuel: trN(e.fuelCost), travelSec: trN(e.travelTime), hydrogenAvailable: e.hydrogenAvailable != null ? trN(e.hydrogenAvailable) : undefined } : null;
                         },
                         send: async (s) => {
+                            if (s.target && s.target.kind === "hub") {
+                                const cargo0 = {};
+                                for (const [k, v] of Object.entries(s.resources || {})) {
+                                    const a = Math.floor(trN(v && typeof v === "object" ? v.amount : v));
+                                    if (a > 0)
+                                        cargo0[k] = a;
+                                }
+                                hubGo({ hub: s.target.name, from: t.from.name, ships: (s.ships || []).filter((x) => trN(x.qty) > 0).map((x) => ({ name: x.name, qty: trN(x.qty) })), cargo: cargo0, speed: trN(s.speed) || 100, at: Date.now() });
+                                return { ok: true, message: "Opening " + s.target.name + "'s Deliver to Hub." };
+                            }
                             const rt = route(s), cargo = {};
                             for (const [k, v] of Object.entries(s.resources || {})) {
                                 const a = Math.floor(trN(v && typeof v === "object" ? v.amount : v));
@@ -10101,11 +10283,14 @@
             };
             const clock = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
             const CALL_FOR = { collect: { title: "Collect", get keep() { return moKeep(); } }, evac: { title: "Evacuate", flyOnly: true } };
-            async function callShips(btn) {
-                const id = moId();
+            async function callShips(btn, moonId) {
+                const id = moonId != null ? String(moonId) : moId();
                 if (!id || !NL.fleet)
                     return;
-                const m = (fresh("/api/moons/" + id) || (NL.cache.latest(new RegExp("^/api/moons/" + id + "$")) || {}).data || {}).moon || {};
+                let md0 = fresh("/api/moons/" + id) || (NL.cache.latest(new RegExp("^/api/moons/" + id + "$")) || {}).data;
+                if (!md0 && moonId != null)
+                    md0 = await get("/api/moons/" + id);
+                const m = (md0 || {}).moon || {};
                 const name = clean(m.name) || "this moon", src = targets(m.planetId);
                 if (!src.length) {
                     btn.title = "No planet of yours found to send from";
@@ -10304,6 +10489,7 @@
             });
             return { open, callShips, add: (cls, text, tip, run) => { buttons.push([cls, text, tip, run]); NL._kick(); } };
         })();
+        NL.moonCallShips = (id, btn) => moTx.callShips(btn, id);
         NL.feature({
             id: "mo-evacuate",
             set: "Moons",
@@ -18271,7 +18457,7 @@
                             el.textContent = t;
                         const acts = (a) => a.filter((r) => r.act).length;
                         const by = [["Leader", acts(c.lead)], ["Modules & Crew", acts(c.mods)], ["Contracts", acts(c.con)], ["Artifact Study", acts(c.st.rows)], ["Fleet Bio", acts(c.bio)], ["Repair", acts(c.rep.bld) + acts(c.rep.ships) + acts(c.rep.maint)], ["Energy", acts(c.en)], ["Planet Hydrogen", acts(c.hyd)], ["Moon Supplies", acts(c.moon)], ["Outposts", acts(c.out)]];
-                        const tip = n ? by.filter(([, k]) => k > 0).map(([w, k]) => k + " " + w).join("\n") : "";
+                        const tip = n ? by.filter(([, k]) => k > 0).map(([w, k]) => w + ": " + k).join("\n") : "";
                         if (link && link.title !== tip)
                             link.title = tip;
                     }
