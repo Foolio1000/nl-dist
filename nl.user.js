@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.71
+// @version      0.5.72
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.71', features: [] };
+const NL = window.__nl2 = { version: '0.5.72', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -1186,20 +1186,28 @@ function yardLevel(id, k) {
 // MO-014: a moon's Moon Dockyard hidden from its Fleet | Shipyard section (our own choice, by moon id) doesn't count; the planet's yards still do
 const moonDockHidden = (id) => { const c = (syChoice.moonDock || {})[id]; return !!c && (c.until === 0 || c.until > Date.now()); };
 const moonDockFree = (p) => typeof NL.moonDock === 'function' && (p.md || []).some((m) => !m.busy && !moonDockHidden(m.id) && Number(NL.moonDock(m.id)) >= 1);
+// SH-008 (David 3 Nov): each yard counts and hides on its own: one badge count per free yard ("Tyr (Planetary)", "Tyr (Orbital)"),
+// and the Shipyard page has Hide buttons for each (our own choice per planet and yard, nl2.gl.idleChoice.yard["Tyr|p"]). A Shipyard
+// reminder muted in the game still hides the planet's yards.
+const YARD_NAME = { p: 'Planetary', o: 'Orbital' };
+const yardHidden = (n, k) => { const c = (syChoice.yard || {})[n + '|' + k]; return !!c && (c.until === 0 || c.until > Date.now()); };
 function shipyardNames() {
-  return actPlanets.map((p) => {
+  return actPlanets.flatMap((p) => {
     const st = idleState.shipyard[p.name];
-    if (st === 'hidden') return null;
-    return planetYardFree(p, st) ? p.name : moonDockFree(p) ? p.name + ' (moon)' : null;
-  }).filter(Boolean);
+    if (st === 'hidden') return [];
+    const fr = planetYardsFree(p, st);
+    if (fr === null) return st === 'idle' ? [p.name] : moonDockFree(p) ? [p.name + ' (moon)'] : [];      // levels never seen: the game's reminder decides
+    const ks = ['p', 'o'].filter((k) => fr[k] && !yardHidden(p.name, k));
+    return ks.length ? ks.map((k) => p.name + ' (' + YARD_NAME[k] + ')') : moonDockFree(p) && !fr.p && !fr.o ? [p.name + ' (moon)'] : [];
+  });
 }
-function planetYardFree(p, st) {
+function planetYardsFree(p) {      // { p, o }: each yard built, not being upgraded, nothing queued on it; null when no level was ever seen
   const lp = yardLevel(p.id, 'p'), lo = yardLevel(p.id, 'o');
-  if (lp === null && lo === null) return st === 'idle';       // levels never seen: the game's reminder decides
+  if (lp === null && lo === null) return null;
   const busy = { p: false, o: false };
   for (const sk of p.sq || []) busy[shipYard[sk] === 'o' ? 'o' : 'p'] = true;
   const free = (k, lv) => (lv || 0) >= 1 && !(p.up && p.up[k]) && !busy[k];
-  return free('p', lp) || free('o', lo);
+  return { p: free('p', lp), o: free('o', lo) };
 }
 
 // ================================================================ GL-001 left menu
@@ -1421,8 +1429,14 @@ async function moonAct(cur, act) {
     });
   } finally { syWorking = false; schedule(); }
 }
-async function shipyardAct(kind, act) {
+async function shipyardAct(kind, act, yard) {
   if (kind === 'moon') return moonAct(moonHere(), act);
+  if (kind === 'shipyard' && yard) {      // per-yard hide: our own choice only, the game's reminder is left alone
+    const cur = curPlanet(), chs = syChoice.yard || (syChoice.yard = {});
+    if (!cur || onMoon() || !SY_ACTS.some((a) => a[0] === act)) return;
+    if (act === 'show') delete chs[cur + '|' + yard]; else chs[cur + '|' + yard] = { act, until: SY_MS[act] ? Date.now() + SY_MS[act] : 0 };
+    glSave('idleChoice', syChoice); schedule(); return;
+  }
   if (kind === 'moondock') {      // MO-014: our own choice only; the planet's Shipyard reminder is left alone
     const id = (location.pathname.match(/^\/moons\/(\d+)/) || [])[1], chs = syChoice.moonDock || (syChoice.moonDock = {});
     if (!id || !SY_ACTS.some((a) => a[0] === act)) return;
@@ -1474,6 +1488,20 @@ function syHost(kind) {
   const hero = document.querySelector(SY_HOSTS[kind]);
   return hero ? { hero, chips: null } : null;
 }
+// the Shipyard page: one group per yard, "Planetary" then "Orbital", each with its own Hide buttons (or its hidden note and Show)
+function yardBtns(cur) {
+  const p = actPlanets.find((x) => x.name === cur), fr = p ? planetYardsFree(p) : null, chs = syChoice.yard || {};
+  let dirty = false;
+  return ['p', 'o'].map((k) => {
+    let ch = chs[cur + '|' + k];
+    if (ch && ch.until && Date.now() > ch.until) { delete chs[cur + '|' + k]; dirty = true; ch = null; }
+    const idleNow = !fr || fr[k], note = ch ? (ch.until ? 'Hidden until ' + new Date(ch.until).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : 'Hidden indefinitely') : '';
+    const btns = ch ? '<button type="button" class="nl2-sybtn" data-yard="' + k + '" data-act="show">Show</button>'
+      : SY_ACTS.filter((a) => a[0] !== 'show').map((a) => '<button type="button" class="nl2-sybtn" data-yard="' + k + '" data-act="' + a[0] + '"' + (idleNow ? '' : ' disabled data-nl2-tip="The ' + YARD_NAME[k] + ' yard is not idle on this planet"') + '>' + a[1].replace('Hide for ', '').replace('Hide ', '') + '</button>').join('');
+    if (dirty) glSave('idleChoice', syChoice);
+    return '<span class="nl2-sygrp"><span class="nl2-sylbl">Hide ' + YARD_NAME[k] + '</span>' + (note ? '<span class="nl2-synote">' + glEsc(note) + '</span>' : '') + btns + '</span>';
+  }).join('');
+}
 function ensureReminderBtns() {
   const isMoon = !!moonHere();
   const kind = isMoon ? moonBoxKind() : SY_KINDS[location.pathname.replace(/\/+$/, '')] || '', host = kind && (isMoon || (!onMoon() && idleState[kind])) ? syHost(kind) : null;
@@ -1483,7 +1511,7 @@ function ensureReminderBtns() {
   if (box && box.dataset.kind !== kind) { box.remove(); box = null; }
   if (!box) {
     box = NL.h('div', { class: 'nl2-syopts', 'data-kind': kind });
-    box.addEventListener('click', (e) => { const b = e.target.closest('.nl2-sybtn'); if (b && !b.disabled) shipyardAct(kind, b.dataset.act); });
+    box.addEventListener('click', (e) => { const b = e.target.closest('.nl2-sybtn'); if (b && !b.disabled) shipyardAct(kind, b.dataset.act, b.dataset.yard); });
   }
   if (box.parentElement !== hero) { hero.appendChild(box); if (getComputedStyle(hero).position === 'static') hero.style.position = 'relative'; }
   const ck = kind === 'moondock' ? 'moonDock' : kind;
@@ -1494,7 +1522,7 @@ function ensureReminderBtns() {
   let ch = chs[cur];
   if (ch && (st !== 'hidden' || (ch.until && Date.now() > ch.until))) { delete chs[cur]; glSave('idleChoice', syChoice); ch = null; }
   const note = st !== 'hidden' ? '' : !ch ? 'Hidden' : ch.until ? 'Hidden until ' + new Date(ch.until).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Hidden indefinitely';
-  const html = (note ? '<span class="nl2-synote">' + glEsc(note) + '</span>' : '') + SY_ACTS.filter((a) => a[0] !== 'show' || st === 'hidden').map((a) => '<button type="button" class="nl2-sybtn' + (ch && ch.act === a[0] ? ' nl2-sysel' : '') + '" data-act="' + a[0] + '"' + (ch && ch.act === a[0] ? ' aria-pressed="true"' : '') + (st ? '' : ' disabled title="' + SY_WORD[kind] + ' is not idle on this planet"') + '>' + a[1] + '</button>').join('');
+  const html = kind === 'shipyard' && st !== 'hidden' ? yardBtns(cur) : (note ? '<span class="nl2-synote">' + glEsc(note) + '</span>' : '') + SY_ACTS.filter((a) => a[0] !== 'show' || st === 'hidden').map((a) => '<button type="button" class="nl2-sybtn' + (ch && ch.act === a[0] ? ' nl2-sysel' : '') + '" data-act="' + a[0] + '"' + (ch && ch.act === a[0] ? ' aria-pressed="true"' : '') + (st ? '' : ' disabled data-nl2-tip="' + SY_WORD[kind] + ' is not idle on this planet"') + '>' + a[1] + '</button>').join('');
   if (box.dataset.sig !== html) { box.dataset.sig = html; box.innerHTML = html; }
   box.classList.toggle('nl2-busy', syWorking);
   const onMoonBanner = kind === 'moon' || kind === 'moondock';
@@ -1529,6 +1557,9 @@ NL.feature({
       .nl2-sybtn{display:inline-flex;align-items:center;box-sizing:border-box;height:30px;padding:0 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font-family:Rajdhani,"Exo 2",sans-serif;font-size:14px;font-weight:600;letter-spacing:.3px;line-height:1;white-space:nowrap;cursor:pointer}
       .nl2-sybtn:hover:not(:disabled){background:rgba(56,189,248,.22);color:#fff}
       .nl2-sybtn.nl2-sysel{background:rgba(251,191,36,.22);border-color:rgba(245,158,11,.6);color:#fbbf24}
+      .nl2-sygrp{display:inline-flex;align-items:center;gap:6px}
+      .nl2-sygrp + .nl2-sygrp{margin-left:10px;padding-left:12px;border-left:1px solid rgba(120,200,255,.25)}
+      .nl2-sylbl{color:#9fb3c8;font-family:Rajdhani,"Exo 2",sans-serif;font-size:14px;font-weight:700;white-space:nowrap}
       .nl2-synote{align-self:center;color:#fbbf24;font-family:Rajdhani,"Exo 2",sans-serif;font-size:14px;font-weight:600;white-space:nowrap}
       .nl2-sybtn:disabled,.nl2-syopts.nl2-busy .nl2-sybtn{opacity:.45;cursor:default}
       body.nl2g-quietpicker .planet-switcher-dropdown,body.nl2g-quietpicker .qol-idle-panel{visibility:hidden!important;pointer-events:none!important}`);
@@ -4256,6 +4287,29 @@ NL.feature({
       });
     });
 
+    // ---- SH-009 Maintain clears at once (David 3 Nov) ----
+    // The game's own Maintain button (Fleet on Planet, damaged miners) opens its confirm and POSTs /api/planets/{id}/maintenance-repair,
+    // but redraws the row only on its next refresh, 10 s or more later. When that POST succeeds (seen through NL.onWrite), the row whose
+    // Maintain was clicked hides its Maintain button and damage note until the game redraws it. Nothing is sent or changed; both views.
+    const SH_MAINT = /^\s*maintain\b/i;
+    let maintRow = null, maintAt = 0;
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('.sy-fleet-row button');
+      if (b && SH_MAINT.test(b.textContent)) { maintRow = b.closest('.sy-fleet-row'); maintAt = Date.now(); }
+    }, true);
+    NL.onWrite(/^\/api\/planets\/\d+\/maintenance-repair$/, () => {
+      if (!maintRow || Date.now() - maintAt > 120000 || !maintRow.isConnected) return;
+      maintRow.querySelectorAll('button').forEach((b) => { if (SH_MAINT.test(b.textContent)) b.setAttribute('data-nl2-shmt', String(Date.now())); });
+      maintRow.setAttribute('data-nl2-shmt', String(Date.now()));
+      maintRow = null;
+    });
+    // the game redrew the row (button gone) or never did within a minute: drop our marks
+    NL.watch('.sy-fleet-row[data-nl2-shmt]', (r) => {
+      const t = Number(r.getAttribute('data-nl2-shmt')) || 0, btn = r.querySelector('button[data-nl2-shmt]');
+      if (!btn || Date.now() - t > 60000) { r.removeAttribute('data-nl2-shmt'); if (btn) btn.removeAttribute('data-nl2-shmt'); }
+    });
+    NL.css('sh-maint', '.sy-fleet-row button[data-nl2-shmt],.sy-fleet-row[data-nl2-shmt] .sy-fleet-dmg{display:none!important}');
+
     // ---- SH-002 Moon button (David 26 Oct) ----
     // Capital ships are built only at a Moon Dockyard. The game's card shows a disabled Build button "Built at Moon Dockyard"; we hide it
     // and show "Moon": it opens this planet's moon that has the dockyard, on its Fleet tab, Shipyard section. If none of the planet's moons
@@ -4760,7 +4814,7 @@ NL.feature({
       .nl2-flw .nl2-flw-retr{background:#5b1515;color:#fca5a5;border:1px solid #ef4444}
       .wormholes-tab h4[data-nl2-flw-cxk]{cursor:pointer;user-select:none}
       .wormholes-tab h4 > .nl2-flw-cx{display:inline-block;width:16px;color:#7ed4ff;flex:none}
-      .wormholes-tab > .wormhole-active[data-nl2-flw-cx] > :not(h4),.wormholes-tab > .wormhole-list[data-nl2-flw-cx],.wormholes-tab > .expedition-reports-list[data-nl2-flw-cx]{display:none!important}`);
+      .wormholes-tab > .wormhole-active[data-nl2-flw-cx] > :not(h4),.wormholes-tab > h4 ~ [data-nl2-flw-cx]:not(h4){display:none!important}`);
     const st = ctx.store;
     const open = new Set();                       // runs whose encounter rows are shown (this page view only)
     let tee = null;
@@ -5058,8 +5112,10 @@ NL.feature({
       for (const h of tab.querySelectorAll(':scope > h4, :scope > .wormhole-active > h4')) {
         const k = h.dataset.nl2FlwCxk || CX_KEY([...h.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(''));
         if (!k) continue;
-        const body = k === 'active' ? h.parentElement : h.nextElementSibling;
-        if (!body) continue;
+        // Detected / Completed: everything after the heading up to the next one (the list, and the game's own empty-state box)
+        const body = k === 'active' ? [h.parentElement] : [];
+        if (k !== 'active') for (let e = h.nextElementSibling; e && e.tagName !== 'H4' && !e.matches('.wormhole-active'); e = e.nextElementSibling) body.push(e);
+        if (!body.length) continue;
         if (h.dataset.nl2FlwCxk !== k) {
           h.dataset.nl2FlwCxk = k;
           h.addEventListener('click', (ev) => {
@@ -5072,7 +5128,9 @@ NL.feature({
         if (!ar) { ar = NL.h('span', { class: 'nl2-flw-cx', title: 'Collapse or expand this section' }); h.insertBefore(ar, h.firstChild); }
         const shut = !!cx[k], g = shut ? '▸' : '▾';
         if (ar.textContent !== g) ar.textContent = g;
-        if (body.hasAttribute('data-nl2-flw-cx') !== shut) body.toggleAttribute('data-nl2-flw-cx', shut);
+        // FL-042 (David 3 Nov): no detected wormholes -> the game's placeholder box ("No wormholes detected…") is hidden; the heading stays
+        const none = k === 'detected' && !tab.querySelector('.wormhole-card');
+        for (const e of body) { const hide = shut || none; if (e.hasAttribute('data-nl2-flw-cx') !== hide) e.toggleAttribute('data-nl2-flw-cx', hide); }
       }
     });
 
@@ -5362,7 +5420,7 @@ NL.feature({
       ${L}{display:flex!important;flex-direction:column!important;gap:0!important}
       ${L} > .mission-card:not([data-nl2-fat-open]){display:none!important}
       ${L} > .mission-card[data-nl2-fat-open]{margin:2px 0 6px 24px!important}
-      ${L} > .nl2-fat{display:grid;grid-template-columns:150px 120px 170px 90px 110px 90px minmax(160px,1fr) 96px;align-items:center;
+      ${L} > .nl2-fat{display:grid;grid-template-columns:150px 120px 170px 90px 120px 120px minmax(160px,1fr) 96px;align-items:center;
         font:15px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7;border-bottom:1px solid rgba(120,200,255,.1);background:rgb(11,21,37)}
       ${L} > .nl2-fat > div{padding:5px 9px;min-width:0}
       ${L} > .nl2-fat > div + div{border-left:1px solid rgba(120,200,255,.1)}
@@ -5375,6 +5433,7 @@ NL.feature({
       ${L} .nl2-fat-st.trav{border-color:#60a5fa;color:#93c5fd}${L} .nl2-fat-st.in{border-color:#22c55e;color:#86efac}
       ${L} .nl2-fat-st.ret{border-color:#f59e0b;color:#fcd34d}${L} .nl2-fat-st.retr{border-color:#ef4444;color:#fca5a5}${L} .nl2-fat-st.oth{border-color:#64748b;color:#cbd5e1}
       ${L} a.nl2-fat-sys{color:#7fd4ff;text-decoration:none;cursor:pointer}${L} a.nl2-fat-sys:hover{text-decoration:underline}
+      ${L} > .nl2-fat > div:nth-child(5),${L} > .nl2-fat > div:nth-child(6){white-space:nowrap}  /* FL-043: Phase / Trip time never wrap */
       ${L} .nl2-fat-cd{color:#fbbf24;font-weight:700}${L} .nl2-fat-utc{color:#8aa;font-size:12.5px;margin-left:5px}
       ${L} .nl2-fat-rc{background:#5b1515;color:#fca5a5;border:1px solid #ef4444;border-radius:4px;padding:2px 9px;font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer}
       ${L} .nl2-fat .mission-type-badge{margin:0}
