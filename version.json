@@ -1,19 +1,38 @@
 {
-  "version": "0.5.76",
-  "built": "2026-11-03T17:05:48.158Z",
+  "version": "0.5.77",
+  "built": "2026-11-03T18:02:24.029Z",
   "items": [
-    "BU-013",
-    "FL-048",
-    "GL-055",
-    "RE-005"
+    "FL-049",
+    "OU-007",
+    "FL-050",
+    "FL-051",
+    "BU-014"
   ],
   "notes": {
-    "BU-013": "Buildings Hide follows the planet on screen",
-    "FL-048": "Transfer table has no Total row",
-    "GL-055": "Banner Fleet Slots count launches at once",
-    "RE-005": "Fragments slider sits under Level Up"
+    "FL-049": "Outpost collections on Fleet Transfer",
+    "OU-007": "Outpost menu badges moved to Transfer",
+    "FL-050": "Fleet Transfer update",
+    "FL-051": "Fleet Transfer update",
+    "BU-014": "Storage alerts off the Buildings badge"
   },
   "history": [
+    {
+      "version": "0.5.77",
+      "items": [
+        "FL-049",
+        "OU-007",
+        "FL-050",
+        "FL-051",
+        "BU-014"
+      ],
+      "notes": {
+        "FL-049": "Outpost collections on Fleet Transfer",
+        "OU-007": "Outpost menu badges moved to Transfer",
+        "FL-050": "Fleet Transfer update",
+        "FL-051": "Fleet Transfer update",
+        "BU-014": "Storage alerts off the Buildings badge"
+      }
+    },
     {
       "version": "0.5.76",
       "items": [

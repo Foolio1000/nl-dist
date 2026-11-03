@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.76
+// @version      0.5.77
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.76', features: [] };
+const NL = window.__nl2 = { version: '0.5.77', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -1360,6 +1360,7 @@ const moonIdleNames = () => moons.map((m) => m.name).filter((n) => moonState[n] 
 // Construction reminder wasn't hidden at the last picker read. The game re-reads the summary right after a build is queued or finishes.
 const buildingNames = () => actPlanets.filter((p) => !p.bBusy && (idleState.buildings || {})[p.name] !== 'hidden').map((p) => p.name);
 // Idle badges (G-060, G-065, G-075, G-079, G-084): the game's own badge look, the planet names as the hover
+const BU_STORAGE_BADGE = false;                     // BU-014
 const BADGE_PATH = { '/research': 'research', '/buildings': 'buildings', '/shipyard': 'shipyard' };
 function setBadge(link, text, title) {
   let b = link.querySelector(':scope > .nl2-idlebadge');
@@ -1387,7 +1388,9 @@ function applyBadges() {
     const names = k === 'research' ? researchNames() : !fromAct ? (idle.lists && idle.lists[k]) || [] : k === 'shipyard' ? shipyardNames() : buildingNames();
     let n = names.length || (k === 'research' || fromAct || idle.lists ? 0 : idle[k] || 0), tip = names.join('\n');
     // BU-010: one Buildings badge; storage alerts from the Buildings module add one each, and the hover names every trigger.
-    const al = k === 'buildings' && NL.buStorage ? NL.buStorage.alerts() || [] : [];
+    // BU-014 (David 3 Nov): storage alerts no longer add to the Buildings badge; they are Move out rows on Fleet > Transfer (which still
+    // reads NL.buStorage). The idle-queue count (BU-011) stays. BU_STORAGE_BADGE = true brings them back.
+    const al = BU_STORAGE_BADGE && k === 'buildings' && NL.buStorage ? NL.buStorage.alerts() || [] : [];
     // BU-011/BU-012: idle planets by name, one per row, then each nearly full planet with its near-full resources, fullest first:
     // "Urik (Hydrogen 95%, Bio-Extract 92%)"
     const full = (t) => (String(t).match(/[^,]*?\d+\s*%/g) || []).map((x) => x.trim()).sort((a, b) => parseFloat(b.match(/[\d.]+(?=\s*%)/)) - parseFloat(a.match(/[\d.]+(?=\s*%)/))).join(', ');
@@ -1611,7 +1614,7 @@ NL.feature({
     NL.onData(/^\/api\/outposts(\?|$)/, (p, d) => setOutposts(d));
     NL.onData(/^\/api\/planets\/activity-summary(\?|$)/, (p, d) => gotActivity(d));
     window.addEventListener('nl2:moondock', () => schedule());   // SH-003: a Moon Dockyard level seen or changed
-    if (NL.buStorage) NL.buStorage.onChange(() => schedule());    // BU-010: storage data or threshold changed
+    if (BU_STORAGE_BADGE && NL.buStorage) NL.buStorage.onChange(() => schedule());    // BU-010: storage data or threshold changed (off: BU-014)
     NL.onData(/^\/api\/planets\/\d+(\?|$)/, (p, d) => gotPlanet(d));
     NL.onData(/^\/api\/planets\/\d+\/shipyard(\?|$)/, (p, d) => gotYardShips(d));
     if (!outposts.at || Date.now() - outposts.at > 15 * 60 * 1000) NL.getJson('/api/outposts', ctx);      // the tee stores the reply
@@ -3476,7 +3479,7 @@ NL.buRoi = (() => {
 // while the tab is visible), with each planet's stock and caps replaced from any teed GET /api/planets/{id} so spending or a
 // bigger store clears the alert. Stock is projected forward per planet from its own read time with each rate; the alert list
 // is re-checked each minute (no reads) and onChange fires only when it changes. NL.buStorage.alerts() ->
-// [{ planetId, name, text: 'Ore 94%, Silicates 91%' }]; Core's Buildings badge adds one per alert and lists them on hover.
+// [{ planetId, name, text: 'Ore 94%, Silicates 91%' }]. BU-014 (3 Nov): no longer on the Buildings badge; Fleet > Transfer's Move out rows use it.
 // Moons and outposts are left out (own badges).
 NL.buStorage = (() => {
   const store = NL.store('bu-storage.'), subs = [];
@@ -3502,7 +3505,7 @@ NL.buStorage = (() => {
     if (rc != null) pl.rareResourceStorage = rc;
     pl._at = at || Date.now(); store.set('snap', snap); fire();
   });
-  if (NL.option) NL.option({ key: 'bu-storage.pct', group: 'Buildings badge', label: 'Storage alert at (%)', type: 'number', def: 90, min: 1, max: 100 });
+  if (NL.option) NL.option({ key: 'bu-storage.pct', group: 'Fleet Transfer', label: 'Move out when planet storage reaches (%)', type: 'number', def: 90, min: 1, max: 100 });
   if (NL.onOpt) NL.onOpt('bu-storage.pct', fire);
   const pct = () => { const v = NL.opt ? +NL.opt('bu-storage.pct') : NaN; return isFinite(v) && v > 0 ? v : 90; };
   function alerts() {
@@ -6271,7 +6274,7 @@ NL.feature({
 // ---- 64_fl_transfer.js: FL-040 Fleet > Transfer tab (Transfer tab thread; David 3 Nov, design 'defaults', mockup mockups/FL-040_transfer_tab_mockup.png) ----
 // A Transfer tab between Surveys and Debris lists transfer and gather tasks the script finds on its own:
 //   Move out   a planet with a produced resource at the Buildings storage threshold (Custom 'bu-storage.pct', 90%): excess to the nearest moon/planet
-//   Collect    an outpost with a produced resource (hydrogen excluded, as OU-004) at the same threshold; a moon (FL-045, David 3 Nov) with a
+//   Collect    an outpost with a produced resource (hydrogen excluded, as OU-004) at 75% (OU-004's badge level; Relocate when its belt is mined out); a moon (FL-045, David 3 Nov) with a
 //              produced resource over 10,000 (hydrogen over 50,000), taking all above the reserves (QD/DM 10,000, hydrogen 50,000); Call Ships if no ships
 //   FL-046     moons a route doesn't cover show under Covered by a route as 'No route' with our Make route dialog (one game route per ticked resource)
 //   Bring in   a planet short of resources for the first item of its Build Next list (BU-009)
@@ -6295,6 +6298,7 @@ const TR_RES = [['antimatter', 'antimatter', 'Antimatter'], ['dark_matter', 'dar
 const TR_BASE = ['ore', 'silicates', 'hydrogen', 'alloys'];
 const TR_TRANSPORTS = ['bulk_carrier', 'freighter', 'transport_shuttle', 'tanker'];
 const TR_DONE = new Set(['returned', 'completed', 'complete', 'cancelled', 'canceled', 'failed', 'recalled', 'destroyed']);
+const TR_OU_PCT = 0.75;     // outposts: OU-004's badge level (David 3 Nov, defaults)
 const TR_MOON_OVER = (k) => (k === 'hydrogen' ? 50000 : 10000);                      // FL-045: a moon row when over this
 const TR_MOON_KEEP = (k) => (k === 'hydrogen' ? 50000 : k === 'quantum_dust' || k === 'dark_matter' ? 10000 : 0);   // left on the moon
 const TR_ROUTE_DEF = (k) => (k === 'hydrogen' ? [100000, 50000] : k === 'quantum_dust' || k === 'dark_matter' ? [20000, 10000] : [10000, 10000]);   // FL-046 [trigger, send]
@@ -6414,8 +6418,8 @@ NL.feature({
     const homeAt = (mi) => trTs(mi.returnArrivesAt) || trTs(mi.arrivesAt);
     // stock now = stock + rate x hours since the reading, capped at storage
     const proj = (have, rate, cap, at) => Math.min(cap, trN(have) + trN(rate) * Math.max(0, Date.now() - (at || Date.now())) / 3600000);
-    const fillOf = (res, rate, cap, at, skip) => {   // [{k, now, cap, f, rate}] for produced resources at/over the threshold, fullest first
-      const lim = pct(), out = [];
+    const fillOf = (res, rate, cap, at, skip, lim0) => {   // [{k, now, cap, f, rate}] for produced resources at/over the threshold, fullest first
+      const lim = lim0 || pct(), out = [];
       for (const [k, c] of TR_RES) {
         if (skip && skip.includes(k)) continue;
         const r = trN(rate[c] != null ? rate[c] : rate[k]), cp = trN(cap[c] != null ? cap[c] : cap[k]);
@@ -6472,7 +6476,8 @@ NL.feature({
           why: hot.map((x) => trName(x.k) + ' ' + trFmt(x.now)).join(' · '), ships: shipsFor('m' + m.id, Object.values(res).reduce((a, b) => a + b, 0)),
           go: (mi) => Number(mi.sourceMoonId) === m.id && mi.status === 'outbound' });
       }
-      // Collect: outposts (hydrogen left out, as OU-004)
+      // FL-049 Collect: outposts (hydrogen left out, as OU-004) at 75%, OU-004's badge level (David 3 Nov, defaults: outposts moved here from the
+      // Outposts menu badges, which Core removes); Relocate: a mined-out (drifting) outpost not yet relocating, as OU-006's badge
       const ou = saved('outposts');
       if (ou && ou.d) {
         const snaps = trList(ou.d, 'resourceSnapshots');
@@ -6484,9 +6489,11 @@ NL.feature({
           for (const [k, c] of TR_RES) { cap[c] = TR_BASE.includes(k) ? trN(stor[c] != null ? stor[c] : op.basicStorage) : trN(stor.rare != null ? stor.rare : op.rareStorage); rt[c] = rate[c] != null ? rate[c] : op[c + 'Rate']; }
           const upd = trTs((sn && sn.resourcesUpdatedAt) || op.resourcesUpdatedAt), srv = trTs(sn && sn.serverNow);
           const at = upd != null ? ou.at - ((srv != null ? srv : ou.at) - upd) : ou.at;
-          const rows = fillOf(res, rt, cap, at, ['hydrogen']), hot = rows.filter((x) => x.hot);
-          if (!hot.length) continue;
           const name = String(op.name || ('Outpost ' + op.id)), fieldId = op.asteroidFieldId;
+          if (op.isDrifting && !op.isRelocating) out.push({ key: 'r' + op.id, kind: 'relocate', task: 'Relocate', from: { t: 'outpost', id: Number(op.id), name }, to: null,
+            res: {}, rows: [], due: Infinity, at: ou.at, why: 'Belt mined out', ships: null, toLabel: 'Picked on the outpost', go: () => false });
+          const rows = fillOf(res, rt, cap, at, ['hydrogen'], TR_OU_PCT), hot = rows.filter((x) => x.hot);
+          if (!hot.length || op.isRelocating) continue;
           out.push({ key: 'o' + op.id, kind: 'outpost', task: 'Collect', from: { t: 'outpost', id: Number(op.id), name }, to: null,
             res: Object.fromEntries(hot.map((x) => [x.k, Math.floor(x.now)])), rows: hot, due: fullIn(hot), at: ou.at,
             why: hot.map((x) => trName(x.k) + ' ' + Math.floor(x.f * 100) + '%').join(', '), ships: null, toLabel: 'Picked in the dialog',
@@ -6611,6 +6618,7 @@ NL.feature({
       btn.setAttribute('data-nl2-busy', '1');
       try {
         if (t.kind === 'move') await moveOut(t, btn);
+        else if (t.kind === 'relocate') { if (NL.openOutpost) NL.openOutpost(t.from.id); else { const g = document.querySelector(`.sidebar-nav [data-nl2-outpost="${t.from.id}"]`); if (g) g.click(); else nav('/mining'); } }
         else if (t.kind === 'outpost') {
           if (NL.openOutpost) NL.openOutpost(t.from.id);
           else { const g = document.querySelector(`.sidebar-nav [data-nl2-outpost="${t.from.id}"]`); if (g) g.click(); else nav('/mining'); }
@@ -6750,6 +6758,7 @@ NL.feature({
       .nl2-ftr tr.nl2-ftr-enr td{color:#6b7a90}.nl2-ftr tr.nl2-ftr-enr a.nl2-ftr-l{color:#4f7d99}.nl2-ftr tr.nl2-ftr-enr img{opacity:.45}
       .nl2-ftr tr.nl2-ftr-tot td{color:#fbbf24;font-weight:700}
       .nl2-ftr button{font:600 13px Rajdhani,"Exo 2",sans-serif;border-radius:4px;padding:2px 9px;margin-right:4px;cursor:pointer}
+      .nl2-ftr td.nl2-ftr-acts{text-align:right;overflow:visible}.nl2-ftr td.nl2-ftr-acts button{margin:0 0 0 4px}.nl2-ftr td.nl2-ftr-acts button.nl2-c-blue{min-width:96px}.nl2-ftr td.nl2-ftr-acts .nl2-ftr-gap{display:inline-block;width:100px}   /* FL-051 (David 3 Nov): buttons lined up on the right */
       .nl2-ftr .nl2-ftr-hb{background:none;color:#9fb3d1;border:1px solid rgba(120,200,255,.25)}
       .nl2-ftr-menu{position:fixed;z-index:10000;background:rgb(11,21,37);border:1px solid rgba(120,200,255,.3);border-radius:6px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
       .nl2-ftr-menu button{display:block;width:100%;text-align:left;background:none;border:0;color:#d9e6f7;font:500 14px Rajdhani,"Exo 2",sans-serif;padding:4px 10px;cursor:pointer}
@@ -6792,9 +6801,9 @@ NL.feature({
       document.body.appendChild(menu);
       setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
     }
-    const LABEL = { move: 'Transfer', outpost: 'Collect', moon: 'Collect', bring: 'Bring resources' };
+    const LABEL = { move: 'Transfer', outpost: 'Collect', moon: 'Collect', bring: 'Bring resources', relocate: 'Open outpost' };
     const COLS = [['Task', '110px', (t) => t.task], ['From', '150px', (t) => t.from && t.from.name], ['To', '150px', (t) => t.to && t.to.name], ['Resources', '', (t) => -Object.values(t.res).reduce((a, b) => a + b, 0)],
-      ['Ships', '170px', (t) => t.ships && t.ships.text], ['Trip time', '100px', (t) => (t.mission ? homeAt(t.mission) : Infinity)], ['Why', '280px', (t) => t.due], ['Status', '100px', (t) => (t.mission ? 0 : 1)], ['', '290px', null]];
+      ['Ships', '170px', (t) => t.ships && t.ships.text], ['Trip time', '100px', (t) => (t.mission ? homeAt(t.mission) : Infinity)], ['Why', '280px', (t) => t.due], ['Status', '100px', (t) => (t.mission ? 0 : 1)], ['', '320px', null]];
     function activeTable(list) {
       const sort = st.get('sort', { c: 6, d: 1 });
       const col = COLS[sort.c] || COLS[6];
@@ -6811,7 +6820,7 @@ NL.feature({
           resCell(t.res), sh, NL.h('td', { class: 'nl2-ftr-r' }, t.mission && homeAt(t.mission) ? cd(homeAt(t.mission)) : NL.h('span', { class: 'nl2-ftr-d' }, '—')),
           NL.h('td', { 'data-nl2-tip': t.why + (t.at ? '\nData ' + trAge(t.at) : '') }, ...why),
           NL.h('td', null, t.mission ? NL.h('span', { class: 'nl2-ftr-st nl2-ftr-trav' }, 'en route') : ''),
-          NL.h('td', null, actBtn, routeBtn, NL.h('button', { type: 'button', class: 'nl2-ftr-hb', onclick: (e) => { e.stopPropagation(); hideMenu(t, e.currentTarget); } }, 'Hide ▾')));
+          NL.h('td', { class: 'nl2-ftr-acts' }, actBtn, routeBtn || NL.h('span', { class: 'nl2-ftr-gap' }), NL.h('button', { type: 'button', class: 'nl2-ftr-hb', onclick: (e) => { e.stopPropagation(); hideMenu(t, e.currentTarget); } }, 'Hide ▾')));
       });
       // FL-048: no Total row in this table (David 3 Nov; an exception to STYLE's Total row)
       return NL.h('table', null, NL.h('colgroup', null, ...COLS.map(([, w]) => NL.h('col', { style: w ? 'width:' + w : null }))), NL.h('thead', null, head), NL.h('tbody', null, ...body));
@@ -6845,7 +6854,7 @@ NL.feature({
           NL.h('td', { class: 'nl2-ftr-r' }, NL.h('span', { class: 'nl2-ftr-d' }, '—')), NL.h('td', { class: 'nl2-ftr-r' }, NL.h('span', { class: 'nl2-ftr-d' }, '—')),
           NL.h('td', null, hub ? hub.name + ' (' + hub.used + '/' + hub.max + ')' : '—'), NL.h('td', null, 'Collect ' + t.from.name),
           NL.h('td', null, NL.h('span', { class: 'nl2-ftr-st nl2-ftr-amb' }, 'no route')),
-          NL.h('td', null, NL.h('button', { type: 'button', class: 'nl2-c-blue', disabled: !hub, onclick: () => routeDialog(t) }, 'Make route'))));
+          NL.h('td', { class: 'nl2-ftr-acts' }, NL.h('button', { type: 'button', class: 'nl2-c-blue', disabled: !hub, onclick: () => routeDialog(t) }, 'Make route'))));
       }
       return NL.h('table', null, NL.h('colgroup', null, ...['130px', '150px', '150px', '160px', '110px', '110px', '150px', '', '100px', '120px'].map((w) => NL.h('col', { style: w ? 'width:' + w : null }))),
         NL.h('thead', null, NL.h('tr', null, ...['Route', 'From', 'To', 'Resource', 'Trigger ≥', 'Send', 'Hub', 'Covers', 'Status', ''].map((l, i) => NL.h('th', { class: 'nl2-ftr-nos' + (i === 4 || i === 5 ? ' nl2-ftr-r' : '') }, l)))),
@@ -6954,13 +6963,18 @@ NL.feature({
     }
 
     // ------------------------------------------------------------ wiring: tab button, open/close, repaint
-    let on = st.get('open', false), sig = '', cdTimer = null, cache = null, cacheAt = 0;
+    // FL-050 (bug, Prepare delivery, David 3 Nov): Transfer opens only on a click on its tab and is never carried into a new visit to the Fleet page, so the
+    // game's own landing tab shows (e.g. Dispatch filled in by the game's "Prepare delivery" from a moon's Bring missing resources)
+    let on = false, sig = '', cdTimer = null, cache = null, cacheAt = 0, gameTab = '';
+    const seenPg = new WeakSet();
+    st.set('open', false);
     function changed() { sig = ''; cache = null; NL._kick(); }
     // the Fleet page redraws often (its own countdowns): work the list out again only after a data change, or each 30 s
     const current = () => { if (!cache || Date.now() - cacheAt > 30000) { cache = tasks(); cacheAt = Date.now(); } return cache; };
     const labelOf = (b) => { const n = b.querySelector('.fleet-activity-label > span'); return ((n ? n.textContent : [...b.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join('')) || '').trim().toLowerCase(); };
     function setOpen(v, pg) {
-      on = v; st.set('open', v);
+      on = v;
+      if (v && pg) { const a = pg.querySelector('.fleet-command-activities .fleet-tab.active:not(.nl2-ftr-tab), .fleet-command-primary .fleet-tab.active'); gameTab = a ? labelOf(a) : ''; }
       if (pg) { if (v) pg.setAttribute('data-nl2-ftr', ''); else pg.removeAttribute('data-nl2-ftr'); }
       if (v) readOnOpen();
       changed();
@@ -6968,6 +6982,9 @@ NL.feature({
     NL.watch('.fleet-page', (pg) => {
       const act = pg.querySelector('.fleet-command-navigation .fleet-command-activities'), content = pg.querySelector(':scope > .fleet-tab-content');
       if (!act || !content) return;
+      // FL-050: a new Fleet page (any navigation in) starts on the game's own tab; so does a tab change made by the game itself
+      if (!seenPg.has(pg)) { seenPg.add(pg); if (on) setOpen(false, pg); }
+      if (on) { const a = pg.querySelector('.fleet-command-activities .fleet-tab.active:not(.nl2-ftr-tab), .fleet-command-primary .fleet-tab.active'), l = a ? labelOf(a) : ''; if (l !== gameTab) setOpen(false, pg); }
       let tab = act.querySelector('.nl2-ftr-tab');
       if (!tab) {
         tab = NL.h('button', { type: 'button', class: 'fleet-tab nl2-ftr-tab' }, 'Transfer', NL.h('span', { class: 'unread-badge nl2-ftr-badge' }));
@@ -6996,6 +7013,9 @@ NL.feature({
         for (const el of els) { const t = trDur((+el.getAttribute('data-nl2-ftr-cd') - Date.now()) / 1000); if (el.textContent !== t) el.textContent = t; }
       }, 1000);
     });
+    // FL-049 (David 3 Nov): outposts are listed here now, so Core's Outposts menu drops its badges while this module is on (OU-007, Core's
+    // hook): fill = the 75% badge, drift = the mined-out +1 (both shown here as Collect / Relocate rows)
+    NL.trOutposts = () => (NL.enabled('fl-transfer') ? { fill: true, drift: true } : null);
     // the menu badge is kept current off the Fleet page too (from the same saved data, no reads)
     setTimeout(() => badge(tasks()), 4000);
     setInterval(() => { if (!document.querySelector('.fleet-page')) badge(tasks()); }, 60000);
@@ -8665,7 +8685,7 @@ NL.feature({
   id: 'ou-badge',
   set: 'Outposts',
   name: 'Outpost badges',
-  desc: 'OU-004: a badge on each outpost in the left menu when any resource except hydrogen is at 75% of storage or more; OU-006: +1 when its belt is mined out (until it relocates). The Outposts heading shows the total.',
+  desc: 'OU-004: a badge on each outpost in the left menu when any resource except hydrogen is at 75% of storage or more; OU-006: +1 when its belt is mined out (until it relocates); OU-007: none for what Fleet > Transfer lists (FL-049). The Outposts heading shows the total.',
   init() {
     let list = null, missions = [], last = 0;
     const shown = new Set();
@@ -8696,10 +8716,13 @@ NL.feature({
         if (!op || op.id == null) continue;
         seen.add(op.id);
         const snap = snaps.find((s) => s && s.locationType !== 'planet' && +s.locationId === +op.id);
-        const over = ouCollectFor(missions, op) ? [] : fill(op, snap);
+        // OU-007 (David 3 Nov): once Fleet > Transfer lists outpost collections (FL-049), the menu badges go. The Transfer module says so
+        // itself (NL.trOutposts() -> {fill, drift}, true while it is on and handles them), so this ships with FL-049 and comes back if it is off.
+        const moved = (NL.trOutposts && NL.trOutposts()) || {};
+        const over = moved.fill || ouCollectFor(missions, op) ? [] : fill(op, snap);
         // OU-006: a mined-out belt leaves the outpost drifting (read live 27 Oct: isDrifting true, asteroidFieldId null, rates 0);
         // its own +1, gone once a relocation starts (David 27 Oct, defaults)
-        const dry = !!op.isDrifting && !op.isRelocating;
+        const dry = !moved.drift && !!op.isDrifting && !op.isRelocating;
         const count = (over.length ? 1 : 0) + (dry ? 1 : 0), tip = [dry ? 'Belt mined out' : '', over.join(', ')].filter(Boolean).join(', ');
         NL.menuBadge('outpost', op.id, count ? { count, tip } : null);
         if (count) shown.add(op.id); else shown.delete(op.id);
