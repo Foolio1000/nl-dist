@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.69
+// @version      0.5.70
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -11,11 +11,11 @@
 // @downloadURL  https://raw.githubusercontent.com/Foolio1000/nl-dist/main/nl.user.js
 // ==/UserScript==
 
-// Built 2026-11-02 from nl_src/. Edit the source modules, not this file.
+// Built 2026-11-03 from nl_src/. Edit the source modules, not this file.
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.69', features: [] };
+const NL = window.__nl2 = { version: '0.5.70', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -1359,10 +1359,20 @@ function setBadge(link, text, title) {
   if (b.textContent !== text) b.textContent = text;
   if (b.getAttribute('data-nl2-tip') !== title) b.setAttribute('data-nl2-tip', title);     // GL-006: the shared larger tooltip
 }
+// FL-037 (Fleet thread, 3 Nov): other modules add menu badges as NL.navBadges[path][source] = { n, tip } and call NL.navBadgeChanged(path).
+// A mirrored link with no badge of our own above shows one amber badge: the n summed, the tips one per row. (Fleet: the wormhole run
+// waiting for a decision; the game's own Fleet badge stays hidden, G-070.)
+NL.navBadges = NL.navBadges || {};
+NL.navBadgeChanged = () => applyBadges();
 function applyBadges() {
   for (const a of document.querySelectorAll('.sidebar-nav .nl2-mirror')) {
     const k = BADGE_PATH[a.dataset.nl2Path];
-    if (!k) continue;
+    if (!k) {
+      const nb = NL.navBadges[a.dataset.nl2Path]; if (!nb) continue;      // paths nobody registered keep whatever badge they have
+      const srcs = Object.values(nb).filter((x) => x && +x.n > 0);
+      setBadge(a, srcs.length ? String(srcs.reduce((t, x) => t + +x.n, 0)) : '', srcs.map((x) => x.tip).filter(Boolean).join('\n'));
+      continue;
+    }
     const fromAct = actPlanets.length && (k === 'shipyard' || k === 'buildings');
     const names = k === 'research' ? researchNames() : !fromAct ? (idle.lists && idle.lists[k]) || [] : k === 'shipyard' ? shipyardNames() : buildingNames();
     let n = names.length || (k === 'research' || fromAct || idle.lists ? 0 : idle[k] || 0), tip = names.join('\n');
@@ -2093,6 +2103,10 @@ NL.feature({
   init() {
     NL.css('gl-inbound', `
       .nl2-inbound{box-sizing:border-box;padding:6px 12px;border-radius:8px;background:rgba(6,14,27,.94);border:1px solid rgba(116,176,232,.2);font-family:Rajdhani,"Exo 2",sans-serif;color:#d9e6f7}
+      /* GL-045 (David 3 Nov): stands out more: blue (STYLE: blue = en route) tint, brighter border, accent edge on the left */
+      .nl2-inbound{background:linear-gradient(90deg,rgba(56,189,248,.20),rgba(56,189,248,.08) 60%,rgba(56,189,248,.05));border:1px solid rgba(56,189,248,.6);border-left:4px solid #38bdf8;box-shadow:0 0 12px rgba(56,189,248,.18)}
+      .nl2-inbound .nl2-in-row>div{border-top-color:rgba(56,189,248,.2)}
+      .nl2-inbound .nl2-in-row>div:first-child{color:#7dd3fc}
       .nl2-inbound.nl2-in-gap{margin:16px 0}
       .moon-page > section.moon-overview-missions{display:none!important}
       .nl2-in-head{font-size:12.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#7ed4ff;margin-bottom:2px}
@@ -2585,9 +2599,29 @@ function fsRead() {
 let fsText = '', fsHtml = '';
 NL.fleetSlotsText = () => fsText;
 const FS_ROWS = '.nl2-fslots-v, .nxs-fs, .nxt-fs';
+// GL-044 (David 2 Nov): the master template for every fleet dialog (ours, PVE, Tasks): Fleet Slots moves out of the body rows into a
+// larger strip just under the dialog title ("Fleet Slots 15 / 19 · 0m 41s", red when every slot is in use). The value element itself is
+// moved, so the 1 s tick above keeps updating it; its old label (PVE / Tasks grid cell, or our whole row) is hidden.
+const FS_DLG = '.nl2-fleet, .nxs-modal, .nxt-modal', FS_HEAD = '.nl2-fleet-head, .nxs-mh, .nxt-mh';
+let fsFull = false;
+function fsTop(e) {
+  if (e.closest('.nl2-fstop')) return;
+  const dlg = e.closest(FS_DLG), head = dlg && dlg.querySelector(FS_HEAD);
+  if (!head) return;
+  const ourRow = e.closest('.nl2-fleet-row'), label = ourRow ? null : e.previousElementSibling;
+  if (ourRow) ourRow.style.display = 'none';
+  else if (label && /^\s*fleet slots\s*$/i.test(label.textContent)) label.style.display = 'none';
+  if (dlg.querySelector('.nl2-fstop')) { if (!ourRow) e.style.display = 'none'; return; }      // the dialog redrew its rows: the strip is already there
+  const strip = NL.h('div', { class: 'nl2-fstop' }, NL.h('span', { class: 'nl2-fstop-k' }, 'Fleet Slots'));
+  head.after(strip);
+  strip.append(e);
+}
 function fsRows(el) {
-  if (!fsText) return;
-  for (const e of el ? [el] : document.querySelectorAll(FS_ROWS)) if (e.dataset.nl2fs !== fsHtml || e.textContent !== fsText) { e.innerHTML = fsHtml; e.dataset.nl2fs = fsHtml; }
+  for (const e of el ? [el] : document.querySelectorAll(FS_ROWS)) {
+    try { fsTop(e); } catch (x) { console.warn('[NL fleetslots] top strip', x); }
+    const top = e.closest('.nl2-fstop'); if (top) top.classList.toggle('nl2-fstop-full', fsFull);
+    if (fsText && (e.dataset.nl2fs !== fsHtml || e.textContent !== fsText)) { e.innerHTML = fsHtml; e.dataset.nl2fs = fsHtml; }
+  }
 }
 // GL-031 (2 Nov): an estimated time is shown in italics, no "~"
 const fsDur = (ms) => { const s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return (h ? h + 'h ' + String(m).padStart(2, '0') + 'm ' : m + 'm ') + String(s % 60).padStart(2, '0') + 's'; };
@@ -2600,6 +2634,7 @@ function fsRender() {
   for (const m of hold) { const h = fsHome(m); if (h && h.t > (h.est ? now : now - 1000) && (!next || h.t < next.t)) next = h; }
   let txt = hold.length + (max != null ? ' / ' + max : ''), html = txt;
   if (next) { txt += ' · ' + fsDur(next.t - now); html += ' · ' + fsTimeHtml(next.t, next.est); }
+  fsFull = max != null && hold.length >= max;
   fsText = txt; fsHtml = html; fsRows();
   const tip = next ? 'Next slot frees at ' + new Date(next.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + (next.est ? ' (estimated)' : '') : 'No fleet due home';
   if (fsBox) {
@@ -2641,7 +2676,12 @@ NL.feature({
       .topbar .nl2-fslots em{font-style:italic}
       .topbar .nl2-xppill .nl2-xp-g{color:#4ade80}
       .topbar .nl2-xppill .nl2-xp-y{color:#e6c34a}
-      .nxs-bl1, .nxt-slots, .nxs-slots{display:none!important}`);
+      .nxs-bl1, .nxt-slots, .nxs-slots{display:none!important}
+      .nl2-fstop{display:flex;justify-content:center;align-items:baseline;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(120,144,165,.25);background:rgba(56,189,248,.06);font:700 18px Rajdhani,"Exo 2",system-ui,sans-serif;letter-spacing:.3px;color:#e6edf7}
+      .nl2-fstop .nl2-fstop-k{color:#9fb3c8}
+      .nl2-fstop > :not(.nl2-fstop-k){color:inherit;font:inherit}
+      .nl2-fstop.nl2-fstop-full{color:#f87171}
+      .nl2-fstop em{font-style:italic}`);
     NL.onData(/^\/api\/fleet\/missions(\?|$)/, (p, d) => { if (d && Array.isArray(d.missions)) { fsData = d; fsRender(); } });
     NL.onWrite(FS_WRITE, fsChanged);
     NL.onRoute(() => { const c = NL.cache.latest(/^\/api\/fleet\/missions(\?|$)/); if (!(c && Date.now() - c.at < 60000) && Date.now() - fsReadAt > 60000) fsRead(); });
@@ -2705,6 +2745,9 @@ NL.feature({
   id: 'gl-leaderpill', set: 'Global', name: 'Leader in the banner',
   desc: 'GL-032/GL-033: a pill right of Fleet Slots: Idle, or the countdown to when the leader is home (needs Fleet Slots in the banner).',
   init() {
+    // GL-042 (David 2 Nov): the PVE page's leader banner (Borys · mission · home in · Command XP; its Fleet Slots line went with GL-029)
+    // repeats these pills, so the whole bar is hidden. 90_pve.js still measures it for --nxs-bh, which is then 0, so its sticky headers sit at the top.
+    NL.css('gl-leaderpill', '.nxs-banner{display:none!important}');
     NL.onData(/^\/api\/leadership(\?|$)/, (p, d) => { if (d && typeof d === 'object') { ldData = d; ldRender(); } });
     NL.onData(/^\/api\/fleet\/missions(\?|$)/, () => ldRender());
   },
@@ -2746,6 +2789,11 @@ NL.feature({
       } catch (e) { /* offline, blocked or bad JSON: show nothing */ }
     };
     setTimeout(run, 3000);                           // after the game's own first reads
+    // GL-043 (David 2 Nov): no reload needed: check again every 10 minutes and when the tab comes back (at most once a minute)
+    let last = Date.now();
+    const again = () => { if (document.querySelector('.nl2-updbar') || Date.now() - last < 60000) return; last = Date.now(); run(); };
+    setInterval(again, 10 * 60000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') again(); });
   },
 });
 
@@ -4550,7 +4598,10 @@ NL.feature({
       .nl2-flw-oc{font-size:12px;font-weight:700;text-transform:uppercase;color:#cbd5e1}.nl2-flw-oc.nl2-flw-vic{color:#4ade80}
       .nl2-flw button{font:600 13px Rajdhani,"Exo 2",sans-serif;border-radius:4px;padding:2px 9px;cursor:pointer;margin-right:4px}
       .nl2-flw .nl2-flw-cont{background:#14532d;color:#86efac;border:1px solid #22c55e}
-      .nl2-flw .nl2-flw-retr{background:#5b1515;color:#fca5a5;border:1px solid #ef4444}`);
+      .nl2-flw .nl2-flw-retr{background:#5b1515;color:#fca5a5;border:1px solid #ef4444}
+      .wormholes-tab h4[data-nl2-flw-cxk]{cursor:pointer;user-select:none}
+      .wormholes-tab h4 > .nl2-flw-cx{display:inline-block;width:16px;color:#7ed4ff;flex:none}
+      .wormholes-tab > .wormhole-active[data-nl2-flw-cx] > :not(h4),.wormholes-tab > .wormhole-list[data-nl2-flw-cx],.wormholes-tab > .expedition-reports-list[data-nl2-flw-cx]{display:none!important}`);
     const st = ctx.store;
     const open = new Set();                       // runs whose encounter rows are shown (this page view only)
     let tee = null;
@@ -4818,6 +4869,33 @@ NL.feature({
       box.dataset.sig = sig; box.dataset.ver = String(ver);
       box.replaceChildren(table(runs, cards));
       ticker(true);
+    });
+
+    // FL-038 (David 2 Nov): every Wormholes-tab section folds from its heading (▸/▾ first); the state is kept across reloads (store
+    // 'collapsed'). Active Runs hides everything in .wormhole-active but its h4; Detected / Completed hide the list after their h4.
+    // Works in table and card view (CSS only; the game's nodes stay where they are).
+    const CX_KEY = (t) => (/^\s*active/i.test(t) ? 'active' : /^\s*detected/i.test(t) ? 'detected' : /^\s*completed/i.test(t) ? 'completed' : null);
+    NL.watch('.wormholes-tab', (tab) => {
+      const cx = st.get('collapsed', {}) || {};
+      for (const h of tab.querySelectorAll(':scope > h4, :scope > .wormhole-active > h4')) {
+        const k = h.dataset.nl2FlwCxk || CX_KEY([...h.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(''));
+        if (!k) continue;
+        const body = k === 'active' ? h.parentElement : h.nextElementSibling;
+        if (!body) continue;
+        if (h.dataset.nl2FlwCxk !== k) {
+          h.dataset.nl2FlwCxk = k;
+          h.addEventListener('click', (ev) => {
+            if (ev.target.closest('label, input, button, a')) return;      // the Table View checkbox keeps working
+            const c = st.get('collapsed', {}) || {};
+            c[k] = !c[k]; st.set('collapsed', c); NL._kick();
+          });
+        }
+        let ar = h.querySelector(':scope > .nl2-flw-cx');
+        if (!ar) { ar = NL.h('span', { class: 'nl2-flw-cx', title: 'Collapse or expand this section' }); h.insertBefore(ar, h.firstChild); }
+        const shut = !!cx[k], g = shut ? '▸' : '▾';
+        if (ar.textContent !== g) ar.textContent = g;
+        if (body.hasAttribute('data-nl2-flw-cx') !== shut) body.toggleAttribute('data-nl2-flw-cx', shut);
+      }
     });
 
     // ------------------------------------------------------------ FL-007 / FL-008: Detected Wormholes and Completed Runs (read live 1 Nov,
@@ -5106,7 +5184,7 @@ NL.feature({
       ${L}{display:flex!important;flex-direction:column!important;gap:0!important}
       ${L} > .mission-card:not([data-nl2-fat-open]){display:none!important}
       ${L} > .mission-card[data-nl2-fat-open]{margin:2px 0 6px 24px!important}
-      ${L} > .nl2-fat{display:grid;grid-template-columns:150px 120px 170px 90px 100px 90px minmax(160px,1fr) 230px 96px;align-items:center;
+      ${L} > .nl2-fat{display:grid;grid-template-columns:150px 120px 170px 90px 110px 90px minmax(160px,1fr) 96px;align-items:center;
         font:15px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7;border-bottom:1px solid rgba(120,200,255,.1);background:rgb(11,21,37)}
       ${L} > .nl2-fat > div{padding:5px 9px;min-width:0}
       ${L} > .nl2-fat > div + div{border-left:1px solid rgba(120,200,255,.1)}
@@ -5122,7 +5200,6 @@ NL.feature({
       ${L} .nl2-fat-cd{color:#fbbf24;font-weight:700}${L} .nl2-fat-utc{color:#8aa;font-size:12.5px;margin-left:5px}
       ${L} .nl2-fat-rc{background:#5b1515;color:#fca5a5;border:1px solid #ef4444;border-radius:4px;padding:2px 9px;font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer}
       ${L} .nl2-fat .mission-type-badge{margin:0}
-      ${L} > .nl2-fat > div.nl2-fat-next{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}  /* FL-032: Next truncates */
       ${L} .nl2-fat-est{font-style:italic;color:#c9d6e6}
       ${L} > .nl2-fat-det{margin:0 0 6px 24px;border-left:2px solid #38bdf8;background:rgb(9,17,31);padding:6px 10px;font:15px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7}
       ${L} > .nl2-fat-det table{border-collapse:collapse;min-width:420px}
@@ -5173,9 +5250,13 @@ NL.feature({
     const ts = (v) => { const t = v ? Date.parse(v) : NaN; return Number.isFinite(t) ? t : null; };
     const phaseEnd = (m) => (m.status === 'outbound' || m.status === 'in_combat' ? ts(m.arrivesAt) : m.status === 'returning' ? ts(m.returnArrivesAt) : ts(m.returnDepartsAt) || ts(m.returnArrivesAt) || ts(m.arrivesAt));
     const left = (t) => dur(Math.max(0, (t - Date.now()) / 1000));
-    function phaseCell(m) {
-      const t = phaseEnd(m);
-      return t && t > Date.now() ? NL.h('div', null, NL.h('span', { 'data-nl2-fat-ph': String(t) }, left(t))) : cell('–');
+    // FL-039 (David 3 Nov): Next is gone; what only it had moves here: the end's clock time (hover), and when we can't time the phase,
+    // the game's own countdown or its word ("Processing…"), copied each second as Next did
+    function phaseCell(m, card) {
+      const t = phaseEnd(m), nx = gameNext(card), id = String(m.id);
+      if (t && t > Date.now()) return NL.h('div', { title: nextLabel(m) + ' ' + dur(Math.max(0, (t - Date.now()) / 1000)) + ' · ' + new Date(t).toISOString().slice(11, 19) + ' UTC' }, NL.h('span', { 'data-nl2-fat-ph': String(t) }, left(t)));
+      if (nx && nx.cd) return NL.h('div', { title: nx.utc || null }, NL.h('span', { class: /\d/.test(nx.cd) ? null : 'nl2-d', 'data-nl2-fat-cd': id }, nx.cd));
+      return cell('–');
     }
     function homeOf(m) {
       if (NL.pveHomeBy) { try { const h = NL.pveHomeBy(m); if (h && h.t) return h; } catch (e) { /* fall back */ } }
@@ -5205,17 +5286,16 @@ NL.feature({
       // the leader's vessel counts as a ship, as on the game's card (live 2 Nov: 394 in fleetComposition + Borys = the card's 395)
       const ships = (m.fleetComposition || []).reduce((a, x) => a + n(x.quantity), 0) + (m.leadershipVessel ? 1 : 0);
       const shipTip = (m.fleetComposition || []).map((x) => fmtN(n(x.quantity)) + ' ' + (x.shipName || x.shipKey)).join(', ');
-      const nx = gameNext(card), rc = card.querySelector('button.recall-btn');
+      const rc = card.querySelector('button.recall-btn');
       return NL.h('div', { class: 'nl2-fat' + (z ? ' nl2-z' : ''), 'data-nl2-fat-id': String(id), style: { order: String(i) } },
         cell(NL.h('span', { class: 'nl2-fat-arc', title: 'Show the game\'s card', onclick: () => toggle(id) }, open.has(id) ? '▾' : '▸'),
           badge ? badge.cloneNode(true) : (m.missionType || '')),
         cell(NL.h('span', { class: 'nl2-fat-st ' + stCls(m) }, stTxt(card, m))),
         cell(planetLink(src), ' → ', link ? NL.h('a', { class: 'nl2-fat-sys', href: link.getAttribute('href') || '#', onclick: (e) => { e.preventDefault(); const g = document.querySelector('.mission-card[data-nl2-fat-mid="' + id + '"] a.mission-route-link'); if (g) g.click(); } }, tgt) : planetLink(tgt)),
         cell(NL.h('span', { title: shipTip || null }, fmtN(ships) + (ships === 1 ? ' ship' : ' ships'))),
-        phaseCell(m),
+        phaseCell(m, card),
         homeCell(m),
         cell(cargo(m.cargo)),
-        NL.h('div', { class: 'nl2-fat-next', title: nx ? ((/\d/.test(nx.cd) ? nextLabel(m) + ' ' : '') + nx.cd + (nx.utc ? ' ' + nx.utc : '')) : null }, ...(nx ? [/\d/.test(nx.cd) ? nextLabel(m) + ' ' : '', NL.h('span', { class: 'nl2-fat-cd', 'data-nl2-fat-cd': String(id) }, nx.cd), NL.h('span', { class: 'nl2-fat-utc', 'data-nl2-fat-utc': String(id) }, nx.utc)] : ['–'])),
         cell(rc ? NL.h('button', { type: 'button', class: 'nl2-fat-rc', onclick: () => { const g = document.querySelector('.mission-card[data-nl2-fat-mid="' + id + '"] button.recall-btn'); if (g) { g.click(); NL._kick(); } } }, '✕ Recall') : ''));
     }
     function leader(m, card) {
@@ -5252,7 +5332,7 @@ NL.feature({
       if (hd && (card.getAttribute('data-expanded') === 'true') === was) hd.click();
       paint();
     }
-    const HEAD = ['Mission', 'Status', 'Route', 'Ships', 'Phase time', 'Trip time', 'Cargo', 'Next', ''];
+    const HEAD = ['Mission', 'Status', 'Route', 'Ships', 'Phase time', 'Trip time', 'Cargo', ''];      // FL-039: Next removed
     const SECS = [{ k: 'slots', t: 'Uses fleet slots', sub: '' }, { k: 'free', t: 'No fleet slot', sub: 'patrols, trade routes, leader moves' }];
     let tick = 0;
     const ticker = () => {
@@ -5264,8 +5344,6 @@ NL.feature({
         for (const el of els) {
           const card = document.querySelector('.mission-card[data-nl2-fat-mid="' + el.dataset.nl2FatCd + '"]'), nx = card && gameNext(card);
           if (nx && el.textContent !== nx.cd) el.textContent = nx.cd;
-          const u = el.nextSibling;
-          if (nx && u && u.textContent !== nx.utc) u.textContent = nx.utc;
         }
       }, 1000);
     };
@@ -5307,6 +5385,63 @@ NL.feature({
       }
       for (const e of out) list.appendChild(e);
       ticker();
+    });
+  },
+});
+
+// FL-037 (David 2 Nov): the Fleet menu badge counts wormhole runs waiting for a Continue / Retreat decision; hover "Wormhole: n".
+// The game's own GET /api/fleet/wormhole-runs answers (the Fleet page, and PVE's run poll: 12 s while a run is inside) are the truth;
+// between them we infer locally so the badge moves on the exact second:
+//  - appears when a run's stage timer (nextEncounterAt) runs out and that stage was not the last one;
+//  - clears when a Continue / Retreat write succeeds (the game's button or ours, seen through NL.onWrite), or when the game's own
+//    auto-continue passes (encounterStartedAt + 10 min, else stage end + 5 min), or when the next answer says the run isn't waiting.
+// A run decided locally stays off the count until an answer shows its stage moved on (or 2 min pass).
+// One timeout, set to the next of those moments only; no polling. The menu itself is Global's: we set NL.navBadges['/fleet'].wormhole = { n, tip } and call NL.navBadgeChanged('/fleet') if Global has it.
+NL.feature({
+  id: 'fl-wh-badge',
+  set: 'Fleet',
+  name: 'Wormhole decision badge',
+  desc: 'FL-037: a badge on the Fleet menu while a wormhole run waits for Continue / Retreat; hover says Wormhole and the count.',
+  init() {
+    const AUTO_MS = 10 * 60 * 1000, STAGE_MS = 5 * 60 * 1000, HOLD_MS = 2 * 60 * 1000;
+    const num = (v) => Number(v) || 0;
+    const ts = (v) => { if (v == null || v === '') return null; const t = typeof v === 'number' ? v : Date.parse(v); return Number.isFinite(t) ? t : null; };
+    let runs = [], timer = null, last = null;
+    const decided = new Map();             // run id -> { at, enc } of a Continue / Retreat seen locally
+    const sigOf = (r) => num(r.currentEncounter) + ':' + (r.nextEncounterAt || '') + ':' + r.status;
+    // { waiting, until, next }: whether the run waits now, when that ends locally, and the next moment its state can change
+    function stateOf(r, now) {
+      if (!r || r.status !== 'inside') return { waiting: false };
+      const d = decided.get(r.id);
+      if (d) { if (d.sig === sigOf(r) && now - d.at < HOLD_MS) return { waiting: false, next: d.at + HOLD_MS }; decided.delete(r.id); }
+      const cur = num(r.currentEncounter), tot = num(r.totalEncounters), nextT = ts(r.nextEncounterAt), started = ts(r.encounterStartedAt);
+      if (!nextT) {                                       // the server says it waits
+        if (cur >= tot) return { waiting: false };
+        const until = started != null ? started + AUTO_MS : null;
+        return until != null && until <= now ? { waiting: false } : { waiting: true, next: until };
+      }
+      if (cur + 1 >= tot) return { waiting: false };      // the stage running now is the last one: the run ends, no decision
+      const until = started != null && started + AUTO_MS > nextT ? started + AUTO_MS : nextT + STAGE_MS;
+      if (now < nextT) return { waiting: false, next: nextT };
+      return now < until ? { waiting: true, next: until } : { waiting: false };
+    }
+    function paint() {
+      clearTimeout(timer); timer = null;
+      const now = Date.now(); let n = 0, next = Infinity;
+      for (const r of runs) { const s = stateOf(r, now); if (s.waiting) n++; if (s.next && s.next > now) next = Math.min(next, s.next); }
+      const key = n + '';
+      if (key !== last) {      // Global reads NL.navBadges whenever it draws the menu, and is told of a change
+        last = key;
+        ((NL.navBadges = NL.navBadges || {})['/fleet'] = NL.navBadges['/fleet'] || {}).wormhole = { n, tip: n ? 'Wormhole: ' + n : '' };
+        if (NL.navBadgeChanged) NL.navBadgeChanged('/fleet');
+      }
+      if (next < Infinity) timer = setTimeout(paint, Math.min(next - now + 50, 2 ** 31 - 1));
+    }
+    NL.onData(/^\/api\/fleet\/wormhole-runs$/, (p, d) => { if (d && Array.isArray(d.runs)) { runs = d.runs; paint(); } });
+    NL.onWrite(/^\/api\/fleet\/wormhole-runs\/\d+\/[a-z_-]+$/, (p) => {
+      const id = Number(p.split('/')[4]), r = runs.find((x) => x.id === id);
+      decided.set(id, { at: Date.now(), sig: r ? sigOf(r) : '' });
+      paint();
     });
   },
 });
@@ -9097,13 +9232,13 @@ function nxsMain() {
       const an = actName(m), ac = ACT_COL[an] || ACT_COL._;
       const cd = (v, e, why) => v != null ? (e ? '<em class="nxs-est" title="' + esc(why) + '">' : '') + '<span data-cd="' + v + '"></span>' + (e ? '</em>' : '') : '<span class="nxs-dim"' + (e ? ' title="Not enough data to estimate"' : '') + '>—</span>';
       const armed = S.recallArm && S.recallArm.id === m.id && Date.now() - S.recallArm.at < 5000;
-      const dr = (S.whRuns || []).find((x) => x.missionId === m.id && whWaiting(x));      // wormhole run waiting for a decision: Continue / Retreat sit on its own row
-      const rc = dr ? decideBtns(dr).replace(' <button', '<br><button') : canRecall(m) && !(S.recalled && S.recalled.has(m.id)) ? '<button type="button" class="nxs-btn nxs-recall' + (armed ? ' nxs-warnbtn' : '') + '" data-recall="' + m.id + '">' + (armed ? 'Confirm' : 'Recall') + '</button>' : '';
+      // FL-037 (David 3 Nov): wormhole decisions are no longer made here (the Fleet menu badge points to them); every row is a normal row
+      const rc = canRecall(m) && !(S.recalled && S.recalled.has(m.id)) ? '<button type="button" class="nxs-btn nxs-recall' + (armed ? ' nxs-warnbtn' : '') + '" data-recall="' + m.id + '">' + (armed ? 'Confirm' : 'Recall') + '</button>' : '';
       return '<tr title="' + esc(tip) + '"><td><span class="nxs-apill" style="background:' + ac[0] + ';color:' + ac[1] + (ac[2] ? ';box-shadow:' + ac[2] : '') + '">' + esc(an) + '</span>' + (m.leadershipVessel ? ' <span class="nxs-star" title="Leader attached">★</span>' : '') + '</td>'
         + '<td>' + detailOf(m, an) + '</td>'
         + '<td>' + targetCell(m, an) + '</td>'
         + '<td>' + esc(m.sourcePlanetName || '—') + '</td>'
-        + '<td>' + esc(STATUS_NAMES[m.status] || m.status) + (dr ? '<br>' + decideShort(dr) : '') + '</td>'
+        + '<td>' + esc(STATUS_NAMES[m.status] || m.status) + '</td>'
         + '<td>' + cd(t, est, 'Estimated end of this phase') + '</td>'
         + '<td>' + cd(home.t, home.est, 'Estimated time until the fleet is home') + '</td>'
         + '<td class="nxs-act">' + rc + '</td></tr>';
@@ -10221,9 +10356,6 @@ function nxsMain() {
     return m;
   }
   const whBadFrac = () => whLossPct() / 100;      // a wormhole template is flagged only when a run lost this share of its ships (default 15%, set in the Loss flag dialog)
-  const whWaiting = (r) => !!r && r.status === 'inside' && !r.nextEncounterAt && num(r.currentEncounter) < num(r.totalEncounters);
-  const whWaitingRuns = () => (S.whRuns || []).filter(whWaiting);
-  let retreatArm = null;                      // {id, at}: first Retreat click arms it, a second within 5 s confirms
   function decideText(r, w) {
     const peek = r.scoutPeek && r.scoutPeek._prerolled, lost = (r.totalShipsLost || []).reduce((a, x) => a + num(x.quantity), 0);
     const auto = r.encounterStartedAt ? new Date(r.encounterStartedAt).getTime() + WH_AUTO_MS : null;
@@ -10233,33 +10365,8 @@ function nxsMain() {
       + (function () { const mm = (S.missionList || []).find((q) => q.id === r.missionId), h = mm ? homeBy(mm) : null; return h && h.t ? ' · <em class="nxs-est" title="Estimated time until the fleet is home, longest scenario">home in <span data-cd="' + h.t + '"></span></em>' : ''; })()
       + (auto ? ' · <span class="nxs-dim">auto-continues in <span data-cd="' + auto + '"></span></span>' : '');
   }
-  // short form for the Fleet Slots row of the wormhole run that is waiting
-  function decideShort(r) {
-    const peek = r.scoutPeek && r.scoutPeek._prerolled, auto = r.encounterStartedAt ? new Date(r.encounterStartedAt).getTime() + WH_AUTO_MS : null;
-    return '<span class="nxs-y">⚠</span> Stage ' + num(r.currentEncounter) + '/' + num(r.totalEncounters) + ' cleared' + (peek ? ' · next: ' + esc(peek.title || peek.type) + (peek.combat ? ' (combat)' : '') : '')
-      + (auto ? ' · <span class="nxs-dim">auto in <span data-cd="' + auto + '"></span></span>' : '');
-  }
-  function decideBtns(r) {
-    const armed = retreatArm && retreatArm.id === r.id && Date.now() - retreatArm.at < 5000;
-    return '<button type="button" class="nxs-btn nxs-cont" data-whd="continue" data-run="' + r.id + '">Continue</button> '
-      + '<button type="button" class="nxs-btn nxs-retr' + (armed ? ' nxs-warnbtn' : '') + '" data-whd="retreat" data-run="' + r.id + '">' + (armed ? 'Confirm retreat' : 'Retreat') + '</button>';
-  }
   // distance of an under-way fleet's trip (the game's own figure on the mission)
   const underDist = (m) => (num(m && m.distance) > 0 ? '<span class="' + distCls(num(m.distance)) + '">' + Math.round(num(m.distance)) + ' ly</span>' : dashCell);
-  async function whDecide(kind, id) {
-    if (kind === 'retreat') {
-      if (!(retreatArm && retreatArm.id === id && Date.now() - retreatArm.at < 5000)) { retreatArm = { id, at: Date.now() }; paint(); setTimeout(paint, 5100); return; }
-      retreatArm = null;
-    }
-    try {
-      const r = await fetch('/api/fleet/wormhole-runs/' + id + '/' + kind, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json' } });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const run = S.whRuns.find((x) => x.id === id);
-      if (run) { if (kind === 'continue') run.nextEncounterAt = new Date().toISOString(); else run.status = 'retreating'; }
-    } catch (e) { console.warn('[pve] wormhole ' + kind, e); alert('Wormhole ' + kind + ' failed: ' + (e && e.message || e)); }
-    const refresh = async () => { await U(() => Promise.all([loadWormholes(), loadMissions(), loadLeader()])); updateBadge(); if (S.root) paint(); };
-    await refresh(); setTimeout(refresh, 3000);      // the game can take a moment to record the change
-  }
   function underCell(m, run) {
     const out = m.status === 'outbound' || m.status === 'in_combat';
     let t = null;
@@ -10653,11 +10760,11 @@ function nxsMain() {
       const f = fillOf(stationOf(x.id));
       if (f && f.p >= WARN_PCT) n++;
     }
-    const wr = whWaitingRuns().length, ef = Math.max(0, expFree()), pf = patCanLaunch() ? Math.max(0, patFree()) : 0, xi = xpIdle() ? 1 : 0;
-    const total = n + wr + ef + pf + xi;
+    const ef = Math.max(0, expFree()), pf = patCanLaunch() ? Math.max(0, patFree()) : 0, xi = xpIdle() ? 1 : 0;
+    const total = n + ef + pf + xi;      // FL-037: waiting wormhole runs count on the Fleet menu badge instead
     const t = total > 0 ? String(total) : '';      // P-132: a bare number; the hover lists what it is made of
     if (el.textContent !== t) el.textContent = t;
-    const tip = [[n, n === 1 ? 'Station' : 'Stations'], [wr, wr === 1 ? 'Wormhole run waiting' : 'Wormhole runs waiting'], [ef, ef === 1 ? 'Expedition slot free' : 'Expedition slots free'], [pf, pf === 1 ? 'Patrol capacity free' : 'Patrol capacity free'], [xi, 'Leader idle (XP)']].filter((x) => x[0] > 0).map((x) => (x[1] === 'Leader idle (XP)' ? '1 ' : x[0] + ' ') + x[1]).join('\n');
+    const tip = [[n, n === 1 ? 'Station' : 'Stations'], [ef, ef === 1 ? 'Expedition slot free' : 'Expedition slots free'], [pf, pf === 1 ? 'Patrol capacity free' : 'Patrol capacity free'], [xi, 'Leader idle (XP)']].filter((x) => x[0] > 0).map((x) => (x[1] === 'Leader idle (XP)' ? '1 ' : x[0] + ' ') + x[1]).join('\n');
     if ((el.title || '') !== tip) el.title = tip;
   }
   function paintStations() {
@@ -11092,8 +11199,6 @@ function nxsMain() {
         if (e.button || e.ctrlKey || e.metaKey || e.shiftKey) return;
         e.preventDefault(); gotoPlanet(+pa.getAttribute('data-planet')); return;
       }
-      const wdb = e.target.closest ? e.target.closest('button[data-whd]') : null;
-      if (wdb) { whDecide(wdb.getAttribute('data-whd'), +wdb.getAttribute('data-run')); return; }
       const ut = e.target.closest ? e.target.closest('tr[data-utoggle]') : null;
       if (ut) { toggleUnder(ut.getAttribute('data-utoggle')); return; }
       const a = e.target.closest ? e.target.closest('a[data-nav]') : null;
