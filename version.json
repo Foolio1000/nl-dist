@@ -1,15 +1,30 @@
 {
-  "version": "0.5.74",
-  "built": "2026-11-03T09:11:55.707Z",
+  "version": "0.5.75",
+  "built": "2026-11-03T09:16:10.295Z",
   "items": [
-    "RE-004",
-    "FL-047"
+    "FL-045",
+    "FL-046",
+    "GL-054"
   ],
   "notes": {
-    "RE-004": "Hide underway no longer amber",
-    "FL-047": "Fleet Active table truncates instead of wrapping"
+    "FL-045": "Transfer moon rows: over 10k (H 50k) collects above reserves",
+    "FL-046": "Transfer moon routes with own defaults dialog",
+    "GL-054": "Moon Supplies switched off"
   },
   "history": [
+    {
+      "version": "0.5.75",
+      "items": [
+        "FL-045",
+        "FL-046",
+        "GL-054"
+      ],
+      "notes": {
+        "FL-045": "Transfer moon rows: over 10k (H 50k) collects above reserves",
+        "FL-046": "Transfer moon routes with own defaults dialog",
+        "GL-054": "Moon Supplies switched off"
+      }
+    },
     {
       "version": "0.5.74",
       "items": [

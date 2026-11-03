@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.74
+// @version      0.5.75
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.74', features: [] };
+const NL = window.__nl2 = { version: '0.5.75', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -6225,7 +6225,9 @@ NL.feature({
 // ---- 64_fl_transfer.js: FL-040 Fleet > Transfer tab (Transfer tab thread; David 3 Nov, design 'defaults', mockup mockups/FL-040_transfer_tab_mockup.png) ----
 // A Transfer tab between Surveys and Debris lists transfer and gather tasks the script finds on its own:
 //   Move out   a planet with a produced resource at the Buildings storage threshold (Custom 'bu-storage.pct', 90%): excess to the nearest moon/planet
-//   Collect    an outpost or a moon with a produced resource (hydrogen excluded on outposts, as OU-004) at the same threshold
+//   Collect    an outpost with a produced resource (hydrogen excluded, as OU-004) at the same threshold; a moon (FL-045, David 3 Nov) with a
+//              produced resource over 10,000 (hydrogen over 50,000), taking all above the reserves (QD/DM 10,000, hydrogen 50,000); Call Ships if no ships
+//   FL-046     moons a route doesn't cover show under Covered by a route as 'No route' with our Make route dialog (one game route per ticked resource)
 //   Bring in   a planet short of resources for the first item of its Build Next list (BU-009)
 // Two tables: Active (en-route rows greyed with a blue EN ROUTE, not counted) and Covered by a route (the game's Logistics routes; not counted).
 // Row buttons open existing dialogs, never send: Move out = our Collection dialog (Transfer to a moon/planet, every field editable);
@@ -6247,6 +6249,9 @@ const TR_RES = [['antimatter', 'antimatter', 'Antimatter'], ['dark_matter', 'dar
 const TR_BASE = ['ore', 'silicates', 'hydrogen', 'alloys'];
 const TR_TRANSPORTS = ['bulk_carrier', 'freighter', 'transport_shuttle', 'tanker'];
 const TR_DONE = new Set(['returned', 'completed', 'complete', 'cancelled', 'canceled', 'failed', 'recalled', 'destroyed']);
+const TR_MOON_OVER = (k) => (k === 'hydrogen' ? 50000 : 10000);                      // FL-045: a moon row when over this
+const TR_MOON_KEEP = (k) => (k === 'hydrogen' ? 50000 : k === 'quantum_dust' || k === 'dark_matter' ? 10000 : 0);   // left on the moon
+const TR_ROUTE_DEF = (k) => (k === 'hydrogen' ? [100000, 50000] : k === 'quantum_dust' || k === 'dark_matter' ? [20000, 10000] : [10000, 10000]);   // FL-046 [trigger, send]
 const trN = (v) => (Number.isFinite(+v) ? +v : 0);
 const trSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const trList = (d, ...keys) => { if (Array.isArray(d)) return d; for (const k of keys) if (d && Array.isArray(d[k])) return d[k]; return []; };
@@ -6374,6 +6379,11 @@ NL.feature({
       }
       return out.sort((a, b) => b.f - a.f);
     };
+    // FL-045: a moon's produced resources now (rate > 0), with storage
+    const moonProd = (m) => TR_RES.filter(([k, c]) => trN((m.rate || {})[c] != null ? m.rate[c] : (m.rate || {})[k]) > 0).map(([k, c]) => {
+      const rate = trN((m.rate || {})[c] != null ? m.rate[c] : m.rate[k]), cap = trN((m.cap || {})[c] != null ? m.cap[c] : (m.cap || {})[k]);
+      return { k, rate, cap, now: proj((m.res || {})[c] != null ? m.res[c] : (m.res || {})[k], rate, cap > 0 ? cap : Infinity, m.at) };
+    });
     const fullIn = (rows) => Math.min(...rows.map((x) => (x.now >= x.cap ? 0 : (x.cap - x.now) / x.rate * 3600)));
     const hubs = () => (saved('hubs') || {}).d || [];
     const freeHubs = () => hubs().filter((h) => trN(h.hubLevel) - trN(h.routeCount) > 0);
@@ -6403,15 +6413,17 @@ NL.feature({
           ships: shipsFor('p' + me.id, Object.values(res).reduce((a, b) => a + b, 0)),
           go: (mi) => mi.sourcePlanetId === me.id && ['transfer', 'deliver'].includes(mi.missionType) && mi.status === 'outbound' && !mi.sourceMoonId });
       }
-      // Collect: moons
+      // Collect: moons (FL-045, David 3 Nov; replaces the 90% rule): a produced resource over 10,000 (hydrogen over 50,000); the pickup
+      // takes everything above the reserves (QD/DM keep 10,000, hydrogen 50,000, the rest taken in full), as the moon's own Collect (MO-010)
       for (const m of moonsAll()) {
         if (!m.res) continue;
-        const rows = fillOf(m.res, m.rate || {}, m.cap || {}, m.at), hot = rows.filter((x) => x.hot);
+        const prod = moonProd(m), hot = prod.filter((x) => x.now > TR_MOON_OVER(x.k));
         if (!hot.length) continue;
-        const par = planetById(m.planetId);
+        const par = planetById(m.planetId), res = Object.fromEntries(hot.map((x) => [x.k, Math.max(0, Math.floor(x.now - TR_MOON_KEEP(x.k)))]));
+        const fl = st.get('ships', {})['m' + m.id];
         out.push({ key: 'm' + m.id, kind: 'moon', task: 'Collect', from: { t: 'moon', id: m.id, name: m.name }, to: par ? { t: 'planet', id: par.id, name: par.name } : null,
-          res: Object.fromEntries(hot.map((x) => [x.k, Math.floor(x.now)])), rows: hot, due: fullIn(hot), at: m.at,
-          why: hot.map((x) => trName(x.k) + ' ' + Math.floor(x.f * 100) + '%').join(', '), ships: shipsFor('m' + m.id, hot.reduce((a, x) => a + x.now, 0)),
+          res, rows: hot, prod, due: Infinity, at: m.at, noShips: Array.isArray(fl) && !fl.some((x) => x.have > 0),
+          why: hot.map((x) => trName(x.k) + ' ' + trFmt(x.now)).join(' · '), ships: shipsFor('m' + m.id, Object.values(res).reduce((a, b) => a + b, 0)),
           go: (mi) => Number(mi.sourceMoonId) === m.id && mi.status === 'outbound' });
       }
       // Collect: outposts (hydrogen left out, as OU-004)
@@ -6502,7 +6514,7 @@ NL.feature({
     }
     // Make route values (David 'defaults' 3 Nov): fullest resource, trigger 90% / send 40% of its storage, To = nearest hub planet with a slot
     function routePlan(t) {
-      if (t.kind === 'bring' || !t.rows || !t.rows.length) return null;
+      if (t.kind === 'bring' || t.kind === 'moon' || !t.rows || !t.rows.length) return null;     // moons: FL-046's own dialog
       const x = t.rows[0], free = freeHubs();
       if (t.kind === 'move') {
         const hub = free.find((h) => +h.planetId === t.from.id); if (!hub) return null;
@@ -6559,7 +6571,8 @@ NL.feature({
           const b = await until(() => document.querySelector('.nl2-ou-collect:not([disabled])')); if (b) b.click();
         } else if (t.kind === 'moon') {
           if (NL.openMoon) await NL.openMoon(t.from.name, 'overview');
-          const b = await until(() => document.querySelector('.nl2-mo-coll:not([disabled])')); if (b) b.click();
+          // FL-045: no cargo ships on the moon -> the moon's own Call Ships (MO-011), else its Collect (MO-010)
+          const b = await until(() => document.querySelector((t.noShips ? '.nl2-mo-call' : '.nl2-mo-coll') + ':not([disabled])')); if (b) b.click();
         } else if (t.kind === 'bring') {
           if (NL.openPlanet) await NL.openPlanet(t.to.name, '/buildings');
           const b = await until(() => { const h = [...document.querySelectorAll('.building-card h4')].find((x) => x.textContent.trim() === t.building); const c = h && h.closest('.building-card'); return c && [...c.querySelectorAll('button')].find((x) => /bring missing resources/i.test(x.textContent || '')); });
@@ -6698,6 +6711,20 @@ NL.feature({
       .nl2-ftr-empty{color:#7f93a8;padding:8px 6px}
       .fleet-page .nl2-ftr-tab .nl2-ftr-badge{background:#f59e0b!important;color:#111!important}
       .fleet-page[data-nl2-ftr] .nl2-flc-tv{display:none!important}
+      .nl2-ftr .nl2-ftr-amb{border-color:#f59e0b;color:#fcd34d}
+      .nl2-ftr-ov{position:fixed;inset:0;background:rgba(2,6,14,.6);z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px}
+      .nl2-ftr-dlg{width:min(600px,calc(100vw - 24px));box-sizing:border-box;background:rgba(8,16,32,.98);border:1px solid rgba(120,200,255,.3);border-radius:10px;box-shadow:0 12px 48px rgba(0,0,0,.7);padding:14px 16px;color:#f1f6ff;font:500 15px Rajdhani,"Exo 2",sans-serif}
+      .nl2-ftr-dlg h3{display:flex;align-items:center;margin:0 0 10px;font-size:17px;font-weight:700}
+      .nl2-ftr-dlg .nl2-ftr-x{margin-left:auto;background:none;border:0;color:#9fb3d1;font-size:20px;cursor:pointer;padding:0 4px}
+      .nl2-ftr-drow{display:grid;grid-template-columns:1fr 2fr;gap:8px;margin:6px 0;align-items:center}.nl2-ftr-drow > span:first-child{color:#c0cce0}
+      .nl2-ftr-dlg select,.nl2-ftr-dlg input[type=number]{background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.2);border-radius:5px;color:#f1f6ff;font:inherit;padding:4px 8px}
+      .nl2-ftr-dlg select{width:100%}.nl2-ftr-dlg input[type=number]{width:100px;text-align:right}
+      .nl2-ftr-lines{border-collapse:collapse;width:100%;table-layout:fixed;margin-top:8px}.nl2-ftr-lines th,.nl2-ftr-lines td{padding:4px 6px;border-bottom:1px solid rgba(120,200,255,.08);text-align:left;white-space:nowrap}
+      .nl2-ftr-lines th{color:#8fb3d9;font-weight:600;font-size:12px}.nl2-ftr-lines .nl2-ftr-r{text-align:right}.nl2-ftr-lines img{width:16px;height:16px;vertical-align:-3px;margin-right:3px}
+      .nl2-ftr-lines .nl2-ftr-d{color:#56657a}.nl2-ftr-lines tr.nl2-ftr-off td{color:#6b7a90}
+      .nl2-ftr-dnote{color:#9fb3d1;font-size:13px;margin-top:8px}.nl2-ftr-dmsg{margin-top:6px;color:#e8c46a;min-height:0}.nl2-ftr-dmsg.nl2-ftr-bad{color:#f87171}.nl2-ftr-dmsg.nl2-ftr-ok{color:#86efac}
+      .nl2-ftr-dfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.nl2-ftr-dfoot button{font:600 14px Rajdhani,"Exo 2",sans-serif;border-radius:4px;padding:4px 12px;cursor:pointer}
+      .nl2-ftr-dfoot .nl2-ftr-hb{background:none;color:#9fb3d1;border:1px solid rgba(120,200,255,.25)}
       .logi-section[data-nl2-ftr-route]{outline:2px solid #f59e0b;outline-offset:4px;border-radius:6px}`);
 
     const icon = (k) => NL.h('img', { class: 'nl2-ftr-ic', src: '/images/resources/' + k + '.webp', alt: '', 'data-nl2-tip': trName(k) });
@@ -6730,9 +6757,9 @@ NL.feature({
       const body = rows.map((t) => {
         const plan = routePlan(t), why = [t.why];
         if (t.kind !== 'bring' && isFinite(t.due)) why.push(' · ', t.due <= 0 ? NL.h('span', { class: 'nl2-ftr-t' }, 'full') : NL.h('span', null, 'full in ', NL.h('span', { class: 'nl2-ftr-t nl2-ftr-est', 'data-nl2-tip': trClock(Date.now() + t.due * 1000) }, trDur(t.due))));
-        const actBtn = NL.h('button', { type: 'button', class: 'nl2-c-blue', disabled: !!t.mission, onclick: (e) => act(t, e.currentTarget) }, LABEL[t.kind]);
+        const actBtn = NL.h('button', { type: 'button', class: 'nl2-c-blue', disabled: !!t.mission, 'data-nl2-tip': t.noShips ? 'No cargo ships on ' + t.from.name + ': call them from its planet' : null, onclick: (e) => act(t, e.currentTarget) }, t.noShips ? 'Call Ships' : LABEL[t.kind]);
         const routeBtn = plan ? NL.h('button', { type: 'button', class: 'nl2-c-blue', 'data-nl2-tip': plan.mode + ': ' + trName(plan.k) + ' from ' + plan.from.name + ' to ' + plan.to.name + ', when ≥ ' + trFmt(plan.trig) + ', send ' + trFmt(plan.amt), onclick: (e) => makeRoute(t, e.currentTarget) }, 'Make route') : null;
-        const sh = t.ships ? NL.h('td', { class: 'nl2-ftr-est' + (t.ships.short ? ' nl2-ftr-short' : ''), 'data-nl2-tip': t.ships.short ? 'Only ' + t.ships.have + ' there' : 'Estimate: the dialog fits the ships' }, t.ships.text) : NL.h('td', { class: 'nl2-ftr-d', 'data-nl2-tip': t.toLabel || '' }, '—');
+        const sh = t.noShips ? NL.h('td', { class: 'nl2-ftr-d' }, 'no ships on moon') : t.ships ? NL.h('td', { class: 'nl2-ftr-est' + (t.ships.short ? ' nl2-ftr-short' : ''), 'data-nl2-tip': t.ships.short ? 'Only ' + t.ships.have + ' there' : 'Estimate: the dialog fits the ships' }, t.ships.text) : NL.h('td', { class: 'nl2-ftr-d', 'data-nl2-tip': t.toLabel || '' }, '—');
         return NL.h('tr', { class: t.mission ? 'nl2-ftr-enr' : null, 'data-nl2-ftr-key': t.key },
           NL.h('td', null, t.task), NL.h('td', null, place(t.from)), NL.h('td', { 'data-nl2-tip': t.toLabel || null }, t.to ? place(t.to) : NL.h('span', { class: 'nl2-ftr-d' }, '—')),
           resCell(t.res), sh, NL.h('td', { class: 'nl2-ftr-r' }, t.mission && homeAt(t.mission) ? cd(homeAt(t.mission)) : NL.h('span', { class: 'nl2-ftr-d' }, '—')),
@@ -6764,11 +6791,97 @@ NL.feature({
           NL.h('td', null, k ? icon(k) : '', k ? trName(k) : String(r.resourceType || '—')), NL.h('td', { class: 'nl2-ftr-r' }, trFmt(r.threshold)), NL.h('td', { class: 'nl2-ftr-r' }, trFmt(r.amount)),
           NL.h('td', null, hub ? trClean(hub.planetName) + ' (' + trN(hub.routeCount) + '/' + trN(hub.hubLevel) + ')' : '—'),
           NL.h('td', null, cov.length ? cov.map((t) => t.task + ' ' + t.from.name + ' (' + t.why + ')').join('; ') : NL.h('span', { class: 'nl2-ftr-d' }, '—')),
-          NL.h('td', null, NL.h('span', { class: 'nl2-ftr-st ' + (paused ? 'nl2-ftr-oth' : 'nl2-ftr-in') }, paused ? 'paused' : 'active')));
+          NL.h('td', null, NL.h('span', { class: 'nl2-ftr-st ' + (paused ? 'nl2-ftr-oth' : 'nl2-ftr-in') }, paused ? 'paused' : 'active')), NL.h('td'));
       });
-      return NL.h('table', null, NL.h('colgroup', null, ...['130px', '150px', '150px', '160px', '110px', '110px', '150px', '', '100px'].map((w) => NL.h('col', { style: w ? 'width:' + w : null }))),
-        NL.h('thead', null, NL.h('tr', null, ...['Route', 'From', 'To', 'Resource', 'Trigger ≥', 'Send', 'Hub', 'Covers', 'Status'].map((l, i) => NL.h('th', { class: 'nl2-ftr-nos' + (i === 4 || i === 5 ? ' nl2-ftr-r' : '') }, l)))),
+      // FL-046: each moon pickup with resources no route covers yet: "No route" + Make route (our dialog)
+      for (const t of noRoute(list)) {
+        const left = t.prod.filter((x) => x.now > TR_MOON_OVER(x.k) && !t.covered.some((r) => rk(r) === x.k)), hub = routeHubs(t)[0];
+        rows.push(NL.h('tr', { 'data-nl2-ftr-nr': t.key }, NL.h('td', null, NL.h('span', { class: 'nl2-ftr-d' }, '—')), NL.h('td', null, place(t.from)),
+          NL.h('td', null, hub ? place({ t: 'planet', id: hub.id, name: hub.name }) : NL.h('span', { class: 'nl2-ftr-d', 'data-nl2-tip': 'No hub planet with a free route slot' }, '—')),
+          NL.h('td', { 'data-nl2-tip': left.map((x) => trName(x.k)).join(', ') }, ...left.map((x) => icon(x.k)), left.length === 1 ? trName(left[0].k) : left.length + ' resources'),
+          NL.h('td', { class: 'nl2-ftr-r' }, NL.h('span', { class: 'nl2-ftr-d' }, '—')), NL.h('td', { class: 'nl2-ftr-r' }, NL.h('span', { class: 'nl2-ftr-d' }, '—')),
+          NL.h('td', null, hub ? hub.name + ' (' + hub.used + '/' + hub.max + ')' : '—'), NL.h('td', null, 'Collect ' + t.from.name),
+          NL.h('td', null, NL.h('span', { class: 'nl2-ftr-st nl2-ftr-amb' }, 'no route')),
+          NL.h('td', null, NL.h('button', { type: 'button', class: 'nl2-c-blue', disabled: !hub, onclick: () => routeDialog(t) }, 'Make route'))));
+      }
+      return NL.h('table', null, NL.h('colgroup', null, ...['130px', '150px', '150px', '160px', '110px', '110px', '150px', '', '100px', '120px'].map((w) => NL.h('col', { style: w ? 'width:' + w : null }))),
+        NL.h('thead', null, NL.h('tr', null, ...['Route', 'From', 'To', 'Resource', 'Trigger ≥', 'Send', 'Hub', 'Covers', 'Status', ''].map((l, i) => NL.h('th', { class: 'nl2-ftr-nos' + (i === 4 || i === 5 ? ' nl2-ftr-r' : '') }, l)))),
         NL.h('tbody', null, ...rows));
+    }
+    // FL-046: moon pickups that still have a resource over its limit with no route (hidden ones too: a route is the cure either way)
+    const noRoute = (list) => list.filter((t) => t.kind === 'moon' && t.prod && t.prod.some((x) => x.now > TR_MOON_OVER(x.k) && !t.covered.some((r) => rk(r) === x.k)));
+    // hub planets with a free slot, nearest the moon's planet first: [{ id, name, used, max, free }]
+    function routeHubs(t) {
+      const base = planetById(t.to && t.to.id) || null;
+      return freeHubs().map((h) => { const p = planetById(h.planetId) || { id: +h.planetId, name: trClean(h.planetName), sortOrder: 99 };
+        return { ...p, id: +h.planetId, name: p.name || trClean(h.planetName), used: trN(h.routeCount), max: trN(h.hubLevel), free: trN(h.hubLevel) - trN(h.routeCount) }; })
+        .sort(base ? byNear(base) : (a, b) => trN(a.sortOrder) - trN(b.sortOrder));
+    }
+
+    // ------------------------------------------------------------ FL-046: our Make route dialog for a moon (the game's own create call, on David's press)
+    // POST /api/logistics/routes {routeMode 'collect_moon', destinationPlanetId, sourceMoonId, resourceType (snake_case), threshold, amount}, one per
+    // ticked line, ~1 s apart, then routes + hub-levels re-read once each (the Logistics page does the same after a create). Never sent on its own.
+    let dlg = null;
+    function routeDialog(t) {
+      if (dlg) dlg.close();
+      const hubsL = routeHubs(t); if (!hubsL.length) return;
+      const routed = new Set(t.covered.map(rk));
+      const lines = t.prod.map((x) => { const [trig, send] = TR_ROUTE_DEF(x.k); return { k: x.k, on: !routed.has(x.k) && x.now > TR_MOON_OVER(x.k), routed: routed.has(x.k), trig, send }; });
+      let hubI = 0, busy = false;
+      const msg = NL.h('div', { class: 'nl2-ftr-dmsg' }), note = NL.h('div', { class: 'nl2-ftr-dnote' });
+      const create = NL.h('button', { type: 'button', class: 'nl2-c-blue' }, 'Create');
+      const sel = NL.h('select', { onchange: () => { hubI = +sel.value; refresh(); } }, ...hubsL.map((h, i) => { const b = planetById(t.to && t.to.id), d = b && ly(b, h); return NL.h('option', { value: String(i) }, h.name + ' (' + h.used + '/' + h.max + ')' + (d != null ? ' · ' + Math.round(d) + ' ly' : '')); }));
+      const num = (l, f) => { const i = NL.h('input', { type: 'number', min: '1', step: '1000', value: String(l[f]), disabled: l.routed }); i.addEventListener('input', () => { l[f] = Math.floor(trN(i.value)); refresh(); }); return i; };
+      const keepTd = new Map();
+      const body = NL.h('tbody', null, ...lines.map((l) => {
+        const cb = NL.h('input', { type: 'checkbox', disabled: l.routed }); cb.checked = l.on; cb.addEventListener('change', () => { l.on = cb.checked; refresh(); });
+        const kt = NL.h('td', { class: 'nl2-ftr-r' }); keepTd.set(l, kt);
+        return NL.h('tr', { class: l.routed ? 'nl2-ftr-off' : null }, NL.h('td', null, cb), NL.h('td', null, icon(l.k), trName(l.k), l.routed ? NL.h('span', { class: 'nl2-ftr-d' }, ' (route exists)') : ''),
+          NL.h('td', { class: 'nl2-ftr-r' }, l.routed ? NL.h('span', { class: 'nl2-ftr-d' }, '—') : num(l, 'trig')), NL.h('td', { class: 'nl2-ftr-r' }, l.routed ? NL.h('span', { class: 'nl2-ftr-d' }, '—') : num(l, 'send')), kt);
+      }));
+      function refresh() {
+        const on = lines.filter((l) => l.on && !l.routed), h = hubsL[hubI];
+        for (const [l, td] of keepTd) td.textContent = l.routed ? '—' : trFmt(Math.max(0, l.trig - l.send));
+        const bad = on.find((l) => !(l.send > 0) || !(l.trig >= l.send));
+        create.textContent = 'Create ' + on.length + ' route' + (on.length === 1 ? '' : 's');
+        create.disabled = busy || !on.length || on.length > h.free || !!bad;
+        note.textContent = on.length + ' route' + (on.length === 1 ? '' : 's') + ' · uses ' + on.length + ' of ' + h.name + '\'s ' + h.free + ' free slot' + (h.free === 1 ? '' : 's') + '. Routes run every 5 minutes with ' + h.name + '\'s cargo ships and hydrogen.';
+        if (!busy) { msg.className = 'nl2-ftr-dmsg nl2-ftr-bad'; msg.textContent = on.length > h.free ? 'More routes than free slots at ' + h.name + '.' : bad ? trName(bad.k) + ': Send must be above 0 and Trigger at least Send.' : ''; }
+      }
+      create.addEventListener('click', async () => {
+        const on = lines.filter((l) => l.on && !l.routed), h = hubsL[hubI];
+        busy = true; refresh(); msg.className = 'nl2-ftr-dmsg'; msg.textContent = 'Creating…';
+        let made = 0;
+        for (const l of on) {
+          if (made) await trSleep(1000);
+          try {
+            const res = await NL.rawFetch('/api/logistics/routes', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({ routeMode: 'collect_moon', destinationPlanetId: h.id, sourceMoonId: t.from.id, resourceType: l.k, threshold: l.trig, amount: l.send }) });
+            const j = await res.json().catch(() => null);
+            if (!res.ok) { msg.className = 'nl2-ftr-dmsg nl2-ftr-bad'; msg.textContent = (made ? made + ' created; ' : '') + trName(l.k) + ': ' + ((j && (j.error || j.message)) || 'the game refused it (HTTP ' + res.status + ').'); break; }
+            made++; l.routed = true;
+          } catch (e) { msg.className = 'nl2-ftr-dmsg nl2-ftr-bad'; msg.textContent = 'Could not reach the game: ' + e.message; break; }
+        }
+        busy = false;
+        if (made) {
+          await trSleep(1000); await NL.getJson('/api/logistics/routes', ctx); await trSleep(1000); await NL.getJson('/api/logistics/hub-levels', ctx);
+          if (made === on.length) { msg.className = 'nl2-ftr-dmsg nl2-ftr-ok'; msg.textContent = 'Created ' + made + ' route' + (made === 1 ? '' : 's') + ' to ' + h.name + '.'; setTimeout(close, 1200); }
+        }
+        create.disabled = true;
+      });
+      const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+      const ov = NL.h('div', { class: 'nl2-ftr-ov', onclick: (e) => { if (e.target === ov) close(); } }, NL.h('div', { class: 'nl2-ftr-dlg', role: 'dialog', 'aria-modal': 'true' },
+        NL.h('h3', null, 'Make route · ' + t.from.name, NL.h('button', { type: 'button', class: 'nl2-ftr-x', 'aria-label': 'Close', onclick: () => close() }, '×')),
+        NL.h('div', { class: 'nl2-ftr-drow' }, NL.h('span', null, 'From'), NL.h('span', null, t.from.name + ' (moon)')),
+        NL.h('div', { class: 'nl2-ftr-drow' }, NL.h('span', null, 'To'), sel),
+        NL.h('table', { class: 'nl2-ftr-lines' }, NL.h('colgroup', null, ...['32px', '', '130px', '130px', '90px'].map((w) => NL.h('col', { style: w ? 'width:' + w : null }))),
+          NL.h('thead', null, NL.h('tr', null, ...['', 'Resource', 'Trigger when ≥', 'Send', 'Keeps'].map((l, i) => NL.h('th', { class: i > 1 ? 'nl2-ftr-r' : null }, l)))), body),
+        note, msg, NL.h('div', { class: 'nl2-ftr-dfoot' }, NL.h('button', { type: 'button', class: 'nl2-ftr-hb', onclick: () => close() }, 'Cancel'), create)));
+      function close() { ov.remove(); document.removeEventListener('keydown', onKey, true); dlg = null; changed(); }
+      document.addEventListener('keydown', onKey, true);
+      document.body.appendChild(ov);
+      dlg = { close };
+      refresh();
     }
     function section(key, title, n, sub, content) {
       const shut = !!st.get('collapsed', {})[key];
@@ -6791,8 +6904,9 @@ NL.feature({
             NL.h('td', null, NL.h('button', { type: 'button', class: 'nl2-ftr-hb', onclick: () => hide(t, null) }, 'Show again')));
         })))));
       }
-      const rs = routes(), rsAt = (saved('routes') || {}).at;
-      out.push(...section('routes', 'Covered by a route', rs.length, 'not counted in the badge' + (rsAt ? ' · routes ' + trAge(rsAt) : ''), rs.length ? routeTable(list) : NL.h('div', { class: 'nl2-ftr-empty' }, rsAt ? 'No Logistics routes yet.' : 'Routes load when this tab opens.')));
+      const rs = routes(), rsAt = (saved('routes') || {}).at, nr = noRoute(list).length;
+      out.push(...section('routes', 'Covered by a route', rs.length + nr, 'not counted in the badge' + (nr ? ' · ' + nr + ' moon' + (nr === 1 ? '' : 's') + ' with no route' : '') + (rsAt ? ' · routes ' + trAge(rsAt) : ''),
+        rs.length || nr ? routeTable(list) : NL.h('div', { class: 'nl2-ftr-empty' }, rsAt ? 'No Logistics routes yet.' : 'Routes load when this tab opens.')));
       return out;
     }
 
@@ -6828,7 +6942,7 @@ NL.feature({
       let box = content.querySelector(':scope > .nl2-ftr');
       if (!box) { box = NL.h('div', { class: 'nl2-ftr' }); content.appendChild(box); sig = ''; }
       if (!on) return;
-      const s = JSON.stringify([list.map((t) => [t.key, t.res, t.why, !!t.mission, t.mission && homeAt(t.mission), t.done, hidden(t), t.to && t.to.id, t.from && t.from.id, t.ships && t.ships.text, !!routePlan(t), Math.round(t.due / 60)]),
+      const s = JSON.stringify([list.map((t) => [t.key, t.res, t.why, !!t.mission, t.mission && homeAt(t.mission), t.done, hidden(t), t.to && t.to.id, t.from && t.from.id, t.ships && t.ships.text, !!routePlan(t), isFinite(t.due) ? Math.round(t.due / 60) : -1, t.noShips, t.covered.length]),
         routes().length, (saved('routes') || {}).at, st.get('collapsed', {}), st.get('sort', null), Math.floor(Date.now() / 60000)]);
       if (s === sig && box.firstChild) return;
       sig = s;
@@ -8140,7 +8254,7 @@ NL.feature({
   init(ctx) {
     moTx.add('nl2-mo-coll', 'Collect', 'Send this moon\'s resources to its planet with the moon\'s cargo ships', (b) => moTx.open(b, {
       ctx, kind: 'mo-collect', title: 'Collect', label: 'Collecting', fields: ['target', 'ships', 'resources', 'speed', 'eta'], fit: true,
-      skip: ['quantum_dust', 'dark_matter'], keep: { hydrogen: 50000 },
+      keep: { hydrogen: 50000, quantum_dust: 10000, dark_matter: 10000 },   // FL-045 (David 3 Nov): QD/DM keep 10,000 instead of being skipped
     }).catch((e) => ctx.log('moon collect failed', e)));
   },
 });
@@ -13920,7 +14034,10 @@ if (NL.enabled('tasks')) (function dashTasks() {      // document-start (its tee
     for (const k of Object.keys(MOON_LOW)) out[k] = { low: num(sv[k] && sv[k].low) > 0 ? num(sv[k].low) : MOON_LOW[k], send: num(sv[k] && sv[k].send) > 0 ? num(sv[k].send) : MOON_SEND[k] };
     return out;
   };
+  // GL-054 (David 3 Nov): Moon Supplies is switched off; moon resources are handled in Fleet > Transfer (FL-045/046). No rows, no count, no section.
+  const MOON_SUPPLIES_OFF = true;
   function moonRows() {
+    if (MOON_SUPPLIES_OFF) return [];
     const cfg = moonCfg();
     return S.d.moons.map((m) => {
       const inb = moonInboundCargo(m.id);
@@ -14228,7 +14345,7 @@ if (NL.enabled('tasks')) (function dashTasks() {      // document-start (its tee
     }
 
     // Moon Supplies
-    if (moon.length || (S.d.moons || []).length) {      // always shown while there are moons, so the settings stay reachable
+    if (!MOON_SUPPLIES_OFF && (moon.length || (S.d.moons || []).length)) {      // always shown while there are moons, so the settings stay reachable (off: GL-054)
       const cell = (r, k) => '<td class="' + (r.low.includes(k) ? 'nxt-r' : '') + '">' + fmt(r.have[k]) + '</td>';
       const mc = moonCfg(), opts = (k, f) => {
         const list = k === 'hydrogen' ? (f === 'low' ? [5000, 10000, 20000, 30000, 50000] : [10000, 25000, 50000, 75000, 100000]) : (f === 'low' ? [1000, 2500, 5000, 7500, 10000] : [1000, 2500, 5000, 7500, 10000]);
