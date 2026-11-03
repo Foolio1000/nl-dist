@@ -10,8 +10,8 @@
   "notes": {
     "SH-008": "Hide Planetary and Orbital shipyards separately",
     "SH-009": "Shipyard Maintain fix",
-    "FL-042": "Fleet fix FL-042",
-    "FL-043": "Fleet fix FL-043"
+    "FL-042": "Hide empty Wormholes placeholder",
+    "FL-043": "Wider Trip time columns"
   },
   "history": [
     {
@@ -25,8 +25,8 @@
       "notes": {
         "SH-008": "Hide Planetary and Orbital shipyards separately",
         "SH-009": "Shipyard Maintain fix",
-        "FL-042": "Fleet fix FL-042",
-        "FL-043": "Fleet fix FL-043"
+        "FL-042": "Hide empty Wormholes placeholder",
+        "FL-043": "Wider Trip time columns"
       }
     },
     {
