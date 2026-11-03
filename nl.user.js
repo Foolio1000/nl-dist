@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.77
+// @version      0.5.78
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.77', features: [] };
+const NL = window.__nl2 = { version: '0.5.78', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -1395,6 +1395,10 @@ function applyBadges() {
     // "Urik (Hydrogen 95%, Bio-Extract 92%)"
     const full = (t) => (String(t).match(/[^,]*?\d+\s*%/g) || []).map((x) => x.trim()).sort((a, b) => parseFloat(b.match(/[\d.]+(?=\s*%)/)) - parseFloat(a.match(/[\d.]+(?=\s*%)/))).join(', ');
     if (al.length) { n += al.length; tip = names.concat(al.map((x) => x.name + ' (' + full(x.text) + ')')).join('\n'); }
+    // SH-010 (David 3 Nov): each planet with any ships needing repair or maintenance adds 1 to the Shipyard badge, "Urik (repairs)" on hover.
+    // The list comes from the Tasks module's own reads (NL.shipRepairPlanets, GL-059); no reads of our own.
+    const rp = k === 'shipyard' && Array.isArray(NL.shipRepairPlanets) ? NL.shipRepairPlanets : [];
+    if (rp.length) { n += rp.length; tip = (tip ? tip.split('\n') : []).concat(rp.map((x) => x + ' (repairs)')).join('\n'); }
     setBadge(a, n ? String(n) : '', tip);
   }
 }
@@ -1493,14 +1497,15 @@ function syHost(kind) {
 }
 // the Shipyard page: one group per yard, "Planetary" then "Orbital", each with its own Hide buttons (or its hidden note and Show)
 function yardBtns(cur) {
-  const p = actPlanets.find((x) => x.name === cur), fr = p ? planetYardsFree(p) : null, chs = syChoice.yard || {};
+  const chs = syChoice.yard || {};
   let dirty = false;
   return ['p', 'o'].map((k) => {
     let ch = chs[cur + '|' + k];
     if (ch && ch.until && Date.now() > ch.until) { delete chs[cur + '|' + k]; dirty = true; ch = null; }
-    const idleNow = !fr || fr[k], note = ch ? (ch.until ? 'Hidden until ' + new Date(ch.until).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : 'Hidden indefinitely') : '';
+    // SH-011 (David 3 Nov): the Hide buttons work while the yard is building too (our own choice; it holds once the yard is idle)
+    const note = ch ? (ch.until ? 'Hidden until ' + new Date(ch.until).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : 'Hidden indefinitely') : '';
     const btns = ch ? '<button type="button" class="nl2-sybtn" data-yard="' + k + '" data-act="show">Show</button>'
-      : SY_ACTS.filter((a) => a[0] !== 'show').map((a) => '<button type="button" class="nl2-sybtn" data-yard="' + k + '" data-act="' + a[0] + '"' + (idleNow ? '' : ' disabled data-nl2-tip="The ' + YARD_NAME[k] + ' yard is not idle on this planet"') + '>' + a[1].replace('Hide for ', '').replace('Hide ', '') + '</button>').join('');
+      : SY_ACTS.filter((a) => a[0] !== 'show').map((a) => '<button type="button" class="nl2-sybtn" data-yard="' + k + '" data-act="' + a[0] + '"' + '>' + a[1].replace('Hide for ', '').replace('Hide ', '') + '</button>').join('');
     if (dirty) glSave('idleChoice', syChoice);
     return '<span class="nl2-sygrp"><span class="nl2-sylbl">Hide ' + YARD_NAME[k] + '</span>' + (note ? '<span class="nl2-synote">' + glEsc(note) + '</span>' : '') + btns + '</span>';
   }).join('');
@@ -2436,6 +2441,46 @@ NL.feature({
   },
 });
 
+// ================================================================ GL-057: where you are, in the Bring missing resources dialog (David 3 Nov)
+// The subtitle line (p.construction-supply-context, the building) gets " · <planet or moon>": the moon whose page is open, else the
+// planet (or moon) picked in the switcher. Our own span at the end of the line, so the game's text is untouched.
+function ensureSupplyPlace(p) {
+  const place = (typeof moonHere === 'function' && moonHere()) || curPlanet();
+  let sp = p.querySelector(':scope > .nl2-supplace');
+  if (!place) { if (sp) sp.remove(); return; }
+  if (!sp) sp = NL.h('span', { class: 'nl2-supplace' });
+  if (p.lastChild !== sp) p.appendChild(sp);
+  const t = ' · ' + place;
+  if (sp.textContent !== t) sp.textContent = t;
+}
+// GL-058 (David 3 Nov): opened from a moon, Supply from starts on the planet that moon orbits (Draj for Draj-a). Once per dialog, so a
+// later pick stands; set the React way (native value setter + a bubbling change), so the game's own state follows.
+function ensureSupplyParent(sel) {
+  const dlg = sel.closest('.construction-supply-dialog');
+  if (!dlg || dlg.dataset.nl2MoonDef) return;
+  const sels = [...dlg.querySelectorAll('.construction-supply-source select')];
+  if (sels[0] !== sel) return;                        // the first Supply from list only
+  const here = (typeof moonHere === 'function' && moonHere()) || curPlanet(), m = moons.find((x) => x.name === here);
+  if (!m || !m.planet) { dlg.dataset.nl2MoonDef = 'n/a'; return; }
+  const pid = supPlanets && (supPlanets.find((p) => p.name === m.planet) || {}).id;
+  const base = (o) => cleanName((o.dataset.nl2Base || o.textContent).replace(/\s*·\s*[\d,]+\s*ly$/, ''));
+  const opt = [...sel.options].find((o) => (pid && Number(o.value) === pid) || base(o) === m.planet);
+  if (!opt) return;                                    // the list may not be filled yet: try on the next sweep
+  dlg.dataset.nl2MoonDef = '1';
+  if (sel.value === opt.value) return;
+  const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+  set.call(sel, opt.value);
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+NL.feature({
+  id: 'gl-supplyplace', set: 'Global', name: 'Planet or moon in Bring missing resources',
+  desc: 'GL-057: the game\'s Bring missing resources dialog names the planet or moon you are on after the building, e.g. "Solar Collector · Draj-a"; GL-058: opened from a moon, Supply from starts on its planet.',
+  init() {
+    NL.watch('.construction-supply-dialog .construction-supply-context', ensureSupplyPlace);
+    NL.watch('.construction-supply-dialog .construction-supply-source select', ensureSupplyParent);   // GL-058
+  },
+});
+
 // ================================================================ GL-022: To Do panel on every page (David 1 Nov)
 // A slim "To Do" tab on the far right edge of the page, halfway down (David moved it there 1 Nov, and dropped the count badge); click slides
 // out a 320px panel to its right, over the page (the page doesn't move); the tab or × collapses it. Same list as Command Center's To Do
@@ -2786,6 +2831,7 @@ NL.feature({
       .topbar .nl2-fslots em{font-style:italic}
       .topbar .nl2-xppill .nl2-xp-g{color:#4ade80}
       .topbar .nl2-xppill .nl2-xp-y{color:#e6c34a}
+      .topbar .nl2-xppill .nl2-xp-0{color:#6b7a90}                                   /* GL-056 (David 3 Nov): a category at 0/5 greyed */
       .nxs-bl1, .nxt-slots, .nxs-slots{display:none!important}
       .nl2-fstop{display:flex;justify-content:center;align-items:baseline;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(120,144,165,.25);background:rgba(56,189,248,.06);font:700 18px Rajdhani,"Exo 2",system-ui,sans-serif;letter-spacing:.3px;color:#e6edf7}
       .nl2-fstop .nl2-fstop-k{color:#9fb3c8}
@@ -2822,7 +2868,7 @@ function xpRender() {
   const reset = d.resetsAt ? Date.parse(d.resetsAt) : 0, fresh = reset && reset <= Date.now();
   const used = fresh ? {} : Object.fromEntries(d.buckets.map((b) => [b.bucket, Math.max(0, Math.floor(+b.count || 0))]));
   // GL-036 (2 Nov, David): the value, not the letter, green at 4-5 left, yellow at 1-3, the pill's own grey at 0
-  const html = XP_SHORT.map(([k, n]) => { const left = Math.max(0, 5 - (used[k] || 0)); return n + ' ' + (left ? '<span class="' + (left >= 4 ? 'nl2-xp-g' : 'nl2-xp-y') + '">' + left + '/5</span>' : left + '/5'); }).join(' · ');
+  const html = XP_SHORT.map(([k, n]) => { const left = Math.max(0, 5 - (used[k] || 0)); return left ? n + ' <span class="' + (left >= 4 ? 'nl2-xp-g' : 'nl2-xp-y') + '">' + left + '/5</span>' : '<span class="nl2-xp-0">' + n + ' 0/5</span>'; }).join(' · ');   // GL-056: 0/5 greyed, letter and value
   xpBox.style.display = '';
   if (xpBox.dataset.nl2fs !== html) { xpBox.innerHTML = html; xpBox.dataset.nl2fs = html; }
   // GL-035 (2 Nov, David): hover shows the full names with their values, one per row (the GL-006 badge hover panel)
@@ -5980,6 +6026,10 @@ NL.feature({
 //   in systems without one of their planets aren't on the list (the map only shows them system by system).
 // - Last spied: the game's own GET /api/fleet/spy-reports (teed). Status: the game's GET /api/fleet/missions (teed): spy / spy_moon /
 //   spy_station on that target. After a launch we read missions once, as the game does (fetchFleetMissions after a send).
+// FL-053 (David 3 Nov): typing an alliance tag in brackets ("[WE]") lists that alliance's players by Overall rank, best first (unranked
+//   last, by name). Ranks: the game's GET /api/rankings/players?category=overall (100 per page, teed whenever the game or Core reads it).
+//   If a member of that alliance has no rank in our copy, we read the next overall page ourselves, one every 5 s, until all are found or
+//   the list ends (bulk-read pace; no loop beyond the 6 pages). Copy kept 1 h (nl2.fl-spy-launch.ranks).
 
 NL.feature({
   id: 'fl-spy-launch',
@@ -6068,8 +6118,46 @@ NL.feature({
     function owners() {
       const mine = myIds(), me = new Set(), by = new Map();
       for (const c of (colonies && colonies.list) || []) if (mine.has(c.pid)) me.add(c.oid);
-      for (const c of (colonies && colonies.list) || []) if (!me.has(c.oid)) by.set(c.owner, c.tag);
-      return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }));
+      for (const c of (colonies && colonies.list) || []) if (!me.has(c.oid)) by.set(c.owner, [c.tag, c.oid]);
+      return [...by.entries()].map(([o, [tag, oid]]) => [o, tag, oid]).sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }));
+    }
+    // FL-053: overall ranks, userId -> rank, from the game's rankings pages (teed) plus our own page reads when an alliance needs them
+    const RANK_FRESH = 3600 * 1000, RANK_GAP = 5000;
+    let ranks = S.get('ranks', null);
+    if (!ranks || Date.now() - ranks.at > RANK_FRESH) ranks = { at: Date.now(), by: {}, pages: [], total: null };
+    let rankBusy = false, lastRankRead = 0;
+    let listHook = null;                            // redraws the open player list when ranks arrive
+    const takeRanks = (p, d) => {
+      if ((p.match(/[?&]category=(\w+)/) || [])[1] !== 'overall' || !d || !Array.isArray(d.leaderboard)) return;
+      if (Date.now() - ranks.at > RANK_FRESH) ranks = { at: Date.now(), by: {}, pages: [], total: null };
+      for (const e of d.leaderboard) if (e && e.userId != null) ranks.by[e.userId] = n0(e.rank);
+      const off = n0((p.match(/[?&]offset=(\d+)/) || [])[1]);
+      if (!ranks.pages.includes(off)) ranks.pages.push(off);
+      if (d.pagination && d.pagination.total != null) ranks.total = n0(d.pagination.total);
+      S.set('ranks', ranks); NL._kick();
+      if (listHook) listHook();
+    };
+    NL.onData(/^\/api\/rankings\/players\?/, takeRanks);
+    const tagOf = (v) => { const m = String(v || '').trim().match(/^\[([^\]]*)\]?$/); return m ? m[1].trim().toLowerCase() : null; };
+    const members = (tag) => owners().filter(([, t]) => t && t.toLowerCase() === tag);
+    const byRank = (list) => list.slice().sort((a, b) => (ranks.by[a[2]] || Infinity) - (ranks.by[b[2]] || Infinity) || a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }));
+    async function fillRanks(tag) {
+      if (rankBusy) return;
+      rankBusy = true;
+      try {
+        for (let i = 0; i < 6; i++) {
+          if (Date.now() - ranks.at > RANK_FRESH) ranks = { at: Date.now(), by: {}, pages: [], total: null };
+          if (!members(tag).some(([, , oid]) => !ranks.by[oid])) break;
+          const next = ranks.pages.length ? Math.max(...ranks.pages) + 100 : 0;
+          if (ranks.total != null && next >= ranks.total) break;
+          const wait = lastRankRead + RANK_GAP - Date.now(); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+          lastRankRead = Date.now();
+          const path = '/api/rankings/players?category=overall&limit=100&offset=' + next;
+          const d = await NL.getJson(path, ctx);
+          takeRanks(path, d);                           // at once (the tee's copy lands a moment later and changes nothing)
+          if (!d || !Array.isArray(d.leaderboard) || !d.leaderboard.length) break;
+        }
+      } finally { rankBusy = false; }
     }
     const planetsOf = (name) => ((colonies && colonies.list) || []).filter((c) => name && c.owner === name);
     // one row per planet, its moons (owned by the same player) right under it; the player's moons around other planets follow
@@ -6217,14 +6305,35 @@ NL.feature({
       if (box && box.dataset.k === sig && tab.firstElementChild === box) return;
       if (!box) box = NL.h('section', { class: 'nl2-fsl' });
       if (tab.firstElementChild !== box) tab.insertBefore(box, tab.firstChild);
-      box.dataset.k = sig;
       if (box.contains(document.activeElement) && document.activeElement.classList.contains('nl2-fsl-pick')) return;   // don't redraw under typing
+      box.dataset.k = sig;
       box.replaceChildren();
 
       const head = NL.h('h4', { class: 'nl2-fsl-h', onclick: () => { S.set('open', !isOpen); NL._kick(); } },
         NL.h('span', { class: 'nl2-car' }, isOpen ? '▾' : '▸'), 'Quick Spy' + (name && list.length ? ' (' + list.length + ')' : ''));
-      const dl = NL.h('datalist', { id: 'nl2-fsl-players' }, owners().map(([o, tag]) => NL.h('option', { value: o }, tag ? '[' + tag + ']' : '')));
-      const pick = NL.h('input', { class: 'nl2-fsl-pick', list: 'nl2-fsl-players', placeholder: 'Choose a player…', value: name, 'data-nl2-tip': 'Type to filter the players the galaxy map shows' });
+      const dl = NL.h('datalist', { id: 'nl2-fsl-players' });
+      const pick = NL.h('input', { class: 'nl2-fsl-pick', list: 'nl2-fsl-players', placeholder: 'Choose a player…', value: name, 'data-nl2-tip': 'Type to filter the players the galaxy map shows; [TAG] lists an alliance by rank' });
+      // FL-053: "[TAG]" lists only that alliance, by Overall rank (best first); anything else lists everyone by name
+      const fillList = () => {
+        const tag = tagOf(pick.value), list = tag != null && tag !== '' ? byRank(owners().filter(([, t]) => t && t.toLowerCase().startsWith(tag))) : owners();
+        const key = JSON.stringify(list.map((x) => [x[0], ranks.by[x[2]] || 0]));
+        if (dl.dataset.k === key) return;
+        dl.dataset.k = key;
+        dl.replaceChildren(...list.map(([o, t, oid]) => NL.h('option', { value: o }, (t ? '[' + t + ']' : '') + (ranks.by[oid] ? ' #' + ranks.by[oid] + ' overall' : ''))));
+        if (tag && members(tag).length && !rankBusy) fillRanks(tag).then(() => { if (dl.isConnected) fillList(); });
+      };
+      fillList();
+      listHook = () => { if (dl.isConnected) fillList(); };
+      pick.addEventListener('input', fillList);
+      // FL-054 (David 3 Nov): clearing the box clears the list at once. The input stays (no redraw under typing): only what follows the
+      // heading row is swapped for the "Choose a player" note, and the heading loses its count.
+      pick.addEventListener('input', () => {
+        if (pick.value.trim() || !player()) return;
+        S.set('player', ''); sysToken++; sysBusy = 0;
+        for (const el of [...box.children]) if (!el.classList.contains('nl2-fsl-head')) el.remove();
+        head.lastChild.textContent = 'Quick Spy';
+        box.append(NL.h('div', { class: 'nl2-fsl-note' }, 'Choose a player to list their planets and moons.'));
+      });
       const choose = () => { const v = pick.value.trim(), hit = owners().find(([o]) => o.toLowerCase() === v.toLowerCase()); if (hit && hit[0] !== player()) { S.set('player', hit[0]); pick.blur(); NL._kick(); loadMoons(); } };
       pick.addEventListener('change', choose);
       pick.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') choose(); });
@@ -6587,7 +6696,9 @@ NL.feature({
     let lastBadge = '';
     function badge(list) {
       const act = list.filter((t) => !t.done && !t.mission && !hidden(t));
-      const tip = act.map((t) => t.task + ': ' + t.from.name + (t.kind === 'bring' ? ' → ' + t.to.name : '') + ' (' + t.why + ')').join('\n');
+      // FL-052 (David 3 Nov): short hover, the fullest triggering resource's fill % only ("Collect: Tyr-a 82%"); Relocate / Bring in name only
+      const pctOf = (t) => { const f = Math.max(-1, ...(t.rows || []).filter((x) => x.cap > 0 && isFinite(x.cap)).map((x) => Math.floor((100 * x.now) / x.cap))); return f >= 0 ? ' ' + f + '%' : ''; };
+      const tip = act.map((t) => t.task + ': ' + t.from.name + (t.kind === 'bring' ? ' → ' + t.to.name : pctOf(t))).join('\n');
       const key = act.length + '|' + tip;
       if (key !== lastBadge) {
         lastBadge = key;
@@ -13386,7 +13497,7 @@ function nxsMain() {
 let tasksBoot = null;
 NL.feature({
   id: 'tasks', set: 'Global', name: 'Tasks dashboard',
-  desc: 'GL-026: Dashboards > Tasks: leader, modules and crew, fleet bio, repairs, energy, hydrogen, moon supplies and scans, outposts, artifacts and contracts that need action, with a count badge (was the separate Tasks script, v0.9.1).',
+  desc: 'GL-026: Dashboards > Tasks: leader, modules and crew, fleet bio, building repairs (ship repairs: Shipyard badge, GL-059), energy, hydrogen, moon supplies and scans, outposts, artifacts and contracts that need action, with a count badge (was the separate Tasks script, v0.9.1).',
   init() { if (tasksBoot) tasksBoot(); },
 });
 
@@ -14235,7 +14346,12 @@ if (NL.enabled('tasks')) (function dashTasks() {      // document-start (its tee
   function computeAll() {
     const lead = leaderRows(), mods = moduleRows(), bio = bioRows(), rep = repairRows(), en = energyRows(), hyd = hydrogenRows(), moon = moonRows(), scan = scanRows();
     const out = outpostRows(), st = studyRows(), con = contractRows();
-    const count = [...lead, ...mods, ...bio, ...rep.bld, ...rep.ships, ...rep.maint, ...en, ...hyd, ...moon, ...out, ...st.rows, ...con].filter((r) => r.act).length;
+    // GL-059 (David 3 Nov): ship repairs and maintenance are no longer Tasks; the planets with any are the Shipyard badge's (SH-010)
+    const shipPl = [...new Set([...rep.ships, ...rep.maint].map((r) => r.planet))];
+    const sig = JSON.stringify(shipPl);
+    if (NL.shipRepairPlanets_sig !== sig) { NL.shipRepairPlanets_sig = sig; NL.shipRepairPlanets = shipPl; if (NL.navBadgeChanged) setTimeout(NL.navBadgeChanged, 0); }
+    rep.ships = []; rep.maint = [];
+    const count = [...lead, ...mods, ...bio, ...rep.bld, ...en, ...hyd, ...moon, ...out, ...st.rows, ...con].filter((r) => r.act).length;
     return { lead, mods, bio, rep, en, hyd, moon, scan, out, st, con, count };
   }
 
