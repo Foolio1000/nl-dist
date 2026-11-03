@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.78
+// @version      0.5.79
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.78', features: [] };
+const NL = window.__nl2 = { version: '0.5.79', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -6695,7 +6695,8 @@ NL.feature({
     // ------------------------------------------------------------ badge: Fleet menu and the tab (en-route, covered and hidden rows not counted)
     let lastBadge = '';
     function badge(list) {
-      const act = list.filter((t) => !t.done && !t.mission && !hidden(t));
+      // OU-008 (David 3 Nov): Relocate rows are not counted here; they are the Outposts menu badge again (OU-006, drift)
+      const act = list.filter((t) => !t.done && !t.mission && !hidden(t) && t.kind !== 'relocate');
       // FL-052 (David 3 Nov): short hover, the fullest triggering resource's fill % only ("Collect: Tyr-a 82%"); Relocate / Bring in name only
       const pctOf = (t) => { const f = Math.max(-1, ...(t.rows || []).filter((x) => x.cap > 0 && isFinite(x.cap)).map((x) => Math.floor((100 * x.now) / x.cap))); return f >= 0 ? ' ' + f + '%' : ''; };
       const tip = act.map((t) => t.task + ': ' + t.from.name + (t.kind === 'bring' ? ' → ' + t.to.name : pctOf(t))).join('\n');
@@ -7126,7 +7127,7 @@ NL.feature({
     });
     // FL-049 (David 3 Nov): outposts are listed here now, so Core's Outposts menu drops its badges while this module is on (OU-007, Core's
     // hook): fill = the 75% badge, drift = the mined-out +1 (both shown here as Collect / Relocate rows)
-    NL.trOutposts = () => (NL.enabled('fl-transfer') ? { fill: true, drift: true } : null);
+    NL.trOutposts = () => (NL.enabled('fl-transfer') ? { fill: true, drift: false } : null);   // OU-008: drift back on the Outposts badge
     // the menu badge is kept current off the Fleet page too (from the same saved data, no reads)
     setTimeout(() => badge(tasks()), 4000);
     setInterval(() => { if (!document.querySelector('.fleet-page')) badge(tasks()); }, 60000);
