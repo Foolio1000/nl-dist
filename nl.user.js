@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.72
+// @version      0.5.73
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.72', features: [] };
+const NL = window.__nl2 = { version: '0.5.73', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -3850,12 +3850,39 @@ NL.feature({
 
 // ================================================================ 40_research.js
 {
-// ---- 40_research.js: Research feature set (RE-001 Lab level range) ----
+// ---- 40_research.js: Research feature set (RE-001/002 Lab level range, RE-004 Hide underway, RE-003 Fragment slider) ----
 // Read live 26 Oct (NF2, read-only): the Research page is .research-page; its .filter-row holds the search box, category and
 // era chips and .research-filter-toggles (the game's Hide Completed / Only Levelable, mirrored in the URL as
 // ?hideCompleted=1&onlyLevelable=1). The game drops filtered cards from .research-grid, so we only see what it shows.
 // Each .research-card shows its required Research Lab level in .research-lab-req ("Lab Lv.N"); the same value is
 // requiredLabLevel (1 to 15, every research has one) in GET /api/research, which the page loads on open (teed, no extra read).
+
+// Shared by the card filters below (RE-001 Lab level range, RE-004 Hide underway): a card is hidden while any of our filter
+// flags is on it, and one "Showing N of M" (amber, per STYLE) sits after our last control while any of our filters narrows the view.
+// M is the cards the game itself shows, so the game's own checkboxes act first.
+const RE_FLAGS = ['data-nl2-relab', 'data-nl2-reuw'];
+const reActive = {};
+// hide by inline style (the game's own !important rules beat a stylesheet); only touch it when it changes,
+// since every write is a DOM change that starts another sweep
+function reSetFlag(card, attr, on) {
+  if (on === card.hasAttribute(attr)) return;
+  if (on) card.setAttribute(attr, '1'); else card.removeAttribute(attr);
+  if (RE_FLAGS.some((a) => card.hasAttribute(a))) card.style.setProperty('display', 'none', 'important');
+  else card.style.removeProperty('display');
+}
+function reCount() {
+  const ours = [...document.querySelectorAll('.research-page .nl2-reuw, .research-page .nl2-relab')];
+  let el = document.querySelector('.nl2-recount');
+  if (!ours.length) { if (el) el.remove(); return; }
+  if (!el) el = NL.h('span', { class: 'nl2-recount' });
+  const last = ours[ours.length - 1];
+  if (last.nextElementSibling !== el) last.insertAdjacentElement('afterend', el);
+  const cards = [...document.querySelectorAll('.research-grid .research-card')];
+  const shown = cards.filter((c) => !RE_FLAGS.some((a) => c.hasAttribute(a))).length;
+  const t = Object.values(reActive).some(Boolean) ? 'Showing ' + shown + ' of ' + cards.length : '';
+  if (el.textContent !== t) el.textContent = t;
+}
+NL.css('re-count', '.nl2-recount{color:#f5b83d;font-weight:700;font-size:12px;white-space:nowrap;align-self:center}');
 
 NL.feature({
   id: 're-lab',
@@ -3863,7 +3890,7 @@ NL.feature({
   name: 'Lab level range',
   desc: 'Min and max Research Lab level boxes beside Hide Completed / Only Levelable; shows only researches needing a Lab level in that range.',
   init(ctx) {
-    NL.css('re-lab', '.nl2-relab{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.nl2-relab select.nl2-relab-in{width:72px!important;min-width:72px!important;height:30px!important;padding:0 6px!important;margin:0!important;box-sizing:border-box!important;cursor:pointer;border-radius:6px!important;border:1px solid #2a3a52!important;background:#0b1424!important;color:#f1f6ff!important;font:inherit;font-size:14px!important;opacity:1!important}.nl2-relab select.nl2-relab-in option{background:#0b1424;color:#f1f6ff}.nl2-relab select.nl2-relab-in:focus{outline:none;border-color:#38bdf8!important}.nl2-relab select.nl2-relab-in.nl2-set{border:2px solid #f5b83d!important;box-shadow:0 0 8px rgba(245,184,61,.55)!important;color:#ffd27a!important}.nl2-relab.nl2-on .nl2-relab-l{color:#f5b83d}.nl2-relab.nl2-on .nl2-relab-n{color:#f5b83d;font-weight:700}.nl2-relab.nl2-bad select.nl2-relab-in{box-shadow:none!important;border-color:#e06c6c!important;color:#e06c6c!important}.nl2-relab .nl2-relab-x{cursor:pointer;color:#8a96a6;padding:0 2px}.nl2-relab .nl2-relab-x:hover{color:#f1f6ff}.nl2-relab .nl2-relab-n{color:#8a96a6;font-size:12px}');
+    NL.css('re-lab', '.nl2-relab{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.nl2-relab select.nl2-relab-in{width:72px!important;min-width:72px!important;height:30px!important;padding:0 6px!important;margin:0!important;box-sizing:border-box!important;cursor:pointer;border-radius:6px!important;border:1px solid #2a3a52!important;background:#0b1424!important;color:#f1f6ff!important;font:inherit;font-size:14px!important;opacity:1!important}.nl2-relab select.nl2-relab-in option{background:#0b1424;color:#f1f6ff}.nl2-relab select.nl2-relab-in:focus{outline:none;border-color:#38bdf8!important}.nl2-relab select.nl2-relab-in.nl2-set{border:2px solid #f5b83d!important;box-shadow:0 0 8px rgba(245,184,61,.55)!important;color:#ffd27a!important}.nl2-relab.nl2-on .nl2-relab-l{color:#f5b83d}.nl2-relab.nl2-bad select.nl2-relab-in{box-shadow:none!important;border-color:#e06c6c!important;color:#e06c6c!important}.nl2-relab .nl2-relab-x{cursor:pointer;color:#8a96a6;padding:0 2px}.nl2-relab .nl2-relab-x:hover{color:#f1f6ff}');
 
     // range: empty box = no limit on that side; same range on every planet, kept across visits and reloads
     let min = ctx.store.get('min', ''), max = ctx.store.get('max', '');
@@ -3888,34 +3915,23 @@ NL.feature({
       return it && it.requiredLabLevel != null ? +it.requiredLabLevel : 0; // no requirement counts as Lab 0 (David, default)
     };
 
-    // hide by inline style (the game's own !important rules beat a stylesheet); only touch it when it changes,
-    // since every write is a DOM change that starts another sweep
-    const setHidden = (card, hide) => {
-      if (hide === (card.getAttribute('data-nl2-relab') === '1')) return;
-      if (hide) { card.setAttribute('data-nl2-relab', '1'); card.style.setProperty('display', 'none', 'important'); }
-      else { card.removeAttribute('data-nl2-relab'); card.style.removeProperty('display'); }
-    };
-
-    let box = null, inMin = null, inMax = null, count = null;
+    let box = null, inMin = null, inMax = null;
     function apply() {
       const r = range();
       const cards = [...document.querySelectorAll('.research-grid .research-card')];
-      let shown = 0;
       cards.forEach((c) => {
         const lab = labOf(c);
-        const hide = !!r.on && ((r.a != null && lab < r.a) || (r.b != null && lab > r.b));
-        setHidden(c, hide);
-        if (!hide) shown++;
+        reSetFlag(c, 'data-nl2-relab', !!r.on && ((r.a != null && lab < r.a) || (r.b != null && lab > r.b)));
       });
+      reActive.lab = !!r.on;
       if (box) {
         box.classList.toggle('nl2-bad', !!r.bad);
         // RE-002 (David 28 Oct): a picklist not on Any glows amber, and the label and count turn amber, so a set filter is seen at a glance
         inMin.classList.toggle('nl2-set', inMin.value !== '');
         inMax.classList.toggle('nl2-set', inMax.value !== '');
         box.classList.toggle('nl2-on', inMin.value !== '' || inMax.value !== '');
-        const t = r.on ? 'Showing ' + shown + ' of ' + cards.length : '';
-        if (count.textContent !== t) count.textContent = t;
       }
+      reCount();
     }
 
     function save() {
@@ -3934,9 +3950,8 @@ NL.feature({
       };
       inMin = pick(min, 'Lowest Research Lab level to show (Any = no limit)');
       inMax = pick(max, 'Highest Research Lab level to show (Any = no limit)');
-      count = NL.h('span', { class: 'nl2-relab-n' });
       const x = NL.h('span', { class: 'nl2-relab-x', title: 'Clear the Lab level range', onclick: () => { inMin.value = ''; inMax.value = ''; save(); } }, '×');
-      box = NL.h('div', { class: 'nl2-relab research-filter-toggle', 'aria-label': 'Lab level range' }, NL.h('span', { class: 'nl2-relab-l' }, 'Lab level'), inMin, '–', inMax, x, count);
+      box = NL.h('div', { class: 'nl2-relab research-filter-toggle', 'aria-label': 'Lab level range' }, NL.h('span', { class: 'nl2-relab-l' }, 'Lab level'), inMin, '–', inMax, x);
     }
 
     // RE-001 fix (v0.5.13 feedback): the box keeps the game's toggle class for its label font, so our picklists get their own
@@ -3944,10 +3959,74 @@ NL.feature({
     // controls sit right after the game's checkboxes, on the same filter row; put back if the game redraws the row
     NL.watch('.research-page .research-filter-toggles', (tg) => {
       if (!box) makeBox();
-      if (tg.nextElementSibling !== box) tg.insertAdjacentElement('afterend', box);
+      const after = tg.nextElementSibling && tg.nextElementSibling.classList.contains('nl2-reuw') ? tg.nextElementSibling : tg; // after Hide underway when it's on
+      if (after.nextElementSibling !== box) after.insertAdjacentElement('afterend', box);
       apply();
     });
     // cards the game adds or redraws (checkbox, chip, search or tab changes) get the range too
+    NL.watch('.research-page .research-grid', () => apply());
+  },
+});
+
+// ---------------------------------------------------------------- RE-004 Hide underway
+// A "Hide underway" checkbox right after the game's Hide Completed / Only Levelable hides every research that is underway on
+// any planet. Copy the game: no reads of our own. Underway comes from the game's own loads, teed: GET /api/research (loaded when
+// the Research page opens and after a research starts; per research status/endsAt, plus activeResearches) and
+// GET /api/planets/activity-summary (planets[].research {key, status, endsAt} for every planet). A card that shows the game's own
+// "Active" badge counts too. Same choice on every planet, kept across reloads; off by default.
+NL.feature({
+  id: 're-underway',
+  set: 'Research',
+  name: 'Hide underway',
+  desc: 'RE-004: a Hide underway checkbox on the Research page that hides researches underway on any planet.',
+  init(ctx) {
+    NL.css('re-underway', '.nl2-reuw.nl2-on span{color:#f5b83d}.nl2-reuw.nl2-on input{box-shadow:0 0 8px rgba(245,184,61,.55)}');
+    let on = !!ctx.store.get('on', false);
+    let fromResearch = new Set(), fromSummary = new Set();
+    const RUNNING = /progress|active|running|research|queue|pending|paus/i;
+    // underway = started somewhere and not finished, paused included (David 3 Nov)
+    const live = (x) => x && (RUNNING.test(String(x.status || '')) || !!x.pauseReason || (x.endsAt && Date.parse(x.endsAt) > Date.now())) && !/complete|done|finish|cancel/i.test(String(x.status || ''));
+    const keyOf = (x) => x && (x.key || x.researchKey || x.techKey || (x.research && x.research.key) || (x.definition && x.definition.key));
+    NL.onData(/^\/api\/research(\?|$)/, (p, d) => {
+      if (!d || !d.research) return;
+      const s = new Set();
+      Object.values(d.research).forEach((x) => { if (live(x) && x.key) s.add(x.key); });
+      [].concat(d.activeResearches || [], d.activeResearch || []).forEach((x) => { const k = keyOf(x); if (k) s.add(k); });
+      fromResearch = s;
+      apply();
+    });
+    NL.onData(/^\/api\/planets\/activity-summary/, (p, d) => {
+      const pl = d && (d.planets || d);
+      if (!Array.isArray(pl)) return;
+      const s = new Set();
+      pl.forEach((q) => { const r = q && q.research; const k = keyOf(r); if (k && (live(r) || !r.status)) s.add(k); });
+      fromSummary = s;
+      apply();
+    });
+    const cardKey = (c) => { const a = c.querySelector('.research-name-link'); return a ? (a.getAttribute('href') || '').split('?')[0].split('/').pop() : ''; };
+    const underway = (c) => {
+      const k = cardKey(c);
+      if (k && (fromResearch.has(k) || fromSummary.has(k))) return true;
+      const b = c.querySelector('.research-status-badge');
+      return !!(b && /\bactive\b/i.test(b.textContent));
+    };
+
+    let box = null, cb = null;
+    function apply() {
+      document.querySelectorAll('.research-grid .research-card').forEach((c) => reSetFlag(c, 'data-nl2-reuw', on && underway(c)));
+      reActive.underway = on;
+      if (box) box.classList.toggle('nl2-on', on);
+      reCount();
+    }
+    NL.watch('.research-page .research-filter-toggles', (tg) => {
+      if (!box) {
+        cb = NL.h('input', { type: 'checkbox', onchange: () => { on = cb.checked; ctx.store.set('on', on); apply(); } });
+        cb.checked = on;
+        box = NL.h('label', { class: 'nl2-reuw research-filter-toggle', 'data-nl2-tip': 'Hide researches that are underway on any planet' }, cb, NL.h('span', null, 'Hide underway'));
+      }
+      if (tg.nextElementSibling !== box) tg.insertAdjacentElement('afterend', box);
+      apply();
+    });
     NL.watch('.research-page .research-grid', () => apply());
   },
 });
@@ -5826,6 +5905,319 @@ NL.feature({
 
 }
 
+// ================================================================ 63_fl_spy_launch.js
+{
+// ---- 63_fl_spy_launch.js: Fleet feature set, FL-044 Quick spy launcher on Fleet > Espionage ----
+// David 3 Nov (answers 1-6 "yes", plus): pick a player, list every planet and moon of theirs the galaxy map shows, and launch a Spy or a
+// Stealth Deploy on each with one button. Each button opens the master fleet dialog (GL-005) with the ships of the last launch of that
+// kind, capped at what the source planet has. Send from = the current planet (changeable). Borys: a Leader checkbox on Spy, never ticked
+// for you. After a launch the row says "Sent". Known = what the galaxy map shows, not what has been spied.
+// Copy-the-game notes (bundle read 3 Nov, nf2; nexus_tests/spy_launch_3nov.md):
+// - Planet target (Galaxy "Send Spy Probes" modal): Spy = POST /api/fleet/spy {sourcePlanetId, targetPlanetId, ships, attachLeader}
+//   with probe / spy_probe / stealth_ship; Stealth Deploy = POST /api/fleet/stealth-deploy {sourcePlanetId, targetPlanetId, ships},
+//   stealth_ship only. ships = [{shipDefId, quantity}]. Fuel: transport POST /fleet/fuel-estimate {..., missionType 'spy'|'spy_station'}.
+// - Moon target ("Moon Operation" > Moon Recon): Spy = POST /api/fleet/moon-dispatch {sourcePlanetId, targetMoonId, missionType
+//   'spy_moon', ships, useHighway, attachLeader?:true}; the "Stealth Deploy" checkbox = POST /api/fleet/stealth-deploy {sourcePlanetId,
+//   targetMoonId, ships}. useHighway is the game's own saved choice (localStorage nexus-highway:...:spy_moon, default on). The game shows
+//   no fuel line we can copy for moons, so the moon dialog has none (Send stays enabled).
+// - Leader: the game reads GET /api/leadership when the dialog opens; Borys can go when vessel.status 'ready', no assignedMissionId and
+//   currentPlanetId = the source planet.
+// - Players and planets: transport GET /galaxy/colony-index {colonies:[{planetId, planetName, position, systemId, systemName, ownerId,
+//   ownerName, allianceTag, protection{vacation}}]} (the map's "Known colonies"; planets only). Read when the Espionage tab opens and our
+//   copy is missing or over 30 min old, or on Refresh. Moons: transport GET /galaxy/systems/:id/planets (the map's system panel) for each
+//   system the player has a planet in, ~1 s apart, when the player is picked and that system's copy is over 6 h old. Moons a player has
+//   in systems without one of their planets aren't on the list (the map only shows them system by system).
+// - Last spied: the game's own GET /api/fleet/spy-reports (teed). Status: the game's GET /api/fleet/missions (teed): spy / spy_moon /
+//   spy_station on that target. After a launch we read missions once, as the game does (fetchFleetMissions after a send).
+
+NL.feature({
+  id: 'fl-spy-launch',
+  set: 'Fleet',
+  name: 'Quick Spy',
+  desc: 'FL-044: Fleet > Espionage gets a Quick Spy panel: pick a player, then Spy or Stealth Deploy each of their planets and moons in one click.',
+  init(ctx) {
+    const S = ctx.store;
+    const CI_FRESH = 30 * 60 * 1000, SYS_FRESH = 6 * 3600 * 1000, SENT_KEEP = 6 * 3600 * 1000;
+    const SPY_SHIPS = ['probe', 'spy_probe', 'stealth_ship'], STEALTH_SHIPS = ['stealth_ship'];
+    const n0 = (v) => (Number.isFinite(+v) ? +v : 0);
+    const fmt = (n) => n0(n).toLocaleString('en-US');
+    let colonies = S.get('ci', null);               // { at, list:[{pid, name, pos, sid, sys, oid, owner, tag, vac}] }
+    const sysMoons = S.get('sys', {}) || {};          // systemId -> { at, moons:[{id, pid, name, pos, oid, owner, vac}] }
+    let sent = S.get('sent', {}) || {};               // 'p:<id>' | 'm:<id>' -> { at, kind }
+    let ciBusy = false, ciErr = '', sysBusy = 0, sysToken = 0, lastRead = 0;
+    let reports = [], missions = null;
+
+    NL.onData(/^\/api\/fleet\/spy-reports(\?|$)/, (p, d) => { reports = Array.isArray(d) ? d : (d && d.reports) || []; NL._kick(); });
+    NL.onData(/^\/api\/fleet\/missions$/, (p, d) => { if (d && Array.isArray(d.missions)) { missions = d.missions; NL._kick(); } });
+
+    NL.css('fl-spy-launch', `
+      .nl2-fsl{margin:0 0 14px;font-family:Rajdhani,"Exo 2",sans-serif}
+      .nl2-fsl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 8px}
+      .nl2-fsl-h{margin:0;font-size:19px;font-weight:700;letter-spacing:.38px;color:var(--text-primary,#f1f6ff);cursor:pointer;user-select:none}
+      .nl2-fsl-h .nl2-car{display:inline-block;width:16px}
+      .nl2-fsl-pick{background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.25);border-radius:6px;color:var(--text-primary,#f1f6ff);padding:5px 10px;font:500 15px Rajdhani,"Exo 2",sans-serif;width:220px}
+      .nl2-fsl-age{color:var(--text-muted,#c0cce0);font-size:14px}
+      .nl2-fsl-ref{background:none;border:0;color:#7ed4ff;cursor:pointer;font:500 14px Rajdhani,"Exo 2",sans-serif;padding:0}
+      .nl2-fsl-ref:hover{text-decoration:underline}
+      .nl2-fsl-note{color:var(--text-muted,#c0cce0);font-size:14px;margin:4px 0}
+      .nl2-fsl-note.nl2-bad{color:#fca5a5}
+      .nl2-fsl table{border-collapse:collapse;table-layout:fixed;width:100%;max-width:1100px;background:rgba(12,24,44,.96);border-radius:8px;overflow:hidden}
+      .nl2-fsl th{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0);text-align:left;padding:7px 10px;border-bottom:1px solid rgba(120,200,255,.12)}
+      .nl2-fsl td{font-size:15px;padding:5px 10px;border-bottom:1px solid rgba(120,200,255,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-primary,#f1f6ff)}
+      .nl2-fsl tr.nl2-fsl-moon td:first-child{padding-left:26px}
+      .nl2-fsl a.nl2-fsl-sys{color:#7ed4ff;text-decoration:none;cursor:pointer}.nl2-fsl a.nl2-fsl-sys:hover{text-decoration:underline}
+      .nl2-fsl-btn{height:26px;padding:2px 12px;border-radius:6px;font:700 14px Rajdhani,"Exo 2",sans-serif;cursor:pointer;margin-right:6px}
+      .nl2-fsl-st{display:inline-block;padding:1px 8px;border-radius:5px;font-size:13px;font-weight:600}
+      .nl2-fsl-blue{background:rgba(59,130,246,.15);border:1px solid rgba(96,165,250,.5);color:#bfdbfe}
+      .nl2-fsl-green{background:rgba(34,197,94,.14);border:1px solid rgba(74,222,128,.5);color:#bbf7d0}
+      .nl2-fsl-grey{background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.45);color:#cbd5e1}`);
+
+    // ------------------------------------------------ reads (the map's own calls, on open or Refresh only)
+    async function readColonies(force) {
+      if (ciBusy || !NL.transportGet) return;
+      if (!force && colonies && Date.now() - colonies.at < CI_FRESH) return;
+      ciBusy = true; ciErr = ''; NL._kick();
+      try {
+        const d = await NL.transportGet('GET /galaxy/colony-index', null, {});
+        const list = ((d && d.colonies) || []).map((c) => ({ pid: n0(c.planetId), name: c.planetName || '', pos: n0(c.position), sid: n0(c.systemId), sys: c.systemName || '',
+          oid: n0(c.ownerId), owner: c.ownerName || '', tag: c.allianceTag || '', vac: !!(c.protection && c.protection.vacation) })).filter((c) => c.pid && c.owner);
+        if (list.length) { colonies = { at: Date.now(), list }; S.set('ci', colonies); } else ciErr = 'The game sent no colonies.';
+      } catch (e) { ciErr = 'Could not read the known colonies: ' + ((e && e.message) || e); }
+      ciBusy = false; NL._kick();
+      loadMoons();
+    }
+    async function loadMoons() {
+      const pl = planetsOf(player());
+      const token = ++sysToken;
+      const need = [...new Set(pl.map((p) => p.sid))].filter((id) => !sysMoons[id] || Date.now() - sysMoons[id].at > SYS_FRESH);
+      if (!need.length || !NL.transportGet) return;
+      sysBusy = need.length; NL._kick();
+      for (const id of need) {
+        if (token !== sysToken) return;
+        const wait = lastRead + 1000 - Date.now();
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        if (token !== sysToken) return;
+        lastRead = Date.now();
+        try {
+          const d = await NL.transportGet('GET /galaxy/systems/:id/planets', id, {});
+          if (d && Array.isArray(d.moons)) {
+            sysMoons[id] = { at: Date.now(), moons: d.moons.filter((m) => m && m.userId).map((m) => ({ id: n0(m.id), pid: n0(m.planetId), name: m.name || '', pos: n0(m.position),
+              oid: n0(m.userId), owner: m.ownerName || '', vac: !!m.ownerIsVacationMode })) };
+            S.set('sys', sysMoons);
+          }
+        } catch (e) { ctx.log('system read failed', id, e && e.message); }
+        sysBusy--; NL._kick();
+      }
+      sysBusy = 0; NL._kick();
+    }
+
+    // ------------------------------------------------ data
+    const player = () => S.get('player', '');
+    const myIds = () => { const s = NL.cache.latest(/^\/api\/planets\/activity-summary$/); return new Set(((s && s.data && s.data.planets) || []).map((p) => n0(p.planetId != null ? p.planetId : p.id))); };
+    function owners() {
+      const mine = myIds(), me = new Set(), by = new Map();
+      for (const c of (colonies && colonies.list) || []) if (mine.has(c.pid)) me.add(c.oid);
+      for (const c of (colonies && colonies.list) || []) if (!me.has(c.oid)) by.set(c.owner, c.tag);
+      return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }));
+    }
+    const planetsOf = (name) => ((colonies && colonies.list) || []).filter((c) => name && c.owner === name);
+    // one row per planet, its moons (owned by the same player) right under it; the player's moons around other planets follow
+    function rows(name) {
+      const pl = planetsOf(name).slice().sort((a, b) => a.sys.localeCompare(b.sys, undefined, { numeric: true }) || a.pos - b.pos);
+      const out = [], seen = new Set();
+      const moons = []; for (const id of new Set(pl.map((p) => p.sid))) for (const m of (sysMoons[id] && sysMoons[id].moons) || []) if (m.owner === name) moons.push({ ...m, sid: id });
+      const sysName = new Map(pl.map((p) => [p.sid, p.sys]));
+      for (const p of pl) {
+        out.push({ kind: 'planet', id: p.pid, name: p.name, sid: p.sid, sys: p.sys, vac: p.vac });
+        for (const m of moons.filter((x) => x.pid === p.pid).sort((a, b) => a.pos - b.pos)) { seen.add(m.id); out.push({ kind: 'moon', id: m.id, name: m.name, sid: m.sid, sys: p.sys, vac: m.vac }); }
+      }
+      for (const m of moons) if (!seen.has(m.id)) out.push({ kind: 'moon', id: m.id, name: m.name, sid: m.sid, sys: sysName.get(m.sid) || '', vac: m.vac, loose: true });
+      return out;
+    }
+    const tkey = (r) => (r.kind === 'moon' ? 'm:' : 'p:') + r.id;
+    function lastSpied(r) {
+      let best = 0;
+      for (const x of reports) {
+        const hit = r.kind === 'moon' ? n0(x.targetMoonId) === r.id : n0(x.targetPlanetId) === r.id && !x.targetMoonId;
+        if (hit) best = Math.max(best, Date.parse(x.createdAt) || 0);
+      }
+      return best;
+    }
+    function status(r) {
+      for (const m of missions || []) {
+        const on = r.kind === 'moon' ? n0(m.targetMoonId) === r.id : n0(m.targetPlanetId) === r.id && !m.targetMoonId;
+        if (!on) continue;
+        if (m.missionType === 'spy_station' && m.status === 'stationed') return ['Stealth deployed', 'green'];
+        if (m.missionType === 'spy_station' && m.status === 'outbound') return ['Stealth en route', 'blue'];
+        if ((m.missionType === 'spy' || m.missionType === 'spy_moon') && m.status === 'outbound') return ['Spy en route', 'blue'];
+      }
+      const s = sent[tkey(r)];
+      if (s && Date.now() - s.at < SENT_KEEP) return ['Sent ' + (s.kind === 'stealth' ? 'Stealth Deploy' : 'Spy') + ' ' + clock(s.at), 'blue'];
+      if (r.vac) return ['Vacation', 'grey'];
+      return null;
+    }
+    const clock = (t) => { const d = new Date(t), today = d.toDateString() === new Date().toDateString(); return (today ? '' : d.toLocaleDateString([], { weekday: 'short' }) + ' ') + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+    const ago = (t) => { if (!t) return '—'; const s = Math.max(0, (Date.now() - t) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + 'm ago' : s < 86400 ? Math.floor(s / 3600) + 'h ago' : Math.floor(s / 86400) + 'd ago'; };
+
+    // ------------------------------------------------ the fleet dialog (master dialog, no template button; last ships remembered per kind)
+    const curName = () => String((document.querySelector('.planet-switcher-btn .ps-name') || {}).textContent || '').replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+    function sources() {
+      const s = NL.cache.latest(/^\/api\/planets\/activity-summary$/), pl = (s && s.data && s.data.planets) || [];
+      const all = pl.map((p) => ({ id: n0(p.planetId != null ? p.planetId : p.id), name: String(p.planetName || p.name || 'Planet').replace(/\s*\[[^\]]*\]\s*$/, '').trim() })).filter((p) => p.id);
+      const cur = curName();
+      return all.filter((p) => p.name === cur).concat(all.filter((p) => p.name !== cur));
+    }
+    const fresh = (path) => { const c = NL.cache.latest(new RegExp('^' + path.replace(/[/]/g, '\\/') + '$')); return c && Date.now() - c.at < 60000 ? c.data : null; };
+    async function get(path) {
+      const f = fresh(path); if (f) return f;
+      const wait = lastRead + 1000 - Date.now(); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      lastRead = Date.now();
+      return NL.getJson(path, ctx);
+    }
+    const highway = () => {                           // the game's own saved choice for spy_moon (default on)
+      try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^nexus-highway:.*:spy_moon$/.test(k)) return localStorage.getItem(k) !== 'false'; } } catch (e) { /* */ }
+      return true;
+    };
+    const shipsBody = (st) => st.ships.filter((s) => s.qty > 0).map((s) => ({ shipDefId: Number(s.key), quantity: s.qty }));
+
+    async function launch(btn, r, kind) {
+      if (!NL.fleet || !NL.fleet.open) return;
+      const stealth = kind === 'stealth', moon = r.kind === 'moon', allow = stealth ? STEALTH_SHIPS : SPY_SHIPS;
+      const src = sources();
+      const title = (stealth ? 'Stealth Deploy' : moon ? 'Moon Recon' : 'Spy') + ' · ' + r.name;
+      const target = { id: r.id, label: r.name + (moon ? ' (moon)' : '') + ' · ' + player() };
+      const typeOf = {};                              // ship def id -> key (the dialog's snapshot carries only the id)
+      await NL.fleet.open({
+        kind: 'fl-spy-' + kind, title, button: btn, template: false, sendLabel: 'Launch', target, sourceLabel: 'Send from',
+        fields: ['source', 'target', 'ships'].concat(stealth ? [] : ['leader'], moon ? [] : ['eta']),
+        sources: async () => (src.length ? src : []),
+        prepare: async (sourceId) => {
+          const f = await get('/api/planets/' + sourceId + '/fleet');
+          if (!f) return null;
+          const last = S.get('ships.' + kind, {}) || {}, list = [];
+          for (const k of allow) {
+            const s = (f.fleet || []).find((x) => x && x.definition && x.definition.key === k);
+            const have = s ? Math.max(0, n0(s.quantity) - Math.min(n0(s.quantity), n0(s.damagedQuantity))) : 0;
+            if (have > 0) typeOf[String(s.definition.id != null ? s.definition.id : s.shipDefId)] = k;
+            if (have > 0) list.push({ key: String(s.definition.id != null ? s.definition.id : s.shipDefId), type: k, name: s.definition.name || k, have, qty: Math.min(have, n0(last[k])), cargo: 0 });
+          }
+          let leader = null;
+          if (!stealth) {
+            const L = await get('/api/leadership'), v = L && L.enabled !== false && L.unlocked !== false && L.vessel;
+            const ok = !!(v && v.status === 'ready' && !v.assignedMissionId && n0(v.currentPlanetId) === n0(sourceId));
+            leader = { value: false, available: ok, reason: ok ? '' : v ? 'not ready on this planet' : 'no command vessel' };
+          }
+          return { ships: list, leader };
+        },
+        estimate: moon ? undefined : async (st, signal) => {
+          const ships = shipsBody(st);
+          if (!ships.length || !NL.transportPost) return null;
+          let e = null;
+          try { e = await NL.transportPost('POST /fleet/fuel-estimate', null, { sourcePlanetId: Number(st.sourceId), targetPlanetId: r.id, ships, missionType: stealth ? 'spy_station' : 'spy', attachLeader: st.leader || undefined }, signal); } catch (err) { return null; }
+          if (!e || e.fuelCost == null) return null;
+          return { fuel: n0(e.fuelCost), travelSec: n0(e.travelTime), hydrogenAvailable: e.hydrogenAvailable != null ? n0(e.hydrogenAvailable) : undefined };
+        },
+        send: async (st) => {
+          const ships = shipsBody(st), sp = Number(st.sourceId);
+          let path, body;
+          if (stealth) { path = '/api/fleet/stealth-deploy'; body = moon ? { sourcePlanetId: sp, targetMoonId: r.id, ships } : { sourcePlanetId: sp, targetPlanetId: r.id, ships }; }
+          else if (moon) { path = '/api/fleet/moon-dispatch'; body = { sourcePlanetId: sp, targetMoonId: r.id, missionType: 'spy_moon', ships, useHighway: highway(), ...(st.leader ? { attachLeader: true } : {}) }; }
+          else { path = '/api/fleet/spy'; body = { sourcePlanetId: sp, targetPlanetId: r.id, ships, attachLeader: st.leader ? true : undefined }; }
+          try {
+            const res = await NL.rawFetch(path, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: new Blob([JSON.stringify(body)], { type: 'application/json' }) });
+            const j = await res.json().catch(() => null);
+            if (!res.ok) {
+              if (j && j.code === 'PACT_VIOLATION') return { ok: false, message: 'You have a pact with this player. Use the game\'s own dialog if you mean to break it.' };
+              return { ok: false, message: (j && (j.error || j.message)) || ('The game refused the launch (HTTP ' + res.status + ').') };
+            }
+            S.set('ships.' + kind, Object.fromEntries(st.ships.filter((s) => typeOf[s.key]).map((s) => [typeOf[s.key], s.qty])));
+            sent[tkey(r)] = { at: Date.now(), kind }; S.set('sent', sent);
+            NL._kick();
+            setTimeout(() => { NL.getJson('/api/fleet/missions', ctx); }, 1000);     // as the game: missions again after a send
+            return { ok: true, message: (stealth ? 'Stealth Deploy' : 'Spy mission') + ' launched to ' + r.name + '.' };
+          } catch (e) { return { ok: false, message: 'Could not reach the game: ' + ((e && e.message) || e) }; }
+        },
+      });
+      NL._kick();
+    }
+
+    // ------------------------------------------------ the panel, first thing in the Espionage tab
+    function routerPush(path) {           // same as 10_global.js: the game's react-router navigator from the sidebar's fiber
+      try {
+        const seed = document.querySelector('a.sidebar-link') || document.body;
+        const key = Object.keys(seed).find((k) => k.startsWith('__reactFiber$'));
+        for (let f = key ? seed[key] : null, i = 0; f && i < 200; f = f.return, i++) { const v = f.memoizedProps && f.memoizedProps.value; if (v && v.navigator && typeof v.navigator.push === 'function') { v.navigator.push(path); return true; } }
+      } catch (e) { /* */ }
+      return false;
+    }
+    const sysLink = (r) => {
+      if (!r.sid) return r.sys || '—';
+      const href = '/galaxy?system=' + r.sid;
+      return NL.h('a', { class: 'nl2-fsl-sys', href, 'data-nl2-tip': 'Open ' + r.sys + ' on the Galaxy map', onclick: (e) => { if (e.button || e.ctrlKey || e.metaKey || e.shiftKey) return; e.preventDefault(); if (!routerPush(href)) location.href = href; } }, r.sys || ('System #' + r.sid));
+    };
+    let lastTab = null;                   // the game redraws the tab on each visit: a new element = a new open
+    function paint(tab) {
+      if (tab !== lastTab) { lastTab = tab; readColonies(false); if (player()) loadMoons(); }
+      let box = tab.querySelector(':scope > .nl2-fsl');
+      const name = player(), list = name ? rows(name) : [], isOpen = S.get('open', true);
+      const sig = JSON.stringify([name, isOpen, myIds().size, colonies && colonies.at, ciBusy, ciErr, sysBusy, list.map((r) => [r.id, r.kind, r.vac]),
+        list.map((r) => [lastSpied(r), status(r)]), Math.floor(Date.now() / 60000)]);
+      if (box && box.dataset.k === sig && tab.firstElementChild === box) return;
+      if (!box) box = NL.h('section', { class: 'nl2-fsl' });
+      if (tab.firstElementChild !== box) tab.insertBefore(box, tab.firstChild);
+      box.dataset.k = sig;
+      if (box.contains(document.activeElement) && document.activeElement.classList.contains('nl2-fsl-pick')) return;   // don't redraw under typing
+      box.replaceChildren();
+
+      const head = NL.h('h4', { class: 'nl2-fsl-h', onclick: () => { S.set('open', !isOpen); NL._kick(); } },
+        NL.h('span', { class: 'nl2-car' }, isOpen ? '▾' : '▸'), 'Quick Spy' + (name && list.length ? ' (' + list.length + ')' : ''));
+      const dl = NL.h('datalist', { id: 'nl2-fsl-players' }, owners().map(([o, tag]) => NL.h('option', { value: o }, tag ? '[' + tag + ']' : '')));
+      const pick = NL.h('input', { class: 'nl2-fsl-pick', list: 'nl2-fsl-players', placeholder: 'Choose a player…', value: name, 'data-nl2-tip': 'Type to filter the players the galaxy map shows' });
+      const choose = () => { const v = pick.value.trim(), hit = owners().find(([o]) => o.toLowerCase() === v.toLowerCase()); if (hit && hit[0] !== player()) { S.set('player', hit[0]); pick.blur(); NL._kick(); loadMoons(); } };
+      pick.addEventListener('change', choose);
+      pick.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') choose(); });
+      pick.addEventListener('blur', () => setTimeout(() => NL._kick(), 0));
+      const age = NL.h('span', { class: 'nl2-fsl-age', 'data-nl2-tip': colonies ? 'Known colonies read ' + new Date(colonies.at).toLocaleString() : '' },
+        ciBusy ? 'Reading known colonies…' : colonies ? 'Colonies ' + ago(colonies.at) : 'No colonies read yet');
+      const ref = NL.h('button', { type: 'button', class: 'nl2-fsl-ref', disabled: ciBusy, onclick: () => { for (const r of planetsOf(player())) delete sysMoons[r.sid]; readColonies(true); } }, 'Refresh');
+      box.append(NL.h('div', { class: 'nl2-fsl-head' }, head, isOpen ? [pick, dl, age, ref] : null));
+      if (!isOpen) return;
+      if (ciErr) box.append(NL.h('div', { class: 'nl2-fsl-note nl2-bad' }, ciErr));
+      if (!name) { box.append(NL.h('div', { class: 'nl2-fsl-note' }, 'Choose a player to list their planets and moons.')); return; }
+      if (!list.length) { box.append(NL.h('div', { class: 'nl2-fsl-note' }, colonies ? 'No planets of ' + name + ' are on the galaxy map.' : 'Waiting for the known colonies…')); return; }
+      if (sysBusy) box.append(NL.h('div', { class: 'nl2-fsl-note' }, 'Looking for moons… (' + sysBusy + ' system' + (sysBusy === 1 ? '' : 's') + ' to go)'));
+      const cols = [['Name', '26%'], ['Type', '8%'], ['System', '10%'], ['Last spied', '11%'], ['Status', '20%'], ['', '25%']];
+      const tb = NL.h('tbody');
+      for (const r of list) {
+        const ls = lastSpied(r), st = status(r);
+        const btn = (kind, label) => {
+          const b = NL.h('button', { type: 'button', class: 'nl2-fsl-btn nl2-c-blue', disabled: r.vac,
+            'data-nl2-tip': r.vac ? r.name + ' is in vacation mode' : (kind === 'spy' ? (r.kind === 'moon' ? 'Moon Recon' : 'Spy mission') : 'Stealth Deploy') + ' to ' + r.name },
+          label);
+          b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); launch(b, r, kind); });
+          return b;
+        };
+        tb.append(NL.h('tr', { class: r.kind === 'moon' ? 'nl2-fsl-moon' : null },
+          NL.h('td', { 'data-nl2-tip': r.name + (r.loose ? ' (orbits another player\'s planet)' : '') }, r.name),
+          NL.h('td', null, r.kind === 'moon' ? 'Moon' : 'Planet'),
+          NL.h('td', null, sysLink(r)),
+          NL.h('td', { 'data-nl2-tip': ls ? new Date(ls).toLocaleString() : 'No report for this target' }, ago(ls)),
+          NL.h('td', null, st ? NL.h('span', { class: 'nl2-fsl-st nl2-fsl-' + st[1] }, st[0]) : '—'),
+          NL.h('td', null, btn('spy', 'Spy'), btn('stealth', 'Stealth Deploy'))));
+      }
+      box.append(NL.h('table', null, NL.h('colgroup', null, cols.map(([, w]) => NL.h('col', { style: { width: w } }))),
+        NL.h('thead', null, NL.h('tr', null, cols.map(([c]) => NL.h('th', null, c)))), tb));
+    }
+    NL.watch('.fleet-tab-content .espionage-tab', paint);
+    // drop old "Sent" marks
+    for (const [k, v] of Object.entries(sent)) if (!v || Date.now() - v.at > SENT_KEEP) delete sent[k];
+    S.set('sent', sent);
+  },
+});
+
+}
+
 // ================================================================ 64_fl_transfer.js
 {
 // ---- 64_fl_transfer.js: FL-040 Fleet > Transfer tab (Transfer tab thread; David 3 Nov, design 'defaults', mockup mockups/FL-040_transfer_tab_mockup.png) ----
@@ -6643,6 +7035,22 @@ NL.feature({
     // Both tables share one column list (David 26 Oct: In space columns line up with By location's): every location the game
     // shows under By location plus every source of a fleet it shows under In space, in the game's By location order, then any
     // other sources. A planet with nothing in one table shows dashes there. Location keys ("planet:8787") = source type:id.
+    // Standard planet order: the game's own GET /api/planets answer (teed; the planet picker reads it), else ONE read of it.
+    let plOrd = null, plReading = false;
+    const gotPlanets = (d) => {
+      const list = Array.isArray(d) ? d : (d && d.planets) || [];
+      if (!list.length) return;
+      plOrd = new Map(list.filter((p) => p && p.name).map((p, i) => [String(p.name), [Number(p.sortOrder) || 0, i]])
+        .sort((a, b) => a[1][0] - b[1][0] || a[1][1] - b[1][1]).map(([n], i) => [n, i]));
+    };
+    NL.onData(/^\/api\/planets$/, (p, d) => { gotPlanets(d); NL._kick(); });
+    const planetOrder = () => {
+      if (plOrd) return plOrd;
+      const c = NL.cache.latest(/^\/api\/planets$/);
+      if (c && c.data) { gotPlanets(c.data); if (plOrd) return plOrd; }
+      if (!plReading && NL.getJson) { plReading = true; NL.getJson('/api/planets', ctx).then((d) => { gotPlanets(d); NL._kick(); }, () => {}); }
+      return null;
+    };
     const locCards = () => [...document.querySelectorAll('.cc-fleet-overview [data-nl2-ems="loc"] article.cc-fleet-location-card')];
     const spaceCards = () => [...document.querySelectorAll('.cc-fleet-overview [data-nl2-ems="space"] article.cc-fleet-mission-card')];
     function shared(data) {
@@ -6656,8 +7064,19 @@ NL.feature({
         ms.push({ key, m });
         if (!cols.has(key)) cols.set(key, src.name || '?');
       }
-      const rank = (k) => { const i = order.indexOf(k); return i < 0 ? 1e6 : i; };
-      return { cols: [...cols.entries()].sort((x, y) => rank(x[0]) - rank(y[0])), ms };
+      // EM-020 (David 3 Nov): planets in his standard order (the game's planet picker, /api/planets sortOrder), then moons in
+      // their planet's order, then anything else (outposts), each in the game's By location order. Until the planet list is
+      // known the game's order stands.
+      const po = planetOrder(), base = (n) => String(n || '').replace(/-[a-z]$/i, '');
+      const rank = (k, name) => {
+        const i = order.indexOf(k), g = i < 0 ? 1e6 : i, t = k.split(':')[0];
+        if (!po) return [0, g];
+        if (t === 'planet' && po.has(name)) return [0, po.get(name), g];
+        if (t === 'moon' && po.has(base(name))) return [1, po.get(base(name)), g];
+        return [2, g];
+      };
+      const cmp = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] || 0) - (b[i] || 0); if (d) return d; } return 0; };
+      return { cols: [...cols.entries()].sort((x, y) => cmp(rank(x[0], x[1]), rank(y[0], y[1]))), ms };
     }
     const locMatrix = (data, sh) => matrix(sh.cols.map(([key, name]) => {
       const l = locCards().some((c) => keyOf(c) === key) && (data.locations || []).find((x) => String(x.key) === key);
@@ -6684,7 +7103,7 @@ NL.feature({
       let box = sec.querySelector(':scope > .nl2-emx');
       sec.toggleAttribute('data-nl2-ems-mx', !!(on && data));
       if (!on || !data) { if (box) box.remove(); return; }
-      const sig = locCards().map(keyOf).join(',') + '/' + spaceCards().map(keyOf).join(',') + '|' + (data.generatedAt || '') + '|' + (data === tee ? 't' : 'p');
+      const sig = locCards().map(keyOf).join(',') + '/' + spaceCards().map(keyOf).join(',') + '|' + (data.generatedAt || '') + '|' + (data === tee ? 't' : 'p') + '|' + (plOrd ? plOrd.size : 0);
       if (box && box.dataset.sig === sig) return;
       if (!box) { box = NL.h('div', { class: 'nl2-emx' }); sec.appendChild(box); }
       box.dataset.sig = sig;

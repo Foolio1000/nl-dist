@@ -1,19 +1,30 @@
 {
-  "version": "0.5.72",
-  "built": "2026-11-03T07:46:44.800Z",
+  "version": "0.5.73",
+  "built": "2026-11-03T08:44:07.098Z",
   "items": [
-    "SH-008",
-    "SH-009",
-    "FL-042",
-    "FL-043"
+    "FL-044",
+    "EM-020",
+    "RE-004"
   ],
   "notes": {
-    "SH-008": "Hide Planetary and Orbital shipyards separately",
-    "SH-009": "Shipyard Maintain fix",
-    "FL-042": "Hide empty Wormholes placeholder",
-    "FL-043": "Wider Trip time columns"
+    "FL-044": "Quick Spy",
+    "EM-020": "Fleet matrix planet order",
+    "RE-004": "Hide underway research"
   },
   "history": [
+    {
+      "version": "0.5.73",
+      "items": [
+        "FL-044",
+        "EM-020",
+        "RE-004"
+      ],
+      "notes": {
+        "FL-044": "Quick Spy",
+        "EM-020": "Fleet matrix planet order",
+        "RE-004": "Hide underway research"
+      }
+    },
     {
       "version": "0.5.72",
       "items": [
