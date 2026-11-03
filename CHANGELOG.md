@@ -1,5 +1,14 @@
 # Release notes
 
+## v0.5.83 · Nov 3, 2026
+- Fleet Active: own planet names in Route
+- Transfer tab no longer jumps to Active
+- Transfer: moon rows see ships on the moon
+- Spy reports table: Alliance and Player columns
+- Spy reports table: Intel level bullets
+- Top bar pills: even spacing
+- Deliver bar: no empty columns
+
 ## v0.5.82 · Nov 3, 2026
 - Transfer: Hide checkbox column
 - Command Center: edit the target ratio

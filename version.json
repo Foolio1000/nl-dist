@@ -1,27 +1,46 @@
 {
-  "version": "0.5.82",
-  "built": "2026-11-03T20:51:49.111Z",
+  "version": "0.5.83",
+  "built": "2026-11-03T21:55:57.844Z",
   "items": [
-    "FL-059",
-    "EM-022",
-    "EM-023",
-    "EM-024",
-    "GL-072",
-    "FL-063",
-    "FL-064",
-    "FL-065"
+    "FL-066",
+    "FL-067",
+    "FL-068",
+    "FL-069",
+    "FL-070",
+    "GL-073",
+    "GL-074"
   ],
   "notes": {
-    "FL-059": "Transfer: Hide checkbox column",
-    "EM-022": "Command Center: edit the target ratio",
-    "EM-023": "Command Center: short ship names in ratios",
-    "EM-024": "Command Center: hide empty location columns",
-    "GL-072": "Tasks: Modules & Crew table removed",
-    "FL-063": "Espionage: Recall on each active mission",
-    "FL-064": "Espionage: Table View for spy reports",
-    "FL-065": "Espionage: collapsible sections"
+    "FL-066": "Fleet Active: own planet names in Route",
+    "FL-067": "Transfer tab no longer jumps to Active",
+    "FL-068": "Transfer: moon rows see ships on the moon",
+    "FL-069": "Spy reports table: Alliance and Player columns",
+    "FL-070": "Spy reports table: Intel level bullets",
+    "GL-073": "Top bar pills: even spacing",
+    "GL-074": "Deliver bar: no empty columns"
   },
   "history": [
+    {
+      "version": "0.5.83",
+      "items": [
+        "FL-066",
+        "FL-067",
+        "FL-068",
+        "FL-069",
+        "FL-070",
+        "GL-073",
+        "GL-074"
+      ],
+      "notes": {
+        "FL-066": "Fleet Active: own planet names in Route",
+        "FL-067": "Transfer tab no longer jumps to Active",
+        "FL-068": "Transfer: moon rows see ships on the moon",
+        "FL-069": "Spy reports table: Alliance and Player columns",
+        "FL-070": "Spy reports table: Intel level bullets",
+        "GL-073": "Top bar pills: even spacing",
+        "GL-074": "Deliver bar: no empty columns"
+      }
+    },
     {
       "version": "0.5.82",
       "items": [
