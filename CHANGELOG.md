@@ -1,5 +1,15 @@
 # Release notes
 
+## v0.5.82 · Nov 3, 2026
+- Transfer: Hide checkbox column
+- Command Center: edit the target ratio
+- Command Center: short ship names in ratios
+- Command Center: hide empty location columns
+- Tasks: Modules & Crew table removed
+- Espionage: Recall on each active mission
+- Espionage: Table View for spy reports
+- Espionage: collapsible sections
+
 ## v0.5.81 · Nov 3, 2026
 - Transfer tab update
 - Quick Spy distance column

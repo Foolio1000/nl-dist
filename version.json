@@ -1,27 +1,50 @@
 {
-  "version": "0.5.81",
-  "built": "2026-11-03T20:21:05.233Z",
+  "version": "0.5.82",
+  "built": "2026-11-03T20:51:49.111Z",
   "items": [
-    "FL-057",
-    "FL-058",
-    "FL-060",
-    "FL-061",
-    "FL-062",
-    "SH-012",
-    "GL-070",
-    "GL-071"
+    "FL-059",
+    "EM-022",
+    "EM-023",
+    "EM-024",
+    "GL-072",
+    "FL-063",
+    "FL-064",
+    "FL-065"
   ],
   "notes": {
-    "FL-057": "Transfer tab update",
-    "FL-058": "Quick Spy distance column",
-    "FL-060": "Fleet badge names each resource",
-    "FL-061": "Moon Call Ships from Transfer",
-    "FL-062": "Launched rows grey out at once",
-    "SH-012": "Shipyard hover says ship repairs",
-    "GL-070": "One format for badge hovers",
-    "GL-071": "Release notes link in the update bar"
+    "FL-059": "Transfer: Hide checkbox column",
+    "EM-022": "Command Center: edit the target ratio",
+    "EM-023": "Command Center: short ship names in ratios",
+    "EM-024": "Command Center: hide empty location columns",
+    "GL-072": "Tasks: Modules & Crew table removed",
+    "FL-063": "Espionage: Recall on each active mission",
+    "FL-064": "Espionage: Table View for spy reports",
+    "FL-065": "Espionage: collapsible sections"
   },
   "history": [
+    {
+      "version": "0.5.82",
+      "items": [
+        "FL-059",
+        "EM-022",
+        "EM-023",
+        "EM-024",
+        "GL-072",
+        "FL-063",
+        "FL-064",
+        "FL-065"
+      ],
+      "notes": {
+        "FL-059": "Transfer: Hide checkbox column",
+        "EM-022": "Command Center: edit the target ratio",
+        "EM-023": "Command Center: short ship names in ratios",
+        "EM-024": "Command Center: hide empty location columns",
+        "GL-072": "Tasks: Modules & Crew table removed",
+        "FL-063": "Espionage: Recall on each active mission",
+        "FL-064": "Espionage: Table View for spy reports",
+        "FL-065": "Espionage: collapsible sections"
+      }
+    },
     {
       "version": "0.5.81",
       "items": [
