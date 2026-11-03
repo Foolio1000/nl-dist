@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.75
+// @version      0.5.76
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -15,7 +15,7 @@
 (function nl2() {
 'use strict';
 if (window.__nl2) return;
-const NL = window.__nl2 = { version: '0.5.75', features: [] };
+const NL = window.__nl2 = { version: '0.5.76', features: [] };
 
 // ---------------------------------------------------------------- tee: copy the game's own GET answers (runs at document-start)
 // The game uses axios, so XHR must be hooked as well as fetch, and before the game starts (Game Access Guide section 9).
@@ -898,7 +898,7 @@ NL.fleet = (() => {
       } else net.backoff = 0;
       if (!r.ok) throw Object.assign(new Error((j && (j.error || j.message)) || ('HTTP ' + r.status)), { status: r.status });
       if (!j) throw new Error('empty body');
-      if (!isGet && /^POST \/(fleet|outposts|stations|moons)\//.test(route) && !/estimate|preview/.test(route) && NL.fleetChanged) NL.fleetChanged();   // GL-029: a launch
+      if (!isGet && /^POST \/(fleet|outposts|stations|moons)\//.test(route) && !/estimate|preview/.test(route) && NL.fleetChanged) NL.fleetChanged(route);   // GL-029: a launch (GL-055: the route, so the banner counts it at once)
       return c.codec.decode(j);
     }
     throw new Error('transport unavailable');
@@ -2641,7 +2641,32 @@ NL.feature({
 // and Tasks banner lines, PVE menu count and dialog rows hidden by CSS).
 const FS_ST = ['outbound', 'returning', 'in_combat', 'raiding', 'mining', 'exploring', 'surveying', 'stationed', 'collecting', 'inside_wormhole'];
 const FS_WRITE = /^\/api\/(fleet\/|moons\/\d+\/(send|dispatch)$|stations\/\d+\/send$|outposts\/\d+\/(collect|dispatch-mining)$|market\/.*(pickup|deliver))/;
-const fsChanged = () => { if (!NL.enabled('gl-fleetslots')) return; clearTimeout(fsWriteTimer); fsWriteTimer = setTimeout(fsRead, 250); };   // GL-029 (2 Nov): read at once, not after 2 s
+// GL-055 (David 3 Nov): a fleet launched from any dialog counts in the banner at once, not after the game's next missions read. Each launch
+// adds a pending slot (held mission ids noted at launch). A read that shows a new slot-holding mission takes one pending off; a read
+// arriving 4 s or more after a launch, or 45 s passing, drops it too (so a write that wasn't a launch only shows +1 briefly).
+// Reads follow at 0.25 s, 2 s, 5 s and 10 s while anything is pending. Recalls, cancels and estimates add nothing.
+const FS_NOT_LAUNCH = /recall|cancel|abort|estimate|preview|rename|preset|favou?rite|template|unread|seen|clear|patrol|leader/i;
+let fsPend = [];
+const fsHeldIds = (d) => new Set(d && Array.isArray(d.missions) ? d.missions.filter(fsHolds).map((m) => m.id) : []);
+function fsLaunched() {
+  fsPend.push({ at: Date.now(), ids: fsHeldIds(fsData) });
+  fsRender();
+  for (const t of [2000, 5000, 10000]) setTimeout(() => { if (fsPend.length) fsRead(); }, t);
+}
+function fsReconcile(d) {
+  if (!fsPend.length) return;
+  const now = Date.now(), held = [...fsHeldIds(d)], claimed = new Set();
+  fsPend = fsPend.filter((p) => {
+    const id = held.find((x) => !p.ids.has(x) && !claimed.has(x));
+    if (id != null) { claimed.add(id); return false; }
+    return now - p.at < 4000;
+  });
+}
+const fsChanged = (what) => {
+  if (!NL.enabled('gl-fleetslots')) return;
+  if (typeof what === 'string' && !FS_NOT_LAUNCH.test(what)) fsLaunched();      // GL-055: callers pass the path, route or op name
+  clearTimeout(fsWriteTimer); fsWriteTimer = setTimeout(fsRead, 250);
+};   // GL-029 (2 Nov): read at once, not after 2 s
 NL.fleetChanged = fsChanged;                       // transport launches (investigate, debris, survey, mine, pirates, salvage) have no readable path, so their callers ring this
 let fsData = null, fsBox = null, fsReadAt = 0, fsReading = false, fsAgain = false, fsWriteTimer = 0, fsDueTimer = 0, fsDueAt = 0, fsTick = 0;
 const fsHolds = (m) => m && !(m.logisticsRouteId != null || m.missionType === 'patrol' || m.missionType === 'leadership_move') && FS_ST.includes(m.status);
@@ -2709,12 +2734,14 @@ const fsTimeHtml = (t, est) => est ? '<em>' + fsDur(t - Date.now()) + '</em>' : 
 function fsRender() {
   const d = fsData;
   if (!d || !Array.isArray(d.missions)) { fsText = ''; if (fsBox) { if (fsBox.textContent !== '') fsBox.textContent = ''; fsBox.style.display = 'none'; } ldRender(); return; }
-  const hold = d.missions.filter(fsHolds), max = Number.isFinite(+d.maxFleetSlots) ? +d.maxFleetSlots : null, now = Date.now();
+  const max = Number.isFinite(+d.maxFleetSlots) ? +d.maxFleetSlots : null, now = Date.now();
+  fsPend = fsPend.filter((p) => now - p.at < 45000);                                  // GL-055
+  const hold = d.missions.filter(fsHolds), used = hold.length + fsPend.length;
   let next = null;
   for (const m of hold) { const h = fsHome(m); if (h && h.t > (h.est ? now : now - 1000) && (!next || h.t < next.t)) next = h; }
-  let txt = hold.length + (max != null ? ' / ' + max : ''), html = txt;
+  let txt = used + (max != null ? ' / ' + max : ''), html = txt;
   if (next) { txt += ' · ' + fsDur(next.t - now); html += ' · ' + fsTimeHtml(next.t, next.est); }
-  fsFull = max != null && hold.length >= max; fsLow = max != null && max - hold.length === 1;
+  fsFull = max != null && used >= max; fsLow = max != null && max - used === 1;
   fsText = txt; fsHtml = html; fsRows();
   const tip = next ? 'Next slot frees at ' + new Date(next.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + (next.est ? ' (estimated)' : '') : 'No fleet due home';
   if (fsBox) {
@@ -2763,7 +2790,7 @@ NL.feature({
       .nl2-fstop.nl2-fstop-full{color:#f87171}
       .nl2-fstop.nl2-fstop-low{color:#e6c34a}
       .nl2-fstop em{font-style:italic}`);
-    NL.onData(/^\/api\/fleet\/missions(\?|$)/, (p, d) => { if (d && Array.isArray(d.missions)) { fsData = d; fsRender(); } });
+    NL.onData(/^\/api\/fleet\/missions(\?|$)/, (p, d) => { if (d && Array.isArray(d.missions)) { fsReconcile(d); fsData = d; fsRender(); } });
     NL.onWrite(FS_WRITE, fsChanged);
     NL.onRoute(() => { const c = NL.cache.latest(/^\/api\/fleet\/missions(\?|$)/); if (!(c && Date.now() - c.at < 60000) && Date.now() - fsReadAt > 60000) fsRead(); });
     NL.watch('.topbar', ensureFleetSlots);
@@ -3525,10 +3552,19 @@ NL.feature({
     const { ensureRates, roiClass, roiSeconds, ageTxt, hasRates } = NL.buRoi;
     NL.buRoi.onChange(() => decorateAll());
 
-    const planet = () => {
-      const l = NL.cache.latest(/^\/api\/planets\/\d+$/);
-      return l && l.data && l.data.buildings ? l.data : null;
+    // BU-013 fix (3 Nov): the planet on screen is the one named in the game's planet switcher, not the planet read last.
+    // Other reads (Command Center all-planet loop, Overview, the game's own) also tee /api/planets/{id}, so "latest" could be
+    // another planet for a few seconds after load: Hide showed that planet's set (all hidden, then a wrong set, then right).
+    // Nothing is shown or saved until the planet on screen has loaded; no switcher on the page = old rule (latest).
+    const onScreen = () => {
+      const all = NL.cache.all(/^\/api\/planets\/\d+$/).filter((v) => v.data && v.data.buildings);
+      const el = document.querySelector('.planet-switcher-btn .ps-name');
+      if (!el) return all.sort((a, b) => b.at - a.at)[0] || null;
+      const name = el.textContent.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+      const nm = (v) => { const p = v.data.planet || v.data; return String((p && p.name) || '').trim(); };
+      return all.filter((v) => name && nm(v) === name).sort((a, b) => b.at - a.at)[0] || null;
     };
+    const planet = () => { const l = onScreen(); return l ? l.data : null; };
     // bonus factor per produced resource = gross / base (consumption is not multiplied)
     const factor = (pl, key) => {
       const b = pl.productionBreakdown && pl.productionBreakdown.breakdown && pl.productionBreakdown.breakdown[key];
@@ -3692,7 +3728,7 @@ NL.feature({
     const cardTools = (hd) => { let t = hd.querySelector(':scope > .nl2-cardtools'); if (!t) { t = NL.h('div', { class: 'nl2-cardtools' }); hd.appendChild(t); } return t; };
     // BU-008: a Hide checkbox per card, per planet. Hidden cards move (CSS order) behind a collapsible "Hidden (N)" bar
     // at the end of the card grid. The game only renders the selected tab's cards, so the bar follows the tab by itself.
-    const planetId = () => { const l = NL.cache.latest(/^\/api\/planets\/\d+$/); return l ? l.path.split('/').pop() : null; };
+    const planetId = () => { const l = onScreen(); return l ? l.path.split('/').pop() : null; };
     const hiddenSet = () => new Set((ctx.store.get('hidden', {})[planetId()] || []));
     function setHidden(key, on) {
       const all = ctx.store.get('hidden', {}), pid = planetId();
@@ -3709,6 +3745,7 @@ NL.feature({
       return b ? b.definition.key : null;
     }
     function applyHidden() {
+      if (!planetId()) return;                                   // planet on screen not loaded yet: leave cards as they are
       const set = hiddenSet(), open = !!ctx.store.get('hiddenOpen', false);
       const grids = new Set();
       document.querySelectorAll('.building-card').forEach((card) => {
@@ -4033,7 +4070,7 @@ NL.feature({
 // ---------------------------------------------------------------- RE-003 Fragment slider on a single research page (moved from old General G-073/G-077, 31 Oct, unchanged)
 // The planet's Research page offers "Precursor Fragments (N available)": a 0 to 5 slider and "-X% time", and its start request carries
 // useFragments. The single research page (/research/<key>) has no slider and sends none (read from the game's code 23 Oct). This adds the
-// same slider above its Start button (.research-detail-start-btn, only while it is enabled and N >= 1), shortens the shown time
+// same slider under its Start button (.research-detail-start-btn; RE-005 moved it from above, David 3 Nov; only while it is enabled and N >= 1), shortens the shown time
 // (.research-detail-time) by the game's own formula max(10%, 1 - n(5% + bonus)(1 + multiplier bonus)), and adds useFragments to the game's
 // own POST /api/research/<key>/start (fetch and XHR; only when the body has none; used once). N and the bonuses come from the game's own
 // stores, found by shape in its already loaded mountApp-*.js module (no request); if they can't be found there is no slider.
@@ -4042,9 +4079,9 @@ NL.feature({
   id: 're-frag',
   set: 'Research',
   name: 'Fragment slider on a research page',
-  desc: 'RE-003: on a single research page, a Precursor Fragments slider (0 to 5) above Start, like the planet Research page; the time shown follows it.',
+  desc: 'RE-003: on a single research page, a Precursor Fragments slider (0 to 5) under Start, like the planet Research page; the time shown follows it.',
   init() {
-    NL.css('re-frag', '.nl2-fragboost{display:flex;flex-direction:column;gap:4px;margin:0 0 8px;font-family:Rajdhani,"Exo 2",sans-serif;color:#d9e6f7}.nl2-fraglabel{font-size:13px;opacity:.85}.nl2-fragctl{display:flex;align-items:center;gap:10px}.nl2-fragctl input{flex:1;min-width:120px;accent-color:#38bdf8}.nl2-fragval{min-width:12px;font-weight:700}.nl2-fragdisc{color:#5ee08a;font-weight:600;white-space:nowrap}');
+    NL.css('re-frag', '.nl2-fragboost{display:flex;flex-direction:column;gap:4px;margin:0 0 8px;font-family:Rajdhani,"Exo 2",sans-serif;color:#d9e6f7}.nl2-fraglabel{font-size:13px;opacity:.85}.nl2-fragctl{display:flex;align-items:center;gap:10px}.nl2-fragctl input{flex:1;min-width:120px;accent-color:#38bdf8}.nl2-fragval{min-width:12px;font-weight:700}.nl2-fragdisc{color:#5ee08a;font-weight:600;white-space:nowrap}.nl2g-fraghost{flex-wrap:wrap!important}.nl2g-fraghost>.nl2-fragbreak{order:98;flex-basis:100%;height:0;margin:0;padding:0}.nl2g-fraghost>.nl2-fragboost{order:99;margin:4px 0 0 auto;box-sizing:border-box}');
     const generalOn = () => document.documentElement.dataset.nxGeneral === '1';
     const isStart = (u) => /\/api\/research\/[^/?]+\/start(\?|$)/.test(String(u || ''));
     let fragN = 0, fragTech = '', stores = null, storesAsked = false;
@@ -4114,19 +4151,28 @@ NL.feature({
       let box = document.querySelector('.nl2-fragboost');
       if (m && m[1] !== fragTech) { fragTech = m[1]; fragN = 0; }
       if (!m) fragTech = '';
-      if (!btn) { if (box) { box.remove(); fragN = 0; scaleTime(1); } return; }
+      if (!btn) { if (box) { if (box.parentElement) box.parentElement.classList.remove('nl2g-fraghost'); document.querySelectorAll('.nl2-fragbreak').forEach((x) => x.remove()); box.remove(); fragN = 0; scaleTime(1); } return; }
       findStores();
       let have = 0, bonus = 0, mult = 0;
       try { const u = stores && stores.us.getState().user, st = stores && stores.rs.getState(); have = Number(u && u.precursorFragments) || 0; bonus = st.precursorFragmentEffectBonus; mult = st.precursorFragmentEffectMultiplierBonus; } catch (e) { have = 0; }
       const max = Math.min(5, have);
-      if (btn.disabled || max < 1) { if (box) box.remove(); fragN = 0; scaleTime(1); return; }      // like the game: only while the research can be started
+      if (btn.disabled || max < 1) { if (box) { btn.parentElement.classList.remove('nl2g-fraghost'); document.querySelectorAll('.nl2-fragbreak').forEach((x) => x.remove()); box.remove(); } fragN = 0; scaleTime(1); return; }      // like the game: only while the research can be started
       if (fragN > max) fragN = max;
       if (!box) {
         box = NL.h('div', { class: 'nl2-fragboost' });
         box.innerHTML = '<label class="nl2-fraglabel"></label><div class="nl2-fragctl"><input type="range" min="0" step="1"><span class="nl2-fragval"></span><span class="nl2-fragdisc"></span></div>';
         box.querySelector('input').addEventListener('input', (e) => { fragN = Number(e.target.value) || 0; NL._kick(); });
       }
-      if (box.nextElementSibling !== btn) btn.before(box);
+      // RE-005 (David 3 Nov): the slider sits under the Level Up button. The action row wraps, and our box takes a second line,
+      // pushed to the right edge and as wide as the button, so the game's button never moves into an element of ours.
+      const host = btn.parentElement;
+      if (host && !host.classList.contains('nl2g-fraghost')) host.classList.add('nl2g-fraghost');
+      let brk = host.querySelector(':scope > .nl2-fragbreak');
+      if (!brk) brk = NL.h('div', { class: 'nl2-fragbreak' }); // a full-width, zero-height item forces the line break
+      if (btn.nextElementSibling !== brk) btn.after(brk);
+      if (brk.nextElementSibling !== box) brk.after(box);
+      const w = Math.max(btn.offsetWidth, 240) + 'px';
+      if (box.style.width !== w) box.style.width = w;
       const lab = box.querySelector('.nl2-fraglabel'), inp = box.querySelector('input'), val = box.querySelector('.nl2-fragval'), dis = box.querySelector('.nl2-fragdisc');
       const lt = 'Precursor Fragments (' + have + ' available):';
       if (lab.textContent !== lt) lab.textContent = lt;
@@ -6767,10 +6813,7 @@ NL.feature({
           NL.h('td', null, t.mission ? NL.h('span', { class: 'nl2-ftr-st nl2-ftr-trav' }, 'en route') : ''),
           NL.h('td', null, actBtn, routeBtn, NL.h('button', { type: 'button', class: 'nl2-ftr-hb', onclick: (e) => { e.stopPropagation(); hideMenu(t, e.currentTarget); } }, 'Hide ▾')));
       });
-      if (rows.length > 1) {
-        const tot = {}; for (const t of rows) for (const [k, v] of Object.entries(t.res)) tot[k] = (tot[k] || 0) + v;
-        body.push(NL.h('tr', { class: 'nl2-ftr-tot' }, NL.h('td', null, 'Total'), NL.h('td'), NL.h('td'), resCell(tot), NL.h('td'), NL.h('td'), NL.h('td'), NL.h('td'), NL.h('td')));
-      }
+      // FL-048: no Total row in this table (David 3 Nov; an exception to STYLE's Total row)
       return NL.h('table', null, NL.h('colgroup', null, ...COLS.map(([, w]) => NL.h('col', { style: w ? 'width:' + w : null }))), NL.h('thead', null, head), NL.h('tbody', null, ...body));
     }
     const MODE = { supply: 'Planet → Planet', collect_outpost: 'Collect Outpost', collect_moon: 'Collect Moon', collect_station: 'Collect Station', supply_outpost: 'Supply Outpost', supply_moon: 'Supply Moon' };
@@ -9607,7 +9650,7 @@ function nxsMain() {
     if (isRead && !u) { const c = tcache.get(ck); if (c && Date.now() - c.at < (TCACHE_MS[key] || 120000)) return c.d; }
     if (method === 'GET') await (key === DETAIL_OP && !u ? bulkGate() : soloGate(u));
     const d = await transportRaw(key, method, payload);
-    if (method !== 'GET' && OP_ROUTES[key] && OP_ROUTES[key].act && NL.fleetChanged) NL.fleetChanged();      // GL-029: a launch updates the banner's Fleet Slots at once
+    if (method !== 'GET' && OP_ROUTES[key] && OP_ROUTES[key].act && NL.fleetChanged) NL.fleetChanged(key);      // GL-029 (GL-055: the op name, so the banner counts it at once): a launch updates the banner's Fleet Slots at once
     if (isRead) { tcache.set(ck, { at: Date.now(), d }); readAt['t:' + key] = Date.now(); }
     return d;
   }

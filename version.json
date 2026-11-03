@@ -1,17 +1,34 @@
 {
-  "version": "0.5.75",
-  "built": "2026-11-03T09:16:10.295Z",
+  "version": "0.5.76",
+  "built": "2026-11-03T17:05:48.158Z",
   "items": [
-    "FL-045",
-    "FL-046",
-    "GL-054"
+    "BU-013",
+    "FL-048",
+    "GL-055",
+    "RE-005"
   ],
   "notes": {
-    "FL-045": "Transfer moon rows: over 10k (H 50k) collects above reserves",
-    "FL-046": "Transfer moon routes with own defaults dialog",
-    "GL-054": "Moon Supplies switched off"
+    "BU-013": "Buildings Hide follows the planet on screen",
+    "FL-048": "Transfer table has no Total row",
+    "GL-055": "Banner Fleet Slots count launches at once",
+    "RE-005": "Fragments slider sits under Level Up"
   },
   "history": [
+    {
+      "version": "0.5.76",
+      "items": [
+        "BU-013",
+        "FL-048",
+        "GL-055",
+        "RE-005"
+      ],
+      "notes": {
+        "BU-013": "Buildings Hide follows the planet on screen",
+        "FL-048": "Transfer table has no Total row",
+        "GL-055": "Banner Fleet Slots count launches at once",
+        "RE-005": "Fragments slider sits under Level Up"
+      }
+    },
     {
       "version": "0.5.75",
       "items": [
