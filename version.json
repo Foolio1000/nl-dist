@@ -37,7 +37,7 @@
     "FL-082": "Fleet: bio tick countdown",
     "FL-083": "Recall hover: time home",
     "FL-084": "Spy reports: Previous and Next",
-    "FL-085": "Fleet: FL-085"
+    "FL-085": "Evacuate always includes damaged ships"
   },
   "history": [
     {
@@ -78,7 +78,7 @@
         "FL-082": "Fleet: bio tick countdown",
         "FL-083": "Recall hover: time home",
         "FL-084": "Spy reports: Previous and Next",
-        "FL-085": "Fleet: FL-085"
+        "FL-085": "Evacuate always includes damaged ships"
       }
     },
     {

@@ -17,7 +17,7 @@
 - Fleet: bio tick countdown
 - Recall hover: time home
 - Spy reports: Previous and Next
-- Fleet: FL-085
+- Evacuate always includes damaged ships
 
 ## v0.5.85 · Nov 3, 2026
 - Make route: flat trigger and send amounts in settings
