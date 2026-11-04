@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.87
+// @version      0.5.88
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.87", features: [] };
+    const NL = window.__nl2 = { version: "0.5.88", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1740,7 +1740,7 @@
             const free = (k, lv) => (lv || 0) >= 1 && !(p.up && p.up[k]) && !busy[k];
             return { p: free("p", lp), o: free("o", lo) };
         }
-        const MAIN = ["/overview", "/buildings", "/research", "/shipyard", "/fleet", "#moons", "#outposts", "/galaxy", "/messages", "/command-center"];
+        const MAIN = ["/overview", "/buildings", "/research", "/shipyard", "/fleet", "#moons", "#outposts", "/galaxy", "/messages", "/command-center", "#core"];
         const mainKey = (a) => (/^galaxy map$/i.test(labelOf(a)) || /^\/galaxy/.test(pathOf(a)) ? "/galaxy" : pathOf(a));
         const DASH_ORDER = ["tasks", "pve", "pvp", "empire"];
         const OURS = "[data-nx-custom], [data-nl2-menu], [data-nxl]";
@@ -1785,7 +1785,12 @@
         const ICON = {
             moons: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z\"></path></svg>",
             outposts: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 2l8 5v10l-8 5-8-5V7z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg>",
+            core: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-crown sidebar-link-icon\" aria-hidden=\"true\"><path d=\"M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z\"></path><path d=\"M5 21h14\"></path></svg>",
         };
+        function coreLink() {
+            const on = /^\/leadership(\/|$)/.test(location.pathname);
+            return `<a class="sidebar-link nl2-mirror nl2-core${on ? " active" : ""}" href="/leadership" data-nl2-path="/leadership" data-nl2-src="Command Core">${ICON.core}<span class="sidebar-link-label-wrap"><span class="sidebar-link-label">Command Core</span></span></a>`;
+        }
         const menuBadges = { outpost: {}, moon: {} };
         NL.menuBadge = (kind, id, b) => {
             const m = menuBadges[kind];
@@ -1826,7 +1831,7 @@
             return sec;
         }
         function fillMain(sec, links) {
-            const cur = curPlanet(), sig = links.map((a) => a.outerHTML).join("") + JSON.stringify([moons, outposts.list, menuOpen, cur, moonIdleNames(), menuBadges]);
+            const cur = curPlanet(), sig = links.map((a) => a.outerHTML).join("") + JSON.stringify([moons, outposts.list, menuOpen, cur, moonIdleNames(), menuBadges, location.pathname]);
             if (sec.dataset.sig === sig)
                 return;
             sec.dataset.sig = sig;
@@ -1835,6 +1840,10 @@
                 if (p === "#moons" || p === "#outposts") {
                     const k = p.slice(1);
                     sec.insertAdjacentHTML("beforeend", groupHtml(k, k === "moons" ? moons : outposts.list, cur));
+                    continue;
+                }
+                if (p === "#core") {
+                    sec.insertAdjacentHTML("beforeend", coreLink());
                     continue;
                 }
                 const a = links.find((x) => mainKey(x) === p);
@@ -2255,6 +2264,8 @@
                         const links = gameLinks();
                         orig = (el.dataset.nl2Path && links.find((a) => pathOf(a) === el.dataset.nl2Path)) || links.find((a) => labelOf(a) === el.dataset.nl2Src);
                     }
+                    if (!orig && el.dataset.nl2Path === "/leadership")
+                        orig = document.querySelector("a.topbar-command-core");
                     if (!orig)
                         return;
                     e.preventDefault();
@@ -2667,6 +2678,8 @@
                 return [];
             const out = [];
             OPT_SEL.forEach((sel, i) => {
+                if (sel === "a.topbar-command-core")
+                    return;
                 const m = tr.querySelector(sel);
                 if (!m)
                     return;
@@ -2795,6 +2808,7 @@
       .topbar .nl2-options{display:inline-flex;align-items:center;box-sizing:border-box;height:30px;padding:0 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font-family:Rajdhani,"Exo 2",sans-serif;font-size:14px;font-weight:600;letter-spacing:.3px;line-height:1;white-space:nowrap;cursor:pointer}
       .topbar .nl2-options:hover,body.nl2g-optopen .topbar .nl2-options{background:rgba(56,189,248,.22);color:#fff}
       .topbar .nl2g-opt{display:none!important}
+      .topbar a.topbar-command-core{display:none!important}
       .nl2-optbg,.nl2-optcustom{display:none;position:fixed;box-sizing:border-box}
       .nl2-optbg{z-index:2147482999;border-radius:12px;border:1px solid rgba(120,200,255,.35);background:${OPT_BG};box-shadow:0 8px 24px rgba(0,0,0,.5)}
       body.nl2g-optopen .nl2-optbg,body.nl2g-optopen .nl2-optcustom{display:block}
@@ -3075,9 +3089,10 @@
                 NL.css("gl-inbound", `
       .nl2-inbound{box-sizing:border-box;padding:6px 12px;border-radius:8px;background:rgba(6,14,27,.94);border:1px solid rgba(116,176,232,.2);font-family:Rajdhani,"Exo 2",sans-serif;color:#d9e6f7}
       
-      .nl2-inbound{background:linear-gradient(90deg,rgba(56,189,248,.20),rgba(56,189,248,.08) 60%,rgba(56,189,248,.05));border:1px solid rgba(56,189,248,.6);border-left:4px solid #38bdf8;box-shadow:0 0 12px rgba(56,189,248,.18)}
-      .nl2-inbound .nl2-in-row>div{border-top-color:rgba(56,189,248,.2)}
-      .nl2-inbound .nl2-in-row>div:first-child{color:#7dd3fc}
+      
+      .nl2-inbound{background:rgba(168,85,247,.13);border:1px solid rgba(168,85,247,.7);border-left:4px solid #a855f7;box-shadow:0 0 12px rgba(168,85,247,.25)}
+      .nl2-inbound .nl2-in-row>div{border-top-color:rgba(168,85,247,.22)}
+      .nl2-inbound .nl2-in-row>div:first-child{color:#d8b4fe}
       .nl2-inbound.nl2-in-gap{margin:16px 0}
       .moon-page > section.moon-overview-missions{display:none!important}
       .nl2-in-head{font-size:12.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#7ed4ff;margin-bottom:2px}
@@ -3353,9 +3368,56 @@
             const n = cleanName(name), m = moons.find((x) => x.name === n), pn = m && m.planet ? m.planet : n;
             return (supPlanets || []).find((p) => p.name === pn) || null;
         }
+        function supHomeHere() {
+            const mm = location.pathname.match(/^\/moons\/(\d+)\/?$/);
+            if (mm) {
+                const c = NL.cache.latest(new RegExp("^/api/moons/" + mm[1] + "$")), m = c && c.data && (c.data.moon || c.data), pid = m && Number(m.planetId);
+                const p = pid && (supPlanets || []).find((x) => x.id === pid);
+                if (p)
+                    return p;
+            }
+            return supPlanetOf(curPlanet());
+        }
+        const SUP_CAMEL = (k) => String(k).replace(/_([a-z])/g, (m, c) => c.toUpperCase());
+        let supSnapRaw = null, supSnap = null;
+        function supStock(pid) {
+            let raw = null;
+            try {
+                raw = localStorage.getItem("nl2.bu-storage.snap");
+            }
+            catch (e) { }
+            if (raw !== supSnapRaw) {
+                supSnapRaw = raw;
+                try {
+                    supSnap = raw ? JSON.parse(raw) : null;
+                }
+                catch (e) {
+                    supSnap = null;
+                }
+            }
+            const pl = supSnap && Array.isArray(supSnap.planets) && supSnap.planets.find((x) => Number(x.id) === pid);
+            if (!pl)
+                return null;
+            const hrs = Math.max(0, (Date.now() - (pl._at || supSnap.at || Date.now())) / 3600000);
+            return (snake) => {
+                const k = SUP_CAMEL(snake), have = +pl[k] || 0, rate = +pl[k + "Rate"] || 0;
+                const rs = pl.rareResourceStorage, cap = +pl[k + "Storage"] || (rs && typeof rs === "object" ? +rs[k] : +rs) || Infinity;
+                return Math.max(have, Math.min(cap, have + rate * hrs));
+            };
+        }
+        function supFill(opt, miss) {
+            const pid = Number(opt.value), keys = Object.keys(miss || {});
+            if (!keys.length || !(pid > 0))
+                return "";
+            const at = supStock(pid);
+            if (!at)
+                return "";
+            const short = keys.map((k) => [k, miss[k] - Math.floor(at(k))]).filter(([, d]) => d > 0);
+            return short.length ? "short " + short.map(([k, d]) => IN_NAME[k] + " " + inShort(d)).join(", ") : "\u2713 all";
+        }
         function supLy(fromName, opt) {
             const v = Number(opt.value), byId = Number.isFinite(v) && v > 0 && (supPlanets || []).find((p) => p.id === v);
-            const a = supPlanetOf(fromName), b = byId || supPlanetOf(opt.dataset.nl2Base), xa = a && supXY(a.systemId), xb = b && supXY(b.systemId);
+            const a = fromName == null ? supHomeHere() : supPlanetOf(fromName), b = byId || supPlanetOf(opt.dataset.nl2Base), xa = a && supXY(a.systemId), xb = b && supXY(b.systemId);
             return xa && xb ? Math.round(Math.hypot(xa.x - xb.x, xa.y - xb.y)) : null;
         }
         function ensureSupplyLy(sel) {
@@ -3371,14 +3433,16 @@
                 if (!supPlanets)
                     return;
             }
-            const from = curPlanet();
+            const from = null;
+            const dlg = sel.closest(".construction-supply-dialog"), miss = dlg && typeof hubMissing === "function" ? hubMissing(dlg) : {};
             for (const o of sel.options) {
                 if (o.value.startsWith("nl2hub:"))
                     continue;
                 const t = o.textContent;
                 if (!o.dataset.nl2Base || t !== o.dataset.nl2Txt)
                     o.dataset.nl2Base = t;
-                const ly = supLy(from, o), want = ly == null ? o.dataset.nl2Base : o.dataset.nl2Base + " \u00B7 " + ly.toLocaleString("en-US") + " ly";
+                const ly = supLy(from, o), fill = supFill(o, miss);
+                const want = o.dataset.nl2Base + (ly == null ? "" : " \u00B7 " + ly.toLocaleString("en-US") + " ly") + (fill ? " \u00B7 " + fill : "");
                 if (t !== want)
                     o.textContent = want;
                 o.dataset.nl2Txt = want;
@@ -3417,14 +3481,18 @@
             const sels = [...dlg.querySelectorAll(".construction-supply-source select")];
             if (sels[0] !== sel)
                 return;
-            const here = (typeof moonHere === "function" && moonHere()) || curPlanet(), m = moons.find((x) => x.name === here);
-            if (!m || !m.planet) {
-                dlg.dataset.nl2MoonDef = "n/a";
+            const onMoonPage = /^\/moons\/\d+\/?$/.test(location.pathname), here = (typeof moonHere === "function" && moonHere()) || curPlanet();
+            const m = moons.find((x) => x.name === here), mid = (location.pathname.match(/^\/moons\/(\d+)/) || [])[1];
+            const md = mid && NL.cache.latest(new RegExp("^/api/moons/" + mid + "$")), mo = md && md.data && (md.data.moon || md.data);
+            const pid = (mo && Number(mo.planetId)) || (m && m.planet && supPlanets && (supPlanets.find((p) => p.name === m.planet) || {}).id);
+            const pname = (m && m.planet) || (pid && supPlanets && (supPlanets.find((p) => p.id === pid) || {}).name) || "";
+            if (!pid && !pname) {
+                if (!onMoonPage)
+                    dlg.dataset.nl2MoonDef = "n/a";
                 return;
             }
-            const pid = supPlanets && (supPlanets.find((p) => p.name === m.planet) || {}).id;
             const base = (o) => cleanName((o.dataset.nl2Base || o.textContent).replace(/\s*·\s*[\d,]+\s*ly$/, ""));
-            const opt = [...sel.options].find((o) => (pid && Number(o.value) === pid) || base(o) === m.planet);
+            const opt = [...sel.options].find((o) => (pid && Number(o.value) === pid) || (pname && base(o) === pname));
             if (!opt)
                 return;
             dlg.dataset.nl2MoonDef = "1";
@@ -3555,7 +3623,7 @@
             return hubBal && hubList;
         }
         function hubLy(hub) {
-            const me = supPlanetOf(curPlanet()), a = me && supXY(me.systemId);
+            const me = supHomeHere(), a = me && supXY(me.systemId);
             const b = hub && (Number.isFinite(+hub.systemX) && Number.isFinite(+hub.systemY) && hub.systemX != null ? { x: +hub.systemX, y: +hub.systemY } : hub.systemId != null ? supXY(hub.systemId) : null);
             return a && b ? Math.round(Math.hypot(a.x - b.x, a.y - b.y)) : null;
         }
@@ -4213,7 +4281,7 @@
         });
     }
     {
-        NL.badgeRows = false;
+        NL.badgeRows = true;
         NL.feature({
             id: "gl-badge-now",
             set: "Global",
@@ -4277,6 +4345,47 @@
                     NL.buStorage.onChange(paint);
                 setTimeout(paint, 3500);
                 setInterval(paint, 60000);
+            },
+        });
+    }
+    {
+        NL.feature({
+            id: "gl-core-badge",
+            set: "Global",
+            name: "Command Core badge",
+            desc: "GL-099: a badge on Command Core when a perk point is unspent or a crew slot is open; it clears right after you spend it or assign crew.",
+            init(ctx) {
+                const RE = /^\/api\/leadership(\?|$)/;
+                let seenAt = 0, due = null, last = "";
+                const set = (d) => {
+                    const v = d && d.vessel, tips = [];
+                    if (v && d.enabled !== false && d.unlocked !== false) {
+                        const pts = Math.max(0, Math.floor(+v.unspentTalentPoints || 0));
+                        const total = 1 + Math.max(0, Math.floor(+v.level || 0));
+                        const used = new Set((Array.isArray(d.modules) ? d.modules : []).filter((m) => m && m.equipped && /^crew_\d+$/.test(m.slot)).map((m) => m.slot)).size;
+                        const open = Math.max(0, total - used);
+                        if (pts)
+                            tips.push("Perks: " + pts + " to spend");
+                        if (open)
+                            tips.push("Crew: " + open + (open === 1 ? " slot open" : " slots open"));
+                    }
+                    const b = { n: tips.length, tip: tips.join("\n") }, k = JSON.stringify(b);
+                    if (k === last)
+                        return;
+                    last = k;
+                    ((NL.navBadges = NL.navBadges || {})["/leadership"] = NL.navBadges["/leadership"] || {}).core = b;
+                    if (NL.navBadgeChanged)
+                        NL.navBadgeChanged("/leadership");
+                };
+                NL.onData(RE, (p, d, at) => { seenAt = Math.max(seenAt, at || Date.now()); if (d && typeof d === "object")
+                    set(d); });
+                NL.onWrite(/^\/api\/leadership\//, () => {
+                    const at = Date.now();
+                    if (due)
+                        return;
+                    due = setTimeout(() => { due = null; if (!(seenAt > at))
+                        NL.getJson("/api/leadership", ctx); }, 1200);
+                });
             },
         });
     }
@@ -9285,7 +9394,7 @@
                         if (!from)
                             continue;
                         const to = { t: "moon", id: m.id, name: m.name };
-                        out.push({ key: "s" + m.id, kind: "supply", task: "Supply", from, to: { ...to, list: [to] }, res: miss, due: 0, at: m.at, why: "Below keep: " + why.join(" \u00B7 "), ships: shipsFor("p" + from.id, Object.values(miss).reduce((a, b) => a + b, 0)), go: (mi) => +mi.targetMoonId === m.id && ["transfer", "deliver"].includes(mi.missionType) && mi.status === "outbound" && trCarries(mi, miss) });
+                        out.push({ key: "s" + m.id, kind: "supply", task: "Supply", from, to: { ...to, list: [to] }, res: miss, due: 0, at: m.at, why: "Below keep: " + why.join(" \u00B7 "), whyLines: ["Below keep:", ...why], ships: shipsFor("p" + from.id, Object.values(miss).reduce((a, b) => a + b, 0)), go: (mi) => +mi.targetMoonId === m.id && ["transfer", "deliver"].includes(mi.missionType) && mi.status === "outbound" && trCarries(mi, miss) });
                     }
                     for (const t of out) {
                         t.covered = routes().filter((r) => covers(r, t));
@@ -9905,7 +10014,7 @@
                         const routeBtn = mHub !== undefined ? NL.h("button", { type: "button", class: "nl2-c-blue", disabled: !mHub, "data-nl2-tip": mHub ? "Collect Moon route from " + t.from.name + " to " + mHub.name + " (" + mHub.used + "/" + mHub.max + " routes)" : "No hub planet with a free route slot", onclick: () => routeDialog(t) }, "Make route")
                             : plan ? NL.h("button", { type: "button", class: "nl2-c-blue", "data-nl2-tip": plan.mode + ": " + trName(plan.k) + " from " + plan.from.name + " to " + plan.to.name + ", when \u2265 " + trFmt(plan.trig) + ", send " + trFmt(plan.amt), onclick: (e) => makeRoute(t, e.currentTarget) }, "Make route") : null;
                         const sh = t.noShips ? NL.h("td", { class: "nl2-ftr-d" }, "no ships on moon") : t.ships ? NL.h("td", { class: "nl2-ftr-est" + (t.ships.short ? " nl2-ftr-short" : ""), "data-nl2-tip": t.ships.short ? "Only " + t.ships.have + " there" : "Estimate: the dialog fits the ships" }, t.ships.text) : NL.h("td", { class: "nl2-ftr-d", "data-nl2-tip": t.toLabel || "" }, "\u2014");
-                        return NL.h("tr", { class: t.mission ? "nl2-ftr-enr" : null, "data-nl2-ftr-key": t.key }, NL.h("td", null, t.task), NL.h("td", null, place(t.from)), NL.h("td", { "data-nl2-tip": t.toLabel || null }, t.to ? place(t.to) : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), resCell(t.res), sh, NL.h("td", { class: "nl2-ftr-r" }, t.mission && homeAt(t.mission) ? cd(homeAt(t.mission)) : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", { "data-nl2-tip": t.why + (t.at ? "\nData " + trAge(t.at) : "") }, ...why), NL.h("td", null, t.mission ? NL.h("span", { class: "nl2-ftr-st nl2-ftr-trav" }, "en route") : ""), NL.h("td", { class: "nl2-ftr-acts" }, routeBtn || NL.h("span", { class: "nl2-ftr-gap" }), actBtn), hideBox(t.key));
+                        return NL.h("tr", { class: t.mission ? "nl2-ftr-enr" : null, "data-nl2-ftr-key": t.key }, NL.h("td", null, t.task), NL.h("td", null, place(t.from)), NL.h("td", { "data-nl2-tip": t.toLabel || null }, t.to ? place(t.to) : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), resCell(t.res), sh, NL.h("td", { class: "nl2-ftr-r" }, t.mission && homeAt(t.mission) ? cd(homeAt(t.mission)) : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", { "data-nl2-tip": (t.whyLines || String(t.why || "").split(/ · |, /)).join("\n") + (t.at ? "\nData " + trAge(t.at) : "") }, ...why), NL.h("td", null, t.mission ? NL.h("span", { class: "nl2-ftr-st nl2-ftr-trav" }, "en route") : ""), NL.h("td", { class: "nl2-ftr-acts" }, routeBtn || NL.h("span", { class: "nl2-ftr-gap" }), actBtn), hideBox(t.key));
                     });
                     return NL.h("table", null, NL.h("colgroup", null, ...COLS.map(([, w]) => NL.h("col", { style: w ? "width:" + w : null }))), NL.h("thead", null, head), NL.h("tbody", null, ...body));
                 }
@@ -10183,8 +10292,9 @@
             desc: "GL-075: a Rare deliver button on each Market hub card opens the game's Deliver dialog filled with every rare resource on the chosen planet (no Bio-Extract from the fleet bio planet), with just enough ships at 100% speed.",
             init(ctx) {
                 NL.css("gl-rare-deliver", ".hub-deliver-modal .nl2-rd-note{margin-right:auto;align-self:center;font-weight:600;color:#9fd3ff}.hub-deliver-modal .nl2-rd-note.nl2-rd-short{color:#f87171}"
-                    + ".market-hub-card-header .nl2-rd-btn{margin-left:auto;padding:2px 8px;font:inherit;font-size:.75rem;font-weight:600;background:#f59e0b;color:#000;border:none;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}"
-                    + ".market-hub-card-header button+.nl2-rd-btn{margin-left:4px}.market-hub-card-header .nl2-rd-btn+button{margin-left:4px!important}");
+                    + ".market-hub-card-header .nl2-rd-btn{margin-left:auto;padding:2px 8px;font-family:inherit;font-size:.75rem;font-weight:600;line-height:normal;background:#6b21a8;color:#fff;border:none;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}"
+                    + ".market-hub-card-header button+.nl2-rd-btn{margin-left:4px}.market-hub-card-header .nl2-rd-btn+button{margin-left:4px!important}"
+                    + ".market-hub-card-header .nl2-hub-pickup{background:#1e40af!important;color:#fff!important}.market-hub-card-header .nl2-hub-deliver{background:#c2410c!important;color:#fff!important}");
                 let pending = 0, busy = false;
                 let sup = null, supAt = 0;
                 NL.onData(/^\/api\/fleet\/supply(\?|$)/, (p, d) => { if (d && d.supplyPlanet) {
@@ -10212,6 +10322,11 @@
                     return sup && sup.name ? String(sup.name).trim() : "";
                 }
                 NL.watch(".market-hub-card", (card) => {
+                    for (const x of card.querySelectorAll(".market-hub-card-header button:not(.nl2-rd-btn)")) {
+                        const t = x.textContent.trim(), c = t === "Pickup" ? "nl2-hub-pickup" : t === "Deliver" ? "nl2-hub-deliver" : "";
+                        if (c && !x.classList.contains(c))
+                            x.classList.add(c);
+                    }
                     if (card.querySelector(".nl2-rd-btn"))
                         return;
                     const dv = [...card.querySelectorAll("button")].find((b) => b.textContent.trim() === "Deliver");
@@ -19379,7 +19494,8 @@
                             }
                             else
                                 fleet[p.id] = g("/api/planets/" + p.id + "/fleet");
-                            const f = fleet[p.id], y = g("/api/planets/" + p.id + "/shipyard");
+                            const yPath = "/api/planets/" + p.id + "/shipyard", yT = NL.cache && NL.cache.latest(new RegExp("^" + yPath + "(\\?|$)"));
+                            const f = fleet[p.id], y = yT && yT.data && (!CACHE[yPath] || yT.at > CACHE[yPath].at) ? yT.data : g(yPath);
                             if (f && Array.isArray(f.fleet) && f.fleet.some((x) => num(x.damagedQuantity) > 0)) {
                                 yard[p.id] = y;
                                 for (const x of f.fleet)
@@ -19498,6 +19614,10 @@
                     }
                     onIngest = () => { if (!S.loading && !S.modal)
                         loadAll({ reads: false }); };
+                    NL.onData(/^\/api\/planets\/\d+\/shipyard(\?|$)/, () => { clearTimeout(ingestTimer); ingestTimer = setTimeout(() => { try {
+                        onIngest();
+                    }
+                    catch (e) { } }, 400); });
                     if (NL.badgeRows)
                         NL.onData(/^\/api\/planets\/activity-summary(\?|$)/, () => { clearTimeout(ingestTimer); ingestTimer = setTimeout(() => { try {
                             onIngest();

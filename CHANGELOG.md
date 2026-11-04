@@ -1,5 +1,24 @@
 # Release notes
 
+## v0.5.88 · Nov 4, 2026
+- Bring resources: hub pick opens the hub dialog
+- Bring resources: which planets can fill the order
+- Bring resources on a moon: its own planet first
+- Deliver bar in violet
+- Transfer: Why hover one resource per line
+- Ship repairs badge skips full queues
+- Command Core in the left menu
+- Command Core badge
+- Rare deliver button colours
+- Badges clear instantly: Buildings
+- Buildings badge for repairs
+- Badges clear instantly: Shipyard
+- Badges clear instantly: Fleet
+- Badges clear instantly: Moons
+- Badges clear instantly: Outposts
+- Badges clear instantly: Dashboards
+- Badge at 100% storage
+
 ## v0.5.87 · Nov 4, 2026
 - Maintenance: error log on the Custom screen
 - Maintenance: shared formatting helpers
