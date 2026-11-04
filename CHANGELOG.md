@@ -1,5 +1,24 @@
 # Release notes
 
+## v0.5.86 · Nov 4, 2026
+- Transfer settings: clearer labels
+- Moon Collect: a threshold per main resource
+- Transfer: deliver to moons below their keeps
+- Transfer: moon ships seen on load
+- Research badge clears when research starts
+- Research: ROI only where it applies
+- Fire Sale: Cancel anyway
+- Overview badge for open Fire Sale orders
+- Fire Sale keeps travel hydrogen
+- Fire Sale keeps 1 h of Bio
+- Rare deliver: button polish
+- Rare deliver: No cargo ships fix
+- Wormholes: lost and damaged % on completed runs
+- Fleet: bio tick countdown
+- Recall hover: time home
+- Spy reports: Previous and Next
+- Fleet: FL-085
+
 ## v0.5.85 · Nov 3, 2026
 - Make route: flat trigger and send amounts in settings
 
