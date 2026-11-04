@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.84
+// @version      0.5.85
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.84", features: [] };
+    const NL = window.__nl2 = { version: "0.5.85", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -8475,6 +8475,18 @@
             NL.option({ key: "fl-transfer.moonres", group: "Fleet Transfer", label: "Collect moon when other resources are over", type: "number", def: 10000, min: 0, step: 1000 });
         }
         const trOptN = (k, d) => { const v = NL.opt ? +NL.opt(k) : NaN; return isFinite(v) && v >= 0 ? v : d; };
+        if (NL.option) {
+            NL.option({ key: "fl-transfer.outrig", group: "Fleet Transfer", label: "Outpost route: trigger when over", type: "number", def: 10000, min: 1, step: 1000 });
+            NL.option({ key: "fl-transfer.ousend", group: "Fleet Transfer", label: "Outpost route: send amount", type: "number", def: 5000, min: 1, step: 1000 });
+            NL.option({ key: "fl-transfer.pltrig", group: "Fleet Transfer", label: "Planet route: trigger when over", type: "number", def: 100000, min: 1, step: 1000 });
+            NL.option({ key: "fl-transfer.plsend", group: "Fleet Transfer", label: "Planet route: send amount", type: "number", def: 50000, min: 1, step: 1000 });
+        }
+        const trRouteAmt = (planet, cap) => {
+            const t = trOptN(planet ? "fl-transfer.pltrig" : "fl-transfer.outrig", planet ? 100000 : 10000) || (planet ? 100000 : 10000);
+            const a = trOptN(planet ? "fl-transfer.plsend" : "fl-transfer.ousend", planet ? 50000 : 5000) || (planet ? 50000 : 5000);
+            const c = cap > 0 ? cap : Infinity;
+            return { trig: Math.round(Math.min(t, c)), amt: Math.round(Math.min(a, c)) };
+        };
         const TR_MOON_OVER = (k) => (k === "hydrogen" ? trOptN("fl-transfer.moonh2", 100000) : trOptN("fl-transfer.moonres", 10000));
         const TR_MOON_KEEP = (k) => (k === "hydrogen" ? 50000 : k === "quantum_dust" || k === "dark_matter" ? 10000 : 0);
         const TR_ROUTE_DEF = (k) => (k === "hydrogen" ? [100000, 50000] : k === "quantum_dust" || k === "dark_matter" ? [20000, 10000] : [10000, 10000]);
@@ -8827,11 +8839,11 @@
                         if (!hub)
                             return null;
                         const me = planetById(t.from.id), to = planets().filter((p) => p.id !== t.from.id).sort(byNear(me))[0];
-                        return to ? { mode: "Planet \u2192 Planet", from: t.from, to: { id: to.id, name: to.name }, k: x.k, trig: Math.round(x.cap * 0.9), amt: Math.round(x.cap * 0.4) } : null;
+                        return to ? { mode: "Planet \u2192 Planet", from: t.from, to: { id: to.id, name: to.name }, k: x.k, ...trRouteAmt(true, x.cap) } : null;
                     }
                     const base = t.kind === "moon" ? planetById(t.to && t.to.id) : null;
                     const hp = free.map((h) => planetById(h.planetId) || { id: +h.planetId, name: trClean(h.planetName) }).sort(base ? byNear(base) : (a, b) => trN(a.sortOrder) - trN(b.sortOrder));
-                    return hp[0] ? { mode: t.kind === "moon" ? "Collect Moon" : "Collect Outpost", from: t.from, to: { id: hp[0].id, name: hp[0].name }, k: x.k, trig: Math.round(x.cap * 0.9), amt: Math.round(x.cap * 0.4) } : null;
+                    return hp[0] ? { mode: t.kind === "moon" ? "Collect Moon" : "Collect Outpost", from: t.from, to: { id: hp[0].id, name: hp[0].name }, k: x.k, ...trRouteAmt(false, x.cap) } : null;
                 }
                 const isHid = (k) => { const h = st.get("hide", {})[k]; return h != null && (h < 0 || h > Date.now()); };
                 const hidden = (t) => isHid(t.key);
@@ -9492,7 +9504,7 @@
                 st.set("open", false);
                 function changed() { sig = ""; cache = null; NL._kick(); }
                 if (NL.onOpt)
-                    for (const k of ["fl-transfer.oupct", "bu-storage.pct", "fl-transfer.moonh2", "fl-transfer.moonres"])
+                    for (const k of ["fl-transfer.oupct", "bu-storage.pct", "fl-transfer.moonh2", "fl-transfer.moonres", "fl-transfer.outrig", "fl-transfer.ousend", "fl-transfer.pltrig", "fl-transfer.plsend"])
                         NL.onOpt(k, changed);
                 const current = () => { if (!cache || Date.now() - cacheAt > 30000) {
                     cache = tasks();

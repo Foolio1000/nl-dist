@@ -1,5 +1,8 @@
 # Release notes
 
+## v0.5.85 · Nov 3, 2026
+- Make route: flat trigger and send amounts in settings
+
 ## v0.5.84 · Nov 3, 2026
 - Command Center Research: lab upgrade end time
 - Transfer: moon Collect opens on the Fleet page
