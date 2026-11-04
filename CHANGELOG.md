@@ -1,5 +1,18 @@
 # Release notes
 
+## v0.5.84 · Nov 3, 2026
+- Command Center Research: lab upgrade end time
+- Transfer: moon Collect opens on the Fleet page
+- Call Ships: one extra cargo ship
+- Transfer: moon Collect thresholds in settings
+- Transfer: Make route on moon rows
+- Market hubs: Rare deliver button
+- To Do: Undo button
+- Shipyard badge skips full repair queues
+- Research: ROI on cards
+- Research: hide researches
+- Research badge: artifacts and trader summon
+
 ## v0.5.83 · Nov 3, 2026
 - Fleet Active: own planet names in Route
 - Transfer tab no longer jumps to Active

@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.83
+// @version      0.5.84
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.83", features: [] };
+    const NL = window.__nl2 = { version: "0.5.84", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -257,7 +257,7 @@
             + `.nl2-c-${k}[disabled],.nl2-c-${k}.disabled{background:#d1d5db!important;border-color:#6b7280!important;color:#6b7280!important;opacity:1!important}`;
     }).join("\n"));
     {
-        const KEY = "nl2.em-tabs.todo", MAX = 255, subs = [];
+        const KEY = "nl2.em-tabs.todo", MAX = 255, UNDO_MS = 86400000, subs = [];
         const all = () => { try {
             const a = JSON.parse(localStorage.getItem(KEY) || "[]");
             return Array.isArray(a) ? a.filter((t) => t && typeof t.text === "string") : [];
@@ -287,6 +287,10 @@
                 return false; const a = all(); a.push({ text: t, done: false, at: Date.now() }); put(a); return true; },
             done(i) { const a = all(); if (!a[i] || a[i].done)
                 return false; a[i].done = true; a[i].doneAt = Date.now(); put(a); return true; },
+            lastDone() { const a = all(), cut = Date.now() - UNDO_MS; let k = -1; a.forEach((t, i) => { if (t.done && +t.doneAt > cut && (k < 0 || +t.doneAt > +a[k].doneAt))
+                k = i; }); return k < 0 ? null : { i: k, text: a[k].text }; },
+            undo() { const l = NL.todo.lastDone(); if (!l)
+                return false; const a = all(); a[l.i].done = false; delete a[l.i].doneAt; put(a); return true; },
             onChange(fn) { subs.push(fn); return () => { const k = subs.indexOf(fn); if (k >= 0)
                 subs.splice(k, 1); }; },
             render(el) {
@@ -296,8 +300,9 @@
                 }
                 const draw = (clear) => {
                     const inp0 = el.querySelector(".nl2-todo-input"), keep = !clear && inp0 ? inp0.value : "", focused = !!inp0 && document.activeElement === inp0;
-                    const open = NL.todo.list();
-                    el.innerHTML = "<div class=\"nl2-todo-add\"><input type=\"text\" class=\"nl2-todo-input\" maxlength=\"" + MAX + "\" placeholder=\"New item (up to " + MAX + " characters)\"><button type=\"button\" class=\"nl2-todo-addbtn nl2-c-blue\">Add</button></div>"
+                    const open = NL.todo.list(), last = NL.todo.lastDone();
+                    el.innerHTML = "<div class=\"nl2-todo-add\"><input type=\"text\" class=\"nl2-todo-input\" maxlength=\"" + MAX + "\" placeholder=\"New item (up to " + MAX + " characters)\"><button type=\"button\" class=\"nl2-todo-addbtn nl2-c-blue\">Add</button>"
+                        + (last ? "<button type=\"button\" class=\"nl2-todo-undo nl2-c-blue\" data-nl2-tip=\"" + esc("Reopen: " + last.text) + "\">Undo</button>" : "") + "</div>"
                         + (open.length ? "<ul class=\"nl2-todo-list\">" + open.map((x) => "<li><label><input type=\"checkbox\" data-todo=\"" + x.i + "\"><span>" + esc(x.text) + "</span></label></li>").join("") + "</ul>" : "<div class=\"nl2-todo-empty\">Nothing to do.</div>");
                     const inp = el.querySelector(".nl2-todo-input");
                     inp.value = keep;
@@ -308,7 +313,9 @@
                 const add = () => { const inp = el.querySelector(".nl2-todo-input"); own = true; const ok = NL.todo.add(inp ? inp.value : ""); own = false; if (ok)
                     draw(true); };
                 el.addEventListener("click", (e) => { if (e.target.closest(".nl2-todo-addbtn"))
-                    add(); });
+                    add();
+                else if (e.target.closest(".nl2-todo-undo"))
+                    NL.todo.undo(); });
                 el.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("nl2-todo-input")) {
                     e.preventDefault();
                     add();
@@ -329,7 +336,7 @@
     .nl2-todo-empty{color:#7890a5;font-size:13px}
     .nl2-todo-add{display:flex;gap:8px;margin-bottom:10px}
     .nl2-todo-input{flex:1;min-width:0;background:rgba(5,10,20,.9);color:#e2eefb;border:1px solid rgba(56,189,248,.3);border-radius:6px;padding:6px 10px;font-size:13px}
-    .nl2-todo-addbtn{border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer}
+    .nl2-todo-addbtn,.nl2-todo-undo{border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer}
     .nl2-todo-list{list-style:none;margin:0;padding:0}
     .nl2-todo-list li{padding:5px 0;border-bottom:1px solid rgba(56,189,248,.12);font-size:13px;color:#e2eefb}
     .nl2-todo-list label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
@@ -1865,6 +1872,11 @@
                 if (rp.length) {
                     n += rp.length;
                     tip = (tip ? tip.split("\n") : []).concat(rp.map((x) => "Ship repairs: " + x)).join("\n");
+                }
+                const xs = Object.values(NL.navBadges[a.dataset.nl2Path] || {}).filter((x) => x && +x.n > 0);
+                if (xs.length) {
+                    n += xs.reduce((t, x) => t + +x.n, 0);
+                    tip = (tip ? tip.split("\n") : []).concat(xs.map((x) => x.tip).filter(Boolean)).join("\n");
                 }
                 setBadge(a, n ? String(n) : "", tip);
             }
@@ -5109,7 +5121,7 @@
         });
     }
     {
-        const RE_FLAGS = ["data-nl2-relab", "data-nl2-reuw"];
+        const RE_FLAGS = ["data-nl2-relab", "data-nl2-reuw", "data-nl2-rehid"];
         const reActive = {};
         function reSetFlag(card, attr, on) {
             if (on === card.hasAttribute(attr))
@@ -5137,11 +5149,16 @@
             if (last.nextElementSibling !== el)
                 last.insertAdjacentElement("afterend", el);
             const cards = [...document.querySelectorAll(".research-grid .research-card")];
-            const shown = cards.filter((c) => !RE_FLAGS.some((a) => c.hasAttribute(a))).length;
+            const shown = cards.filter((c) => !RE_FLAGS.some((a) => c.hasAttribute(a)) && !c.hasAttribute("data-nl2-rehidset")).length;
             const t = Object.values(reActive).some(Boolean) ? "Showing " + shown + " of " + cards.length : "";
             if (el.textContent !== t)
                 el.textContent = t;
         }
+        const reHooks = [];
+        const reRefresh = () => { reCount(); reHooks.forEach((fn) => { try {
+            fn();
+        }
+        catch (e) { } }); };
         NL.css("re-count", ".nl2-recount{color:#f5b83d;font-weight:700;font-size:12px;white-space:nowrap;align-self:center}");
         NL.feature({
             id: "re-lab",
@@ -5187,7 +5204,7 @@
                         inMax.classList.toggle("nl2-set", inMax.value !== "");
                         box.classList.toggle("nl2-on", inMin.value !== "" || inMax.value !== "");
                     }
-                    reCount();
+                    reRefresh();
                 }
                 function save() {
                     min = inMin.value;
@@ -5262,7 +5279,7 @@
                 function apply() {
                     document.querySelectorAll(".research-grid .research-card").forEach((c) => reSetFlag(c, "data-nl2-reuw", on && underway(c)));
                     reActive.underway = on;
-                    reCount();
+                    reRefresh();
                 }
                 NL.watch(".research-page .research-filter-toggles", (tg) => {
                     if (!box) {
@@ -5466,6 +5483,277 @@
                         dis.textContent = dt;
                     scaleTime(f);
                 });
+            },
+        });
+        NL.feature({
+            id: "re-badge",
+            set: "Research",
+            name: "Research badge: artifacts and trader",
+            desc: "RE-008: the Research menu badge also counts fewer than 3 active artifacts and a ready Wandering Trader summon.",
+            init(ctx) {
+                const OPTS = [["re-badge.artifacts", "Badge when fewer than 3 artifacts are active"], ["re-badge.trader", "Badge when a Wandering Trader summon is ready"]];
+                OPTS.forEach(([key, label]) => { if (NL.option)
+                    NL.option({ key, group: "Research badge", label, type: "checkbox", def: true }); });
+                const optOn = (key) => { const v = NL.opt ? NL.opt(key) : true; return v === undefined || v === null ? true : !!v; };
+                let art = ctx.store.get("art", null), trader = ctx.store.get("trader", null);
+                NL.onData(/^\/api\/artifacts$/, (p, d, at) => {
+                    if (!Array.isArray(d))
+                        return;
+                    const exp = d.filter((x) => x && /activ/i.test(x.status) && !/inactiv/i.test(x.status)).map((x) => (x.expiresAt ? Date.parse(x.expiresAt) || 0 : 0));
+                    art = { exp, at: at || Date.now() };
+                    ctx.store.set("art", art);
+                    update();
+                });
+                NL.onData(/^\/api\/artifacts\/trader/, (p, d, at) => {
+                    if (!d || !d.nextSummonAt)
+                        return;
+                    const skew = d.serverNow ? (at || Date.now()) - Date.parse(d.serverNow) : 0;
+                    trader = { next: Date.parse(d.nextSummonAt) + (isFinite(skew) ? skew : 0), at: at || Date.now() };
+                    ctx.store.set("trader", trader);
+                    update();
+                });
+                let timer = 0, last = "";
+                function update() {
+                    const now = Date.now(), wake = [];
+                    const set = (src, n, tip) => { ((NL.navBadges = NL.navBadges || {})["/research"] = NL.navBadges["/research"] || {})[src] = { n, tip: n ? tip : "" }; };
+                    let a = 0, aTip = "";
+                    if (art && optOn("re-badge.artifacts")) {
+                        const live = art.exp.filter((e) => !e || e > now);
+                        art.exp.forEach((e) => { if (e > now)
+                            wake.push(e); });
+                        if (live.length < 3) {
+                            a = 1;
+                            aTip = "Artifacts: " + live.length + " of 3 active";
+                        }
+                    }
+                    let t = 0;
+                    if (trader && optOn("re-badge.trader")) {
+                        if (now >= trader.next)
+                            t = 1;
+                        else
+                            wake.push(trader.next);
+                    }
+                    set("artifacts", a, aTip);
+                    set("trader", t, "Trader: summon ready");
+                    const key = a + aTip + "|" + t;
+                    if (key !== last) {
+                        last = key;
+                        if (NL.navBadgeChanged)
+                            NL.navBadgeChanged("/research");
+                    }
+                    clearTimeout(timer);
+                    if (wake.length)
+                        timer = setTimeout(update, Math.min(Math.max(Math.min(...wake) - now + 500, 1000), 2147483000));
+                }
+                OPTS.forEach(([key]) => { if (NL.onOpt)
+                    NL.onOpt(key, () => update()); });
+                update();
+                const firstReads = [["art", "/api/artifacts"], ["trader", "/api/artifacts/trader"]].filter(([k]) => !(k === "art" ? art : trader));
+                firstReads.forEach(([k, path], i) => setTimeout(() => {
+                    if (k === "art" ? art : trader)
+                        return;
+                    NL.getJson(path, ctx);
+                }, 1000 * (i + 1)));
+            },
+        });
+        NL.feature({
+            id: "re-hide",
+            set: "Research",
+            name: "Hide researches",
+            desc: "RE-007: a Hide checkbox on each research card; hidden cards move into a collapsed \"Hidden (N)\" bar at the bottom.",
+            init(ctx) {
+                NL.css("re-hide", ".research-card-header{position:relative}.nl2-rehide{position:absolute;top:30px;right:10px;display:flex;align-items:center;gap:4px;font-size:11px;color:#8a96a6;cursor:pointer;z-index:2}.nl2-rehide input{margin:0;cursor:pointer}.nl2-rehidbar{order:9998;grid-column:1/-1;flex-basis:100%;padding:8px 12px;margin-top:6px;border:1px solid #2a3a52;border-radius:6px;color:#c9d4e3;font-weight:600;cursor:pointer;user-select:none}.nl2-rehidbar:hover{background:#13213a}");
+                const keyOf = (card) => { const a = card.querySelector(".research-name-link"); return a ? (a.getAttribute("href") || "").split("?")[0].split("/").pop() : ""; };
+                const hidden = () => new Set(ctx.store.get("hidden", []));
+                function setHidden(key, on) {
+                    const set = hidden();
+                    if (on)
+                        set.add(key);
+                    else
+                        set.delete(key);
+                    ctx.store.set("hidden", [...set]);
+                    apply();
+                }
+                function apply() {
+                    const set = hidden(), open = !!ctx.store.get("hiddenOpen", false);
+                    const grid = document.querySelector(".research-page .research-grid");
+                    if (!grid)
+                        return;
+                    let n = 0;
+                    grid.querySelectorAll(":scope > .research-card").forEach((card) => {
+                        const k = keyOf(card), hid = !!k && set.has(k);
+                        const cb = card.querySelector(".nl2-rehide input");
+                        if (cb && cb.checked !== hid)
+                            cb.checked = hid;
+                        if (hid !== card.hasAttribute("data-nl2-rehidset")) {
+                            if (hid)
+                                card.setAttribute("data-nl2-rehidset", "1");
+                            else
+                                card.removeAttribute("data-nl2-rehidset");
+                        }
+                        const want = hid ? "9999" : "";
+                        if (card.style.order !== want)
+                            card.style.order = want;
+                        reSetFlag(card, "data-nl2-rehid", hid && !open);
+                        if (hid && !card.hasAttribute("data-nl2-relab") && !card.hasAttribute("data-nl2-reuw"))
+                            n++;
+                    });
+                    let bar = grid.querySelector(":scope > .nl2-rehidbar");
+                    if (!bar) {
+                        bar = NL.h("div", { class: "nl2-rehidbar" });
+                        bar.addEventListener("click", () => { ctx.store.set("hiddenOpen", !ctx.store.get("hiddenOpen", false)); apply(); });
+                        grid.appendChild(bar);
+                    }
+                    const t = (open ? "\u25BE " : "\u25B8 ") + "Hidden (" + n + ")";
+                    if (bar.textContent !== t)
+                        bar.textContent = t;
+                    const disp = n ? "" : "none";
+                    if (bar.style.display !== disp)
+                        bar.style.display = disp;
+                    reCount();
+                }
+                NL.watch(".research-page .research-card .research-card-header", (hd) => {
+                    if (hd.querySelector(".nl2-rehide"))
+                        return;
+                    const card = hd.closest(".research-card");
+                    const cb = NL.h("input", { type: "checkbox" });
+                    const lab = NL.h("label", { class: "nl2-rehide", "data-nl2-tip": "Hide this research (same on every planet)" }, cb, "Hide");
+                    lab.addEventListener("click", (e) => e.stopPropagation());
+                    cb.addEventListener("change", () => { const k = keyOf(card); if (k)
+                        setHidden(k, cb.checked); });
+                    hd.appendChild(lab);
+                });
+                reHooks.push(apply);
+                NL.watch(".research-page .research-grid", () => apply());
+            },
+        });
+        const RE_RES = [["cryoIce", /cryo/i], ["plasmaCore", /plasma/i], ["bioExtract", /bio/i], ["quantumDust", /quantum/i], ["darkMatter", /dark\s*matter/i], ["antimatter", /antimatter/i], ["silicates", /silicate/i], ["hydrogen", /hydrogen/i], ["alloys", /alloy/i], ["ore", /\bore\b|^ore/i]];
+        const reResOf = (txt) => { const t = String(txt || "").replace(/_/g, " "); const m = RE_RES.find(([, re]) => re.test(t)); return m ? m[0] : null; };
+        NL.feature({
+            id: "re-roi",
+            set: "Research",
+            name: "Research ROI",
+            desc: "RE-006: break-even time on production researches (card line and a level-table column), valued like Building ROI.",
+            init() {
+                NL.css("re-roi", ".nl2-reroi{display:block;margin:0 0 4px;padding:0 10px;font-size:16px;font-weight:700;color:#7fd6a0}.nl2-reroi.nl2-y,td.nl2-reroi-c.nl2-y{color:#e6c34a}.nl2-reroi.nl2-r,td.nl2-reroi-c.nl2-r{color:#e06c6c}.nl2-reroi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-reroi-h,td.nl2-reroi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-reroi-c.nl2-dim{opacity:.5;color:#8a96a6}");
+                const R = () => NL.buRoi;
+                const camel = (k) => String(k).replace(/_([a-z])/g, (m, c) => c.toUpperCase());
+                const items = () => { const l = NL.cache.latest(/^\/api\/research(\?|$)/); const r = l && l.data && l.data.research; return r ? Object.values(r) : []; };
+                const itemOf = (key) => items().find((x) => x && x.key === key);
+                const empire = () => { const c = NL.cache.latest(/^\/api\/command-center\/empire-resources/); if (c && c.data && Array.isArray(c.data.planets))
+                    return c.data.planets; const s = NL.store("bu-storage.").get("snap", null); return s && Array.isArray(s.planets) ? s.planets : null; };
+                function bonusOf(it, card) {
+                    for (const e of (it && it.effects) || []) {
+                        const t = String(e && e.type || "");
+                        if (!/production|yield|output|mining|extract/i.test(t) || /cost|storage|capacity|speed|time|consum/i.test(t))
+                            continue;
+                        const res = reResOf(t), v = +e.value;
+                        if (res && v > 0)
+                            return { res, v: v > 1 ? v / 100 : v };
+                    }
+                    if (card) {
+                        const m = /\+\s*([\d.]+)\s*%\s*([A-Za-z][A-Za-z \-]*?)\s*\/\s*lv/i.exec(card.textContent || "");
+                        const res = m && !/cost|storage|capacity|speed|time|commission/i.test(m[2]) ? reResOf(m[2]) : null;
+                        if (res)
+                            return { res, v: +m[1] / 100 };
+                    }
+                    return null;
+                }
+                function gainOf(b) {
+                    const pl = empire();
+                    if (!pl)
+                        return null;
+                    let g = 0;
+                    pl.forEach((p) => { const rate = Math.max(0, +p[b.res + "Rate"] || 0), pm = +p.productionMultiplier > 0 ? +p.productionMultiplier : 1; g += (rate * b.v) / pm; });
+                    return { [b.res]: g };
+                }
+                const costOf = (it) => {
+                    const c = { ore: +it.nextCostOre || 0, silicates: +it.nextCostSilicates || 0, hydrogen: +it.nextCostHydrogen || 0, alloys: +it.nextCostAlloys || 0 };
+                    Object.entries(it.nextRareCosts || {}).forEach(([k, v]) => { c[camel(k)] = +v || 0; });
+                    return c;
+                };
+                const keyOfCard = (card) => { const a = card.querySelector(".research-name-link"); return a ? (a.getAttribute("href") || "").split("?")[0].split("/").pop() : ""; };
+                function decorateCard(card) {
+                    if (!R())
+                        return;
+                    const it = itemOf(keyOfCard(card)), b = bonusOf(it, card);
+                    let box = card.querySelector(".nl2-reroi");
+                    const anchor = card.querySelector(".research-costs") || card.querySelector(".research-card-bottom");
+                    if (!b || !it || it.isMaxed || !anchor) {
+                        if (box)
+                            box.remove();
+                        return;
+                    }
+                    R().ensureRates();
+                    if (!box)
+                        box = NL.h("div", { class: "nl2-reroi" });
+                    if (box.nextElementSibling !== anchor)
+                        anchor.insertAdjacentElement("beforebegin", box);
+                    const gain = gainOf(b), s = gain ? R().roiSeconds(costOf(it), gain) : NaN;
+                    let cls, txt, tip;
+                    if (!isFinite(s)) {
+                        cls = "nl2-reroi nl2-na";
+                        txt = "ROI \u2014";
+                        tip = gain ? R().ageTxt() : "No all-planet production yet (open the Command Center once)";
+                    }
+                    else {
+                        cls = "nl2-reroi " + R().roiClass(s);
+                        txt = "ROI " + NL.fmtDur(s);
+                        tip = "Break-even for Lv " + it.level + " \u2192 " + (it.level + 1) + ", all planets, in ore-equivalents (" + R().ageTxt() + ")";
+                    }
+                    if (box.className !== cls)
+                        box.className = cls;
+                    if (box.textContent !== txt)
+                        box.textContent = txt;
+                    if (box.getAttribute("data-nl2-tip") !== tip)
+                        box.setAttribute("data-nl2-tip", tip);
+                }
+                function decorateTable(tbl) {
+                    const m = /^\/research\/([^/]+)/.exec(location.pathname);
+                    const it = m && itemOf(m[1]), b = bonusOf(it, document.querySelector(".research-detail-page"));
+                    if (!b || !R())
+                        return;
+                    const hrow = tbl.querySelector("thead tr") || tbl.querySelector("tr");
+                    if (!hrow)
+                        return;
+                    let h = hrow.querySelector(".nl2-reroi-h");
+                    if (!h) {
+                        h = NL.h("th", { class: "nl2-reroi-h" }, "ROI");
+                        hrow.appendChild(h);
+                    }
+                    const cols = [...hrow.children].filter((x) => x !== h).map((x) => x.textContent.trim());
+                    const lvCol = cols.findIndex((c) => /^lv/i.test(c)), resCol = cols.map((c) => (/effect|time|lv/i.test(c) ? null : reResOf(c)));
+                    const gain = gainOf(b);
+                    [...tbl.querySelectorAll("tr")].filter((r) => r !== hrow).forEach((r) => {
+                        const cells = [...r.children].filter((c) => !c.classList.contains("nl2-reroi-c"));
+                        const num = (c) => { const v = parseFloat(String(c ? c.textContent : "").replace(/[^0-9.\-]/g, "")); return isFinite(v) ? v : 0; };
+                        const L = num(cells[lvCol >= 0 ? lvCol : 0]), cost = {};
+                        resCol.forEach((res, i) => { if (res && cells[i])
+                            cost[res] = num(cells[i]); });
+                        const s = gain ? R().roiSeconds(cost, gain) : NaN;
+                        let c = r.querySelector("td.nl2-reroi-c");
+                        if (!c) {
+                            c = NL.h("td", { class: "nl2-reroi-c" });
+                            r.appendChild(c);
+                        }
+                        const txt = NL.fmtDur(s), done = L <= (+it.level || 0);
+                        const cls = "nl2-reroi-c" + (done ? " nl2-dim" : isFinite(s) ? " " + R().roiClass(s) : "");
+                        if (c.textContent !== txt)
+                            c.textContent = txt;
+                        if (c.className !== cls)
+                            c.className = cls;
+                    });
+                }
+                function decorateAll() {
+                    document.querySelectorAll(".research-page .research-grid .research-card").forEach(decorateCard);
+                    if (/^\/research\/[^/]+/.test(location.pathname))
+                        document.querySelectorAll(".research-detail-page table").forEach(decorateTable);
+                }
+                NL.watch(".research-page .research-grid .research-card", decorateCard);
+                NL.watch(".research-detail-page table", decorateTable);
+                NL.onData(/^\/api\/(research(\?|$)|command-center\/empire-resources)/, () => decorateAll());
+                if (NL.buRoi)
+                    NL.buRoi.onChange(decorateAll);
             },
         });
     }
@@ -8182,7 +8470,12 @@
         if (NL.option)
             NL.option({ key: "fl-transfer.oupct", group: "Fleet Transfer", label: "Collect outpost when storage reaches (%)", type: "number", def: 75, min: 1, max: 100 });
         const TR_OU_PCT = () => { const v = NL.opt ? +NL.opt("fl-transfer.oupct") : NaN; return (isFinite(v) && v > 0 ? v : 75) / 100; };
-        const TR_MOON_OVER = (k) => (k === "hydrogen" ? 50000 : 10000);
+        if (NL.option) {
+            NL.option({ key: "fl-transfer.moonh2", group: "Fleet Transfer", label: "Collect moon when hydrogen is over", type: "number", def: 100000, min: 0, step: 1000 });
+            NL.option({ key: "fl-transfer.moonres", group: "Fleet Transfer", label: "Collect moon when other resources are over", type: "number", def: 10000, min: 0, step: 1000 });
+        }
+        const trOptN = (k, d) => { const v = NL.opt ? +NL.opt(k) : NaN; return isFinite(v) && v >= 0 ? v : d; };
+        const TR_MOON_OVER = (k) => (k === "hydrogen" ? trOptN("fl-transfer.moonh2", 100000) : trOptN("fl-transfer.moonres", 10000));
         const TR_MOON_KEEP = (k) => (k === "hydrogen" ? 50000 : k === "quantum_dust" || k === "dark_matter" ? 10000 : 0);
         const TR_ROUTE_DEF = (k) => (k === "hydrogen" ? [100000, 50000] : k === "quantum_dust" || k === "dark_matter" ? [20000, 10000] : [10000, 10000]);
         const trN = (v) => (Number.isFinite(+v) ? +v : 0);
@@ -8636,6 +8929,10 @@
                             btn.removeAttribute("data-nl2-busy");
                             await NL.moonCallShips(t.from.id, btn);
                         }
+                        else if (t.kind === "moon" && !t.noShips && NL.moonCollect) {
+                            btn.removeAttribute("data-nl2-busy");
+                            await NL.moonCollect(t.from.id, btn);
+                        }
                         else if (t.kind === "moon") {
                             if (NL.openMoon)
                                 await NL.openMoon(t.from.name, "overview");
@@ -9036,7 +9333,9 @@
                         if (t.kind !== "bring" && isFinite(t.due))
                             why.push(" \u00B7 ", t.due <= 0 ? NL.h("span", { class: "nl2-ftr-t" }, "full") : NL.h("span", null, "full in ", NL.h("span", { class: "nl2-ftr-t nl2-ftr-est", "data-nl2-tip": trClock(Date.now() + t.due * 1000) }, trDur(t.due))));
                         const actBtn = NL.h("button", { type: "button", class: "nl2-c-blue", disabled: !!t.mission, "data-nl2-tip": t.noShips ? "No cargo ships on " + t.from.name + ": call them from its planet" : null, onclick: (e) => act(t, e.currentTarget) }, t.noShips ? "Call Ships" : LABEL[t.kind]);
-                        const routeBtn = plan ? NL.h("button", { type: "button", class: "nl2-c-blue", "data-nl2-tip": plan.mode + ": " + trName(plan.k) + " from " + plan.from.name + " to " + plan.to.name + ", when \u2265 " + trFmt(plan.trig) + ", send " + trFmt(plan.amt), onclick: (e) => makeRoute(t, e.currentTarget) }, "Make route") : null;
+                        const mHub = t.kind === "moon" && noRoute([t]).length ? routeHubs(t)[0] || null : undefined;
+                        const routeBtn = mHub !== undefined ? NL.h("button", { type: "button", class: "nl2-c-blue", disabled: !mHub, "data-nl2-tip": mHub ? "Collect Moon route from " + t.from.name + " to " + mHub.name + " (" + mHub.used + "/" + mHub.max + " routes)" : "No hub planet with a free route slot", onclick: () => routeDialog(t) }, "Make route")
+                            : plan ? NL.h("button", { type: "button", class: "nl2-c-blue", "data-nl2-tip": plan.mode + ": " + trName(plan.k) + " from " + plan.from.name + " to " + plan.to.name + ", when \u2265 " + trFmt(plan.trig) + ", send " + trFmt(plan.amt), onclick: (e) => makeRoute(t, e.currentTarget) }, "Make route") : null;
                         const sh = t.noShips ? NL.h("td", { class: "nl2-ftr-d" }, "no ships on moon") : t.ships ? NL.h("td", { class: "nl2-ftr-est" + (t.ships.short ? " nl2-ftr-short" : ""), "data-nl2-tip": t.ships.short ? "Only " + t.ships.have + " there" : "Estimate: the dialog fits the ships" }, t.ships.text) : NL.h("td", { class: "nl2-ftr-d", "data-nl2-tip": t.toLabel || "" }, "\u2014");
                         return NL.h("tr", { class: t.mission ? "nl2-ftr-enr" : null, "data-nl2-ftr-key": t.key }, NL.h("td", null, t.task), NL.h("td", null, place(t.from)), NL.h("td", { "data-nl2-tip": t.toLabel || null }, t.to ? place(t.to) : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), resCell(t.res), sh, NL.h("td", { class: "nl2-ftr-r" }, t.mission && homeAt(t.mission) ? cd(homeAt(t.mission)) : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", { "data-nl2-tip": t.why + (t.at ? "\nData " + trAge(t.at) : "") }, ...why), NL.h("td", null, t.mission ? NL.h("span", { class: "nl2-ftr-st nl2-ftr-trav" }, "en route") : ""), NL.h("td", { class: "nl2-ftr-acts" }, routeBtn || NL.h("span", { class: "nl2-ftr-gap" }), actBtn), hideBox(t.key));
                     });
@@ -9058,10 +9357,6 @@
                         const paused = r.isPaused === true || r.paused === true || r.isActive === false || r.enabled === false || /pause/i.test(String(r.status || ""));
                         return NL.h("tr", null, NL.h("td", null, MODE[r.routeMode] || String(r.routeMode || "\u2014")), NL.h("td", null, place(from)), NL.h("td", null, place(to)), NL.h("td", null, k ? icon(k) : "", k ? trName(k) : String(r.resourceType || "\u2014")), NL.h("td", { class: "nl2-ftr-r" }, trFmt(r.threshold)), NL.h("td", { class: "nl2-ftr-r" }, trFmt(r.amount)), NL.h("td", null, hub ? trClean(hub.planetName) + " (" + trN(hub.routeCount) + "/" + trN(hub.hubLevel) + ")" : "\u2014"), NL.h("td", null, cov.length ? cov.map((t) => t.task + " " + t.from.name + " (" + t.why + ")").join("; ") : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", null, NL.h("span", { class: "nl2-ftr-st " + (paused ? "nl2-ftr-oth" : "nl2-ftr-in") }, paused ? "paused" : "active")), NL.h("td", { class: "nl2-ftr-acts" }), hideBox("rt" + r.id));
                     });
-                    for (const t of noRoute(list).filter((x) => isHid("nr" + x.key) === !!wantHid)) {
-                        const left = t.prod.filter((x) => x.now > TR_MOON_OVER(x.k) && !t.covered.some((r) => rk(r) === x.k)), hub = routeHubs(t)[0];
-                        rows.push(NL.h("tr", { "data-nl2-ftr-nr": t.key }, NL.h("td", null, NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", null, place(t.from)), NL.h("td", null, hub ? place({ t: "planet", id: hub.id, name: hub.name }) : NL.h("span", { class: "nl2-ftr-d", "data-nl2-tip": "No hub planet with a free route slot" }, "\u2014")), NL.h("td", { "data-nl2-tip": left.map((x) => trName(x.k)).join(", ") }, ...left.map((x) => icon(x.k)), left.length === 1 ? trName(left[0].k) : left.length + " resources"), NL.h("td", { class: "nl2-ftr-r" }, NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", { class: "nl2-ftr-r" }, NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", null, hub ? hub.name + " (" + hub.used + "/" + hub.max + ")" : "\u2014"), NL.h("td", null, "Collect " + t.from.name), NL.h("td", null, NL.h("span", { class: "nl2-ftr-st nl2-ftr-amb" }, "no route")), NL.h("td", { class: "nl2-ftr-acts" }, NL.h("button", { type: "button", class: "nl2-c-blue", disabled: !hub, onclick: () => routeDialog(t) }, "Make route")), hideBox("nr" + t.key)));
-                    }
                     return NL.h("table", null, NL.h("colgroup", null, ...["130px", "150px", "150px", "160px", "110px", "110px", "150px", "", "100px", TR_ACTS_W, TR_HIDE_W].map((w) => NL.h("col", { style: w ? "width:" + w : null }))), NL.h("thead", null, NL.h("tr", null, ...["Route", "From", "To", "Resource", "Trigger \u2265", "Send", "Hub", "Covers", "Status", "", "Hide"].map((l, i) => NL.h("th", { class: "nl2-ftr-nos" + (i === 4 || i === 5 ? " nl2-ftr-r" : "") + (l === "Hide" ? " nl2-ftr-hide" : "") }, l)))), NL.h("tbody", null, ...rows));
                 }
                 const noRoute = (list) => list.filter((t) => t.kind === "moon" && t.prod && t.prod.some((x) => x.now > TR_MOON_OVER(x.k) && !t.covered.some((r) => rk(r) === x.k)));
@@ -9178,9 +9473,9 @@
                         if (!shut)
                             out.push(NL.h("div", { class: "nl2-ftr-box" }, activeTable(hid)));
                     }
-                    const rsAll = routes(), rsAt = (saved("routes") || {}).at, nrAll = noRoute(list);
-                    const rs = rsAll.filter((r) => !isHid("rt" + r.id)), nr = nrAll.filter((t) => !isHid("nr" + t.key)).length, rh = rsAll.length - rs.length + nrAll.length - nr;
-                    out.push(...section("routes", "Covered by a route", rs.length + nr, "not counted in the badge" + (nr ? " \u00B7 " + nr + " moon" + (nr === 1 ? "" : "s") + " with no route" : "") + (rsAt ? " \u00B7 routes " + trAge(rsAt) : ""), rs.length || nr ? routeTable(list) : NL.h("div", { class: "nl2-ftr-empty" }, rsAt ? (rh ? "All routes are hidden." : "No Logistics routes yet.") : "Routes load when this tab opens.")));
+                    const rsAll = routes(), rsAt = (saved("routes") || {}).at;
+                    const rs = rsAll.filter((r) => !isHid("rt" + r.id)), rh = rsAll.length - rs.length;
+                    out.push(...section("routes", "Covered by a route", rs.length, "not counted in the badge" + (rsAt ? " \u00B7 routes " + trAge(rsAt) : ""), rs.length ? routeTable(list) : NL.h("div", { class: "nl2-ftr-empty" }, rsAt ? (rh ? "All routes are hidden." : "No Logistics routes yet.") : "Routes load when this tab opens.")));
                     if (rh) {
                         const shut = st.get("collapsed", {}).hiddenRoutes !== false;
                         out.push(NL.h("div", { class: "nl2-ftr-sec", onclick: () => { const c = { ...st.get("collapsed", {}) }; c.hiddenRoutes = !shut; st.set("collapsed", c); changed(); } }, NL.h("span", { class: "nl2-ftr-ar" }, shut ? "\u25B8" : "\u25BE"), "Hidden routes", NL.h("span", { class: "nl2-ftr-n" }, "(" + rh + ")")));
@@ -9197,7 +9492,7 @@
                 st.set("open", false);
                 function changed() { sig = ""; cache = null; NL._kick(); }
                 if (NL.onOpt)
-                    for (const k of ["fl-transfer.oupct", "bu-storage.pct"])
+                    for (const k of ["fl-transfer.oupct", "bu-storage.pct", "fl-transfer.moonh2", "fl-transfer.moonres"])
                         NL.onOpt(k, changed);
                 const current = () => { if (!cache || Date.now() - cacheAt > 30000) {
                     cache = tasks();
@@ -9293,6 +9588,152 @@
                 setTimeout(() => badge(tasks()), 4000);
                 setInterval(() => { if (!document.querySelector(".fleet-page"))
                     badge(tasks()); }, 60000);
+            },
+        });
+    }
+    {
+        const RD_RARE = [["antimatter", "Antimatter"], ["dark_matter", "Dark Matter"], ["quantum_dust", "Quantum Dust"], ["plasma_core", "Plasma Core"], ["bio_extract", "Bio-Extract"], ["cryo_ice", "Cryo-Ice"]];
+        const rdNorm = (t) => String(t || "").toLowerCase().replace(/[^a-z]/g, "");
+        const rdNum = (t) => Number(String(t || "").replace(/[^\d.]/g, "")) || 0;
+        const rdKey = (name) => (RD_RARE.find((r) => rdNorm(r[1]) === rdNorm(name)) || [])[0] || null;
+        const RD_SHIP_KEYS = { transportshuttle: "transport_shuttle", bulkcarrier: "bulk_carrier", freighter: "freighter", tanker: "tanker" };
+        const rdSet = (i, v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, String(v)); i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); };
+        const rdSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const rdUntil = async (fn, ms = 3000) => { for (let t = 0; t < ms; t += 100) {
+            const v = fn();
+            if (v)
+                return v;
+            await rdSleep(100);
+        } return null; };
+        const rdFrom = (modal) => { const b = modal.querySelector(".location-select-button"); return b ? ((b.querySelector(".location-select-row-label") || b).textContent || "").trim() : ""; };
+        const rdPlace = (label) => String(label || "").replace(/\[.*$/, "").trim();
+        NL.feature({
+            id: "gl-rare-deliver",
+            set: "Global",
+            name: "Rare deliver to a hub",
+            desc: "GL-075: a Rare deliver button on each Market hub card opens the game's Deliver dialog filled with every rare resource on the chosen planet (no Bio-Extract from the fleet bio planet), with just enough ships at 100% speed.",
+            init(ctx) {
+                NL.css("gl-rare-deliver", ".hub-deliver-modal .nl2-rd-note{margin-right:auto;align-self:center;font-weight:600;color:#9fd3ff}.hub-deliver-modal .nl2-rd-note.nl2-rd-short{color:#f87171}");
+                let pending = 0, busy = false;
+                let sup = null, supAt = 0;
+                NL.onData(/^\/api\/fleet\/supply(\?|$)/, (p, d) => { if (d && d.supplyPlanet) {
+                    sup = d.supplyPlanet;
+                    supAt = Date.now();
+                } });
+                async function supplyName() {
+                    if (!sup || Date.now() - supAt > 300000) {
+                        const c = NL.cache.latest(/^\/api\/fleet\/supply$/);
+                        if (c && c.data && c.data.supplyPlanet && Date.now() - c.at < 300000) {
+                            sup = c.data.supplyPlanet;
+                            supAt = c.at;
+                        }
+                        else {
+                            try {
+                                const j = await NL.getJson("/api/fleet/supply", ctx);
+                                if (j && j.supplyPlanet) {
+                                    sup = j.supplyPlanet;
+                                    supAt = Date.now();
+                                }
+                            }
+                            catch (e) { }
+                        }
+                    }
+                    return sup && sup.name ? String(sup.name).trim() : "";
+                }
+                NL.watch(".market-hub-card", (card) => {
+                    if (card.querySelector(".nl2-rd-btn"))
+                        return;
+                    const dv = [...card.querySelectorAll("button")].find((b) => b.textContent.trim() === "Deliver");
+                    if (!dv)
+                        return;
+                    const b = NL.h("button", { type: "button", class: dv.className + " nl2-rd-btn", "data-nl2-tip": "Deliver every rare resource from the chosen planet (no Bio-Extract from your fleet bio planet)" }, "Rare deliver");
+                    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); pending = Date.now(); dv.click(); });
+                    dv.before(b);
+                });
+                NL.watch(".hub-deliver-modal", (modal) => {
+                    if (!modal.dataset.nl2Rd) {
+                        if (!pending || Date.now() - pending > 5000)
+                            return;
+                        pending = 0;
+                        modal.dataset.nl2Rd = "1";
+                    }
+                    const from = rdFrom(modal);
+                    if (busy || !from || from === modal.dataset.nl2RdFrom)
+                        return;
+                    modal.dataset.nl2RdFrom = from;
+                    fill(modal, from).catch((e) => ctx.log("rare deliver fill failed", e));
+                });
+                async function fill(modal, from) {
+                    busy = true;
+                    try {
+                        const foot = modal.querySelector(".spy-modal-footer") || modal;
+                        let note = modal.querySelector(".nl2-rd-note");
+                        if (!note) {
+                            note = NL.h("span", { class: "nl2-rd-note" });
+                            foot.prepend(note);
+                        }
+                        note.className = "nl2-rd-note";
+                        note.textContent = "Rare deliver: filling\u2026";
+                        const shipRows = () => [...modal.querySelectorAll(".hub-deliver-ship-row")].map((r) => ({ r, i: r.querySelector("input[type=number]"), name: ((r.querySelector(".ship-select-copy span") || r.querySelector(".ship-select-name") || {}).textContent || "").trim(), cargo: rdNum((r.querySelector(".hub-deliver-cargo") || {}).textContent) })).filter((x) => x.i);
+                        const resRows = () => [...modal.querySelectorAll(".hub-deliver-resource-row")].map((r) => ({ r, i: r.querySelector("input[type=number]"), k: rdKey(((r.querySelector(".ship-select-name") || {}).textContent || "").trim()), have: rdNum((r.querySelector(".ship-select-available") || {}).textContent) })).filter((x) => x.i);
+                        const bioPlanet = await supplyName();
+                        await rdUntil(() => shipRows().length || modal.querySelector(".no-ships-warning"));
+                        const ships = shipRows();
+                        if (!ships.length) {
+                            note.className = "nl2-rd-note nl2-rd-short";
+                            note.textContent = "No cargo ships on " + rdPlace(from);
+                            return;
+                        }
+                        for (const s of ships)
+                            rdSet(s.i, s.i.max || 0);
+                        await rdUntil(() => resRows().length);
+                        await rdSleep(150);
+                        const noBio = !!bioPlanet && rdNorm(rdPlace(from)) === rdNorm(bioPlanet);
+                        const want = {};
+                        for (const x of resRows())
+                            if (x.k && x.have > 0 && !(noBio && x.k === "bio_extract"))
+                                want[x.k] = Math.floor(x.have);
+                        const sum = Object.values(want).reduce((a, b) => a + b, 0);
+                        if (!sum) {
+                            for (const x of resRows())
+                                rdSet(x.i, 0);
+                            for (const s of ships)
+                                rdSet(s.i, 0);
+                            note.textContent = "No rare resources on " + rdPlace(from) + (noBio ? " (Bio-Extract kept: fleet bio planet)" : "");
+                            return;
+                        }
+                        const list = ships.map((s, n) => ({ id: n + 1, key: RD_SHIP_KEYS[rdNorm(s.name)] || "freighter", available: Number(s.i.max) || 0, cargo: s.cargo, s }));
+                        const r = NL.fleet && NL.fleet.fitShips ? await NL.fleet.fitShips(list.map(({ s, ...x }) => x), want) : { ships: Object.fromEntries(list.map((x) => [x.id, x.available])) };
+                        const qty = (x) => Math.min(x.available, Number(r.ships[x.id]) || 0);
+                        for (const x of list.slice().sort((a, b) => (qty(b) > Number(b.s.i.value) ? 1 : 0) - (qty(a) > Number(a.s.i.value) ? 1 : 0)))
+                            rdSet(x.s.i, qty(x));
+                        await rdSleep(200);
+                        let room = list.reduce((t, x) => t + qty(x) * x.cargo, 0);
+                        const amt = {};
+                        for (const [k] of RD_RARE)
+                            if (want[k]) {
+                                amt[k] = Math.max(0, Math.min(want[k], room));
+                                room -= amt[k];
+                            }
+                        for (const x of resRows())
+                            rdSet(x.i, x.k && amt[x.k] ? Math.min(amt[x.k], Number(x.i.max) || amt[x.k]) : 0);
+                        const sp = modal.querySelector("input[type=range]");
+                        if (sp)
+                            rdSet(sp, 10);
+                        const carried = Object.values(amt).reduce((a, b) => a + b, 0);
+                        const bioTxt = noBio ? " \u00B7 Bio-Extract kept (fleet bio planet)" : "";
+                        if (carried < sum) {
+                            note.className = "nl2-rd-note nl2-rd-short";
+                            note.textContent = "Short " + (sum - carried).toLocaleString("en-US") + " cargo: carrying what fits" + bioTxt;
+                        }
+                        else
+                            note.textContent = "Rare deliver: all rare resources from " + rdPlace(from) + bioTxt;
+                    }
+                    finally {
+                        busy = false;
+                        NL._kick();
+                    }
+                }
             },
         });
     }
@@ -9811,9 +10252,19 @@
                     if (!sum)
                         return tools + empty();
                     return tools + "<table class=\"nl2-emt-matrix nl2-emt-left\"><thead><tr><th>Planet</th><th>Lab</th><th>Research</th><th>Level</th><th>Status</th><th>Ends in</th><th>Ends at</th></tr></thead><tbody>"
-                        + sum.map((p) => "<tr><td>" + plink(p, "/research") + "</td><td>" + labCell(p) + "</td>" + (p.r
-                            ? "<td>" + esc(p.r.n) + "</td><td>" + p.r.t + "</td><td>" + esc(friendly(p.r.s, "research")) + "</td><td>" + endsIn(p.r.e) + "</td><td>" + (parseT(p.r.e) ? clock(parseT(p.r.e)) : "") + "</td>"
-                            : "<td colspan=\"5\"><span class=\"nl2-emt-null\">idle</span></td>") + "</tr>").join("") + "</tbody></table>";
+                        + sum.map((p) => {
+                            const lq = p.q.find((x) => x.k === "research_lab" && x.s === "in_progress"), le = lq && parseT(lq.e);
+                            const lab = le && le > Date.now() ? lq : null;
+                            const tip = lab ? " data-nl2-tip=\"Lab upgrade to level " + lab.t + " finishes\"" : "";
+                            const ends = (e, cls) => "<td" + cls + tip + ">" + endsIn(e) + "</td><td" + cls + tip + ">" + (parseT(e) ? clock(parseT(e)) : "") + "</td>";
+                            const cells = lab
+                                ? (p.r ? "<td>" + esc(p.r.n) + "</td><td>" + p.r.t + "</td>" : "<td><span class=\"nl2-emt-null\">idle</span></td><td></td>")
+                                    + "<td class=\"nl2-emt-up\">Lab upgrading</td>" + ends(lab.e, " class=\"nl2-emt-up\"")
+                                : p.r
+                                    ? "<td>" + esc(p.r.n) + "</td><td>" + p.r.t + "</td><td>" + esc(friendly(p.r.s, "research")) + "</td>" + ends(p.r.e, "")
+                                    : "<td colspan=\"5\"><span class=\"nl2-emt-null\">idle</span></td>";
+                            return "<tr><td>" + plink(p, "/research") + "</td><td>" + labCell(p) + "</td>" + cells + "</tr>";
+                        }).join("") + "</tbody></table>";
                 }
                 const OURS = TABS.map((t) => t.id);
                 const urlTab = () => { const t = new URLSearchParams(location.search).get("tab"); return OURS.indexOf(t) >= 0 ? t : null; };
@@ -10747,7 +11198,10 @@
                             if (ok > 0)
                                 list.push({ key: String(d.id != null ? d.id : s.shipDefId), type: d.key, name: d.name || d.key, have: ok, qty: 0, cargo: Math.floor(moN(d.cargoCapacity) * (1 + bonus)), allowedCargo: d.allowedCargo });
                         }
-                        return { ships: list, resources: gap > 0 ? { ore: { have: gap, amount: gap, name: "Cargo room" } } : {}, mission: { value: kind, options: [{ value: "collect", label: "Collect" }, { value: "evac", label: "Evacuate" }] } };
+                        const spare = gap > 0 ? list.reduce((a, s) => Math.max(a, s.cargo), 0) : 0;
+                        if (spare)
+                            target.label += " \u00B7 +1 spare ship";
+                        return { ships: list, resources: gap > 0 ? { ore: { have: gap + spare, amount: gap + spare, name: "Cargo room" } } : {}, mission: { value: kind, options: [{ value: "collect", label: "Collect" }, { value: "evac", label: "Evacuate" }] } };
                     },
                     estimate: async (state, signal) => {
                         const b = body(state);
@@ -10784,12 +11238,15 @@
                     },
                 });
             }
-            async function open(btn, o) {
-                const id = moId();
+            async function open(btn, o, moonId) {
+                const id = moonId != null ? String(moonId) : moId();
                 if (!id || !NL.fleet)
                     return;
                 ctx0 = o.ctx;
-                const m = (fresh("/api/moons/" + id) || (NL.cache.latest(new RegExp("^/api/moons/" + id + "$")) || {}).data || {}).moon || {};
+                let md0 = fresh("/api/moons/" + id) || (NL.cache.latest(new RegExp("^/api/moons/" + id + "$")) || {}).data;
+                if (!md0 && moonId != null)
+                    md0 = await get("/api/moons/" + id);
+                const m = (md0 || {}).moon || {};
                 const name = clean(m.name) || "this moon", tg = targets(m.planetId);
                 if (!tg.length) {
                     btn.title = "No planet of yours found to send to";
@@ -10941,7 +11398,7 @@
             name: "Moon Collect",
             desc: "MO-010: a Collect button on moon pages that ships the moon's resources to its planet with the moon's cargo ships, leaving what the Moon Collect keeps settings say (MO-017).",
             init(ctx) {
-                moTx.add("nl2-mo-coll", "Collect", "Send this moon's resources to its planet with the moon's cargo ships", (b) => moTx.open(b, {
+                const opts = () => ({
                     ctx,
                     kind: "mo-collect",
                     title: "Collect",
@@ -10949,7 +11406,9 @@
                     fields: ["target", "ships", "resources", "speed", "eta"],
                     fit: true,
                     keep: moKeep(),
-                }).catch((e) => ctx.log("moon collect failed", e)));
+                });
+                moTx.add("nl2-mo-coll", "Collect", "Send this moon's resources to its planet with the moon's cargo ships", (b) => moTx.open(b, opts()).catch((e) => ctx.log("moon collect failed", e)));
+                NL.moonCollect = (id, btn) => moTx.open(btn, opts(), id).catch((e) => ctx.log("moon collect failed", e));
             },
         });
         NL.feature({
@@ -18536,6 +18995,8 @@
                                     const row = { pid: p.id, planet: p.name, defId: def.id, name: def.name || def.key, n, cost, short };
                                     const orbital = sd && /orbital/i.test(String(sd.shipyardName || ""));
                                     const qFull = y && num(y.maxQueueSize) > 0 && num(orbital ? y.orbitalQueueCount : y.planetaryQueueCount) >= num(y.maxQueueSize);
+                                    if (qFull)
+                                        row.qFull = true;
                                     if (!cost)
                                         Object.assign(row, { act: false, note: "Cost unknown" });
                                     else if (qFull)
@@ -18852,7 +19313,7 @@
                         readTaskOpts();
                         const lead = leaderRows(), mods = moduleRows(), bio = bioRows(), rep = repairRows(), en = energyRows(), hyd = hydrogenRows(), moon = moonRows(), scan = scanRows();
                         const out = outpostRows(), st = studyRows(), con = contractRows();
-                        const shipPl = [...new Set([...rep.ships, ...rep.maint].map((r) => r.planet))];
+                        const shipPl = [...new Set([...rep.ships.filter((r) => !r.qFull), ...rep.maint].map((r) => r.planet))];
                         const sig = JSON.stringify(shipPl);
                         if (NL.shipRepairPlanets_sig !== sig) {
                             NL.shipRepairPlanets_sig = sig;

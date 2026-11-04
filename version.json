@@ -1,25 +1,62 @@
 {
-  "version": "0.5.83",
-  "built": "2026-11-03T21:55:57.844Z",
+  "version": "0.5.84",
+  "built": "2026-11-04T05:07:27.992Z",
   "items": [
-    "FL-066",
-    "FL-067",
-    "FL-068",
-    "FL-069",
-    "FL-070",
-    "GL-073",
-    "GL-074"
+    "EM-025",
+    "FL-071",
+    "FL-072",
+    "FL-073",
+    "FL-074",
+    "GL-075",
+    "GL-076",
+    "SH-013",
+    "RE-006",
+    "RE-007",
+    "RE-008"
   ],
   "notes": {
-    "FL-066": "Fleet Active: own planet names in Route",
-    "FL-067": "Transfer tab no longer jumps to Active",
-    "FL-068": "Transfer: moon rows see ships on the moon",
-    "FL-069": "Spy reports table: Alliance and Player columns",
-    "FL-070": "Spy reports table: Intel level bullets",
-    "GL-073": "Top bar pills: even spacing",
-    "GL-074": "Deliver bar: no empty columns"
+    "EM-025": "Command Center Research: lab upgrade end time",
+    "FL-071": "Transfer: moon Collect opens on the Fleet page",
+    "FL-072": "Call Ships: one extra cargo ship",
+    "FL-073": "Transfer: moon Collect thresholds in settings",
+    "FL-074": "Transfer: Make route on moon rows",
+    "GL-075": "Market hubs: Rare deliver button",
+    "GL-076": "To Do: Undo button",
+    "SH-013": "Shipyard badge skips full repair queues",
+    "RE-006": "Research: ROI on cards",
+    "RE-007": "Research: hide researches",
+    "RE-008": "Research badge: artifacts and trader summon"
   },
   "history": [
+    {
+      "version": "0.5.84",
+      "items": [
+        "EM-025",
+        "FL-071",
+        "FL-072",
+        "FL-073",
+        "FL-074",
+        "GL-075",
+        "GL-076",
+        "SH-013",
+        "RE-006",
+        "RE-007",
+        "RE-008"
+      ],
+      "notes": {
+        "EM-025": "Command Center Research: lab upgrade end time",
+        "FL-071": "Transfer: moon Collect opens on the Fleet page",
+        "FL-072": "Call Ships: one extra cargo ship",
+        "FL-073": "Transfer: moon Collect thresholds in settings",
+        "FL-074": "Transfer: Make route on moon rows",
+        "GL-075": "Market hubs: Rare deliver button",
+        "GL-076": "To Do: Undo button",
+        "SH-013": "Shipyard badge skips full repair queues",
+        "RE-006": "Research: ROI on cards",
+        "RE-007": "Research: hide researches",
+        "RE-008": "Research badge: artifacts and trader summon"
+      }
+    },
     {
       "version": "0.5.83",
       "items": [
