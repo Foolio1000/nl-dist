@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.86
+// @version      0.5.87
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.86", features: [] };
+    const NL = window.__nl2 = { version: "0.5.87", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -129,6 +129,27 @@
             return null;
         }
     };
+    NL.postJson = async function (path, body, ctx, method) {
+        const st = (ctx && ctx._net) || (NL._net = NL._net || { until: 0, backoff: 0 });
+        if (Date.now() < st.until)
+            return { ok: false, status: 0, paused: true, data: null };
+        try {
+            const r = await fetch(path, { method: method || "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: body == null ? undefined : JSON.stringify(body) });
+            if (r.status === 429 || r.status === 403) {
+                st.backoff = Math.min((st.backoff || 30000) * 2, 600000);
+                st.until = Date.now() + st.backoff;
+                console.warn("[NL]", ctx ? ctx.id : "", method || "POST", path, r.status, "pausing for", st.backoff / 1000, "s");
+            }
+            else
+                st.backoff = 0;
+            return { ok: r.ok, status: r.status, data: await r.json().catch(() => null) };
+        }
+        catch (e) {
+            if (NL.err)
+                NL.err((ctx ? ctx.id : "postJson") + " " + path, e);
+            return { ok: false, status: 0, data: null };
+        }
+    };
     NL.h = function (tag, attrs, ...kids) {
         const el = document.createElement(tag);
         for (const [k, v] of Object.entries(attrs || {})) {
@@ -161,6 +182,26 @@
         const m = Math.round(sec / 60), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
         return d ? `${d}d ${h}h` : h ? `${h}h ${mm}m` : `${Math.max(mm, 1)}m`;
     };
+    NL.esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+    NL.fmt = (n, short) => {
+        const v = Number(n);
+        if (!Number.isFinite(v))
+            return "\u2014";
+        if (!short || Math.abs(v) < 10000)
+            return Math.round(v).toLocaleString("en-US");
+        return Math.abs(v) < 1000000 ? +(v / 1000).toPrecision(3) + "K" : Math.abs(v) < 1000000000 ? +(v / 1000000).toPrecision(3) + "M" : +(v / 1000000000).toPrecision(3) + "B";
+    };
+    NL.countdown = (ms) => {
+        const s = Math.max(0, Math.round((Number(ms) || 0) / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+        return h ? h + "h " + String(m).padStart(2, "0") + "m" : m + "m " + String(s % 60).padStart(2, "0") + "s";
+    };
+    NL.clock = (t) => {
+        const d = new Date(t);
+        if (!Number.isFinite(d.getTime()))
+            return "";
+        const hm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+        return d.toDateString() === new Date().toDateString() ? hm : d.toLocaleDateString("en-US", { weekday: "short" }) + " " + hm;
+    };
     const watchers = [];
     let pending = false;
     const sweep = () => {
@@ -172,7 +213,10 @@
                     w.fn(el);
                 }
                 catch (e) {
-                    console.warn("[NL] watch", w.sel, e);
+                    if (NL.err)
+                        NL.err("watch " + w.sel, e);
+                    else
+                        console.warn("[NL] watch", w.sel, e);
                 }
             }
     };
@@ -365,17 +409,41 @@
                     cfg.set("on." + f.id, true);
         cfg.set("defOffSeen", true);
     }
+    const ERR_KEY = "nl2.errlog", ERR_MAX = 50;
+    NL.errors = () => { try {
+        const a = JSON.parse(localStorage.getItem(ERR_KEY) || "[]");
+        return Array.isArray(a) ? a : [];
+    }
+    catch (e) {
+        return [];
+    } };
+    NL.err = function (feature, e) {
+        console.error("[NL]", feature, e);
+        const msg = e && e.message ? e.message : String(e), stack = e && e.stack ? String(e.stack).split("\n").slice(0, 4).join("\n") : "";
+        try {
+            const a = NL.errors(), l = a[a.length - 1];
+            if (l && l.feature === String(feature || "") && l.msg === msg.slice(0, 300) && Date.now() - Date.parse(l.at) < 60000)
+                return;
+            a.push({ at: new Date().toISOString(), v: NL.version, feature: String(feature || ""), path: location.pathname, msg: msg.slice(0, 300), stack: stack.slice(0, 600) });
+            localStorage.setItem(ERR_KEY, JSON.stringify(a.slice(-ERR_MAX)));
+        }
+        catch (x) { }
+    };
+    NL.clearErrors = () => { try {
+        localStorage.removeItem(ERR_KEY);
+    }
+    catch (e) { } };
     function startFeatures() {
         keepForExisting();
         for (const f of NL.features) {
             if (!NL.enabled(f.id))
                 continue;
-            const ctx = { id: f.id, _net: { until: 0, backoff: 0 }, store: NL.store(f.id + "."), log: (...a) => console.log("[NL " + f.id + "]", ...a) };
+            const ctx = { id: f.id, _net: { until: 0, backoff: 0 }, store: NL.store(f.id + "."), log: (...a) => console.log("[NL " + f.id + "]", ...a), err: (e) => NL.err(f.id, e) };
             try {
                 f.init(ctx);
             }
             catch (e) {
-                console.error("[NL] feature", f.id, "failed to start", e);
+                NL.err(f.id + " (start)", e);
             }
         }
     }
@@ -391,7 +459,7 @@
                 fn(v);
             }
             catch (e) {
-                console.warn("[NL] onOpt", key, e);
+                NL.err("option " + key, e);
             }
         }
     }
@@ -495,7 +563,17 @@
             find.value = "";
             filter();
         } });
-        box.append(NL.h("div", { class: "nl2-sec-bar" }, all(true), all(false), find), note, none, ...secs);
+        const errs = NL.errors(), errBox = NL.h("div", { class: "nl2-errs", style: { display: "none" } });
+        const errText = () => NL.errors().map((x) => x.at + " v" + x.v + " " + x.feature + " " + x.path + ": " + x.msg + (x.stack ? "\n  " + x.stack.split("\n").slice(1).join("\n  ") : "")).join("\n");
+        const errBtn = NL.h("button", { type: "button", class: "nl2-sec-all nl2-errbtn", style: errs.length ? {} : { display: "none" }, onclick: () => {
+                errBox.replaceChildren(NL.h("pre", null, errText()), NL.h("div", { class: "nl2-errs-bar" }, NL.h("button", { type: "button", class: "nl2-sec-all", onclick: (ev) => { try {
+                        navigator.clipboard.writeText(errText());
+                        ev.target.textContent = "Copied";
+                    }
+                    catch (x) { } } }, "Copy"), NL.h("button", { type: "button", class: "nl2-sec-all", onclick: () => { NL.clearErrors(); errBox.style.display = "none"; errBtn.style.display = "none"; } }, "Clear")));
+                errBox.style.display = errBox.style.display === "none" ? "" : "none";
+            } }, "Errors (" + errs.length + ")");
+        box.append(NL.h("div", { class: "nl2-sec-bar" }, all(true), all(false), errBtn, find), note, errBox, none, ...secs);
         if (!secs.length)
             box.append(NL.h("small", null, "No features yet."));
         return box;
@@ -538,6 +616,8 @@
     .nl2-settings small{display:block;color:#8aa3c0;font-size:13px}
     .nl2-note{color:#e8c46a;font-size:13px;margin-top:10px}
     .nl2-sec-bar{display:flex;gap:8px;margin:10px 0 8px}
+    .nl2-errs pre{max-height:260px;overflow:auto;margin:8px 0;padding:8px 10px;border-radius:6px;background:rgba(5,10,20,.9);border:1px solid rgba(248,113,113,.35);color:#fecaca;font:12px/1.4 ui-monospace,monospace;white-space:pre-wrap}
+    .nl2-errs-bar{display:flex;gap:8px;margin-bottom:10px}
     .nl2-sec-all{padding:4px 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font:600 13px Rajdhani,"Exo 2",system-ui,sans-serif;cursor:pointer}
     .nl2-sec-all:hover{background:rgba(56,189,248,.22);color:#fff}
     .nl2-sec-find{flex:0 1 240px;min-width:120px;padding:4px 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:#14203a;color:#fff;font:600 13px Rajdhani,"Exo 2",system-ui,sans-serif;outline:none}

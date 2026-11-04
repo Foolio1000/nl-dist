@@ -1,5 +1,10 @@
 # Release notes
 
+## v0.5.87 · Nov 4, 2026
+- Maintenance: error log on the Custom screen
+- Maintenance: shared formatting helpers
+- Maintenance: shared write helper
+
 ## v0.5.86 · Nov 4, 2026
 - Transfer settings: clearer labels
 - Moon Collect: a threshold per main resource
