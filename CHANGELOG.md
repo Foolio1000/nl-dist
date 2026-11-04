@@ -1,5 +1,17 @@
 # Release notes
 
+## v0.5.89 · Nov 4, 2026
+- PVE: leader vessel never auto-selected
+- Click a menu badge to open its planet
+- Daylight saving time notice
+- Leader pill shows the mission type
+- PVE: station defense rows get Select Ships and Recall All
+- Research badge for artifact study
+- Shipyard: one Hide menu for four notices
+- Fleet Active: Recall on station defense opens the game dialog
+- Transfer: no full on Supply rows
+- Transfer: Supply from the moon's own planet
+
 ## v0.5.88 · Nov 4, 2026
 - Bring resources: hub pick opens the hub dialog
 - Bring resources: which planets can fill the order
