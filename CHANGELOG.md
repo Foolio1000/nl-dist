@@ -1,5 +1,37 @@
 # Release notes
 
+## v0.5.90 · Nov 4, 2026
+- Fire Sale: review dialog with a Post button per row
+- Fire Sale: posted rows with Cancel; repeat sales
+- Fire Sale button shows active order count
+- Attack banner shows resources and ships at risk
+- Defense2 tab for attacked stations
+- Defense2: battle planet and Scout times
+- Defense2: Scout counts and Defend button
+- Defense2: Phalanx per row
+- Defense2: Recalled attacks
+- Survey Ruins: table under Stations
+- Survey Ruins: source planet picker
+- Survey Ruins: 10 nearest Ancient moons
+- Survey Ruins: hide colonised moons
+- Survey Ruins: 24h cooldown hide
+- Survey Ruins: Spy Probes and Hackers only
+- Survey Ruins: simpler columns
+- Survey Ruins works in S0
+- Daylight saving notice
+- Mine: launched belt leaves the list at once
+- Mine dialog: worst loss line
+- Messages moves to the end of the menu
+- Bring resources: planets that can fill it read all
+- Transfer: To move column
+- Transfer: Supply rows clear when delivered
+- Fleet: game's own fleet slots chip back
+- Transfer: Supply from the moon's planet with a warning
+- Transfer tab after Espionage
+- Hide buttons never disabled
+- Relocate badge on Asteroid field depleted
+- Research badge opens Artifacts
+
 ## v0.5.89 · Nov 4, 2026
 - PVE: leader vessel never auto-selected
 - Click a menu badge to open its planet
