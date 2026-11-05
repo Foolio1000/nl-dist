@@ -1,5 +1,27 @@
 # Release notes
 
+## v0.5.98 · Nov 5, 2026
+- Fleet slots count right after Fleet
+- Transfer improvements
+- Transfer improvements
+- Transfer improvements
+- Readable labels over banner art
+- Transfer Why column categories
+- PVE tabs layout
+- Defense2 uses shared phalanx and spy reports
+- Season presets
+- Command Center menu icon
+- Station Ops in the main menu during an attack
+- Options close on an outside click
+- Storage full: any resource at 100%
+- Moon storage rules
+- Research hover text no longer names a player
+- Fragments picker stays open
+- Energy hover example text
+- Buildings Table View
+- Buildings Table View tidy-up
+- Fire Sale greyed until Galactic Exchange
+
 ## v0.5.97 · Nov 5, 2026
 - Buildings banner
 - Buildings slots colour
