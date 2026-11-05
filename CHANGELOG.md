@@ -1,5 +1,55 @@
 # Release notes
 
+## v0.5.97 · Nov 5, 2026
+- Buildings banner
+- Buildings slots colour
+- Cancel-upgrade warning
+- Buildings table view
+- Empire countdowns
+- Reports: Gains cleanup
+- Routes: Last run column
+- Moon Collect amount in the Fleet badge hover
+- Planet names in Fleet Active routes
+- Moon supply target
+- Bio upkeep in the Fleet banner
+- Wormholes tab badge
+- Wormholes tab badge
+- Wormholes tab badge
+- Wormholes tab badge
+- Wormholes tab badge
+- Collect badge opens Transfer
+- Fleet badges on the badge registry
+- PVE features in the Fleet menu
+- PVE features in the Fleet menu
+- PVE features in the Fleet menu
+- PVE features in the Fleet menu
+- PVE features in the Fleet menu
+- Galaxy amber
+- Galaxy names truncated
+- Season colour picker
+- Unmute guard
+- Moon-scan finds on the Survey table at once
+- UI review: hovers
+- UI review: PVE fold
+- UI review: shared countdowns
+- UI review
+- UI review
+- Badge registry
+- Fleet slots pill refresh
+- Badge registry
+- Badge registry
+- Badge registry
+- Badge registry
+- Badge registry
+- Badge registry
+- Badge registry
+- Moons list opens on badge click
+- Moons table view
+- Outposts badge on the registry
+- Research Plan self-heal
+- Ship maintenance badge
+- Shipyard idle split
+
 ## v0.5.96 · Nov 5, 2026
 - Internal cleanup: the Global module split into smaller files
 
