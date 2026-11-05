@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.91
+// @version      0.5.92
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.91", features: [] };
+    const NL = window.__nl2 = { version: "0.5.92", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -816,7 +816,7 @@
             const btn = o.button || null;
             const collection = o.type === "collection", transfer = o.type === "transfer";
             const targets = Array.isArray(o.targets) && o.targets.length ? o.targets : null;
-            const st = { kind: o.kind, collection, only: null, short: false, target: targets ? targets[0] : o.target || null, speed: speedOf(o), sourceId: null, sources: [], ships: [], resources: {}, est: null, estPending: false, sending: false };
+            const st = { kind: o.kind, collection, only: null, short: false, target: targets ? targets.find((t) => t.def) || targets[0] : o.target || null, speed: speedOf(o), sourceId: null, sources: [], ships: [], resources: {}, est: null, estPending: false, sending: false };
             let fitFn = null;
             const tpl = useTpl ? tpls.get(o.kind, null) : null;
             const wantEst = fields.has("eta") && typeof o.estimate === "function";
@@ -830,10 +830,11 @@
                 if (!st.sources.length)
                     err = "No source planet available.";
                 else {
-                    st.sourceId = st.sources[0].id;
+                    const first = st.sources.find((s) => s.def) || st.sources[0];
+                    st.sourceId = first.id;
                     const prep = await o.prepare(st.sourceId, tpl);
                     if (!prep)
-                        err = "Could not read the fleet for " + st.sources[0].name + ".";
+                        err = "Could not read the fleet for " + first.name + ".";
                     else {
                         applyPrep(st, prep);
                         if (collection)
@@ -1818,8 +1819,9 @@
             const ob = items.map((x) => {
                 const mb = kind === "moons" ? menuBadges.moon[x.name] : menuBadges.outpost[String(x.id)], idl = idleM.includes(x.name);
                 const parts = mb && mb.tip ? String(mb.tip).split(/,\s*/).filter(Boolean) : [], dry = parts.filter((t) => /belt mined out/i.test(t)), fills = parts.filter((t) => !/belt mined out/i.test(t));
-                const tops = NL.badgeRows ? fills.filter((t) => /\b100%$/.test(t)) : [], rest = fills.filter((t) => !tops.includes(t));
-                const count = (idl ? 1 : 0) + (mb ? mb.count : 0), causes = (idl ? ["Build idle: " + x.name] : []).concat(dry.length ? ["Relocate: " + x.name] : [], tops.length ? ["Storage full: " + x.name + " " + tops.join(", ")] : [], rest.length ? ["Storage: " + x.name + " " + rest.join(", ")] : []);
+                const ups = parts.filter((t) => /^upgrade /i.test(t)), fills2 = fills.filter((t) => !ups.includes(t));
+                const tops = NL.badgeRows ? fills2.filter((t) => /\b100%$/.test(t)) : [], rest = fills2.filter((t) => !tops.includes(t));
+                const count = (idl ? 1 : 0) + (mb ? mb.count : 0), causes = (idl ? ["Build idle: " + x.name] : []).concat(dry.length ? ["Relocate: " + x.name] : [], ups.map((t) => "Upgrade ready: " + x.name + " " + t.replace(/^upgrade /i, "")), tops.length ? ["Storage full: " + x.name + " " + tops.join(", ")] : [], rest.length ? ["Storage: " + x.name + " " + rest.join(", ")] : []);
                 return count ? { count, causes } : null;
             });
             const head = badge(ob.reduce((t, b) => t + (b ? b.count : 0), 0), items.flatMap((x, i) => !ob[i] ? [] : ob[i].causes.length ? ob[i].causes : [x.name]).join("\n"));
@@ -1946,7 +1948,12 @@
         function gameFleetBadge(a) {
             const src = [...document.querySelectorAll(".sidebar-nav a.sidebar-link:not(.nl2-mirror)")].find((x) => pathOf(x) === "/fleet");
             const gb = src && [...src.querySelectorAll(":scope > .sidebar-badge")].find((x) => !/\bnl2-/.test(x.className));
-            const text = gb ? (gb.textContent || "").trim() : "";
+            let text = gb ? (gb.textContent || "").trim() : "";
+            if (NL.flTrim && NL.flTrimAt && NL.cache) {
+                const s = NL.cache.latest(/^\/api\/fleet\/report-unread-summary(\?|$)/);
+                if (s && s.data && s.at >= NL.flTrimAt && Date.now() - s.at < 300000)
+                    text = String(+s.data.total || 0);
+            }
             let b = a.querySelector(":scope > .nl2-gamebadge");
             if (!text || text === "0") {
                 if (b)
@@ -2032,7 +2039,7 @@
             }
             return null;
         }
-        NL.re016 = false;
+        NL.re016 = true;
         function traderModules() {
             let tries = 0, opened = false;
             const step = () => {
@@ -5782,6 +5789,103 @@
     }
     {
         NL.feature({
+            id: "gl-crew-view",
+            set: "Global",
+            name: "Crew cards",
+            desc: "GL-126: on Command Core > Crew, hides crew portraits and flavor text and shows each crew member's role and grade (e.g. Attack Officer \u00B7 Genius (4)) instead of the academy.",
+            init() {
+                const ROLE = {
+                    "command flight school": "Ace Pilot",
+                    "war command academy": "Attack Officer",
+                    "deep scan office": "Scan Master",
+                    "fleet quartermaster service": "Shipboard Advisor",
+                    "fleet navigation corps": "Fleet Coordinator",
+                    "archive computation bureau": "Computation Master",
+                    "fleet defense academy": "Defense Officer",
+                    "auxiliary engineering corps": "Auxiliary Systems Engineer",
+                    "command engineering corps": "Chief Systems Engineer",
+                    "planetary engineering corps": "Planetary Systems Engineer",
+                    "colonial administration": "Planetary Advisor",
+                };
+                const GRADE = { genius: 4, savant: 3, veteran: 2, specialist: 1 };
+                const key = (s) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+                const learn = (o) => { const m = o && (o.metadata || o); if (m && m.origin && m.role)
+                    ROLE[key(m.origin)] = String(m.role); };
+                NL.onData(/^\/api\/leadership(\?|$)/, (p, d) => {
+                    if (!d || typeof d !== "object")
+                        return;
+                    const defs = d.definitions && d.definitions.crew;
+                    (Array.isArray(defs) ? defs : defs && typeof defs === "object" ? Object.values(defs) : []).forEach(learn);
+                    (Array.isArray(d.modules) ? d.modules : []).filter((m) => m && m.metadata && m.metadata.crew).forEach(learn);
+                    NL._kick();
+                });
+                NL.css("gl-crew-view", `
+      .leadership-crew-card .leadership-crew-avatar{display:none!important}
+      .leadership-crew-card .leadership-crew-card-copy > p{display:none!important}
+      .leadership-crew-card .leadership-crew-card-copy > small[data-nl2-crew]{font-size:0!important}
+      .leadership-crew-card .leadership-crew-card-copy > small[data-nl2-crew]::after{content:attr(data-nl2-crew);font-size:var(--nl2-crew-fs,12px)}
+    `);
+                NL.watch(".leadership-crew-card .leadership-crew-card-copy > small", (el) => {
+                    const card = el.closest(".leadership-crew-card");
+                    const role = ROLE[key(el.textContent)];
+                    const g = /(?:^|\s)rarity-([a-z]+)/.exec(card ? card.className : "");
+                    const grade = g && GRADE[g[1]] ? g[1][0].toUpperCase() + g[1].slice(1) + " (" + GRADE[g[1]] + ")" : "";
+                    const text = role ? role + (grade ? " \u00B7 " + grade : "") : "";
+                    if ((el.getAttribute("data-nl2-crew") || "") === text)
+                        return;
+                    if (!text) {
+                        el.removeAttribute("data-nl2-crew");
+                        return;
+                    }
+                    if (!el.style.getPropertyValue("--nl2-crew-fs"))
+                        el.style.setProperty("--nl2-crew-fs", getComputedStyle(el).fontSize);
+                    el.setAttribute("data-nl2-crew", text);
+                });
+            },
+        });
+    }
+    {
+        NL.planetPick = true;
+        (() => {
+            let rank = null;
+            try {
+                const s = JSON.parse(localStorage.getItem("nl2.gl.pickerOrder") || "null");
+                if (Array.isArray(s))
+                    rank = new Map(s.map((id, i) => [Number(id), i]));
+            }
+            catch (e) { }
+            const take = (d) => {
+                const list = Array.isArray(d) ? d : (d && d.planets) || [];
+                const ids = list.filter((p) => p && p.id != null).map((p, i) => [Number(p.id), Number(p.sortOrder) || 0, i])
+                    .sort((a, b) => a[1] - b[1] || a[2] - b[2]).map((x) => x[0]);
+                if (!ids.length)
+                    return;
+                rank = new Map(ids.map((id, i) => [id, i]));
+                try {
+                    localStorage.setItem("nl2.gl.pickerOrder", JSON.stringify(ids));
+                }
+                catch (e) { }
+            };
+            NL.onData(/^\/api\/planets$/, (p, d) => take(d));
+            const fresh = () => { if (!rank) {
+                const c = NL.cache.latest(/^\/api\/planets$/);
+                if (c)
+                    take(c.data);
+            } return rank; };
+            NL.pickerRank = (id) => { const r = fresh(); const v = r && r.get(Number(id)); return v == null ? Infinity : v; };
+            NL.pickerSort = (list, how = {}) => {
+                const idOf = how.id || ((x) => x.id), kindOf = how.kind || (() => "planet"), parent = how.planetOf || ((x) => x.planetId);
+                const K = { planet: 0, moon: 1, hub: 2 };
+                return (list || []).map((x, i) => {
+                    const k = K[kindOf(x)] != null ? K[kindOf(x)] : 0;
+                    return { x, i, k, r: k === 0 ? NL.pickerRank(idOf(x)) : k === 1 ? NL.pickerRank(parent(x)) : 0 };
+                }).sort((a, b) => a.k - b.k || (a.r === b.r ? 0 : a.r < b.r ? -1 : 1) || a.i - b.i).map((o) => o.x);
+            };
+            NL.pickList = (list, how) => (NL.planetPick ? NL.pickerSort(list, how) : list);
+        })();
+    }
+    {
+        NL.feature({
             id: "ov-colony",
             set: "Overview",
             name: "Hide Colony image",
@@ -6899,6 +7003,28 @@
         });
     }
     {
+        NL.feature({
+            id: "bu-energy-badge",
+            set: "Buildings",
+            name: "Energy badge",
+            desc: "BU-019: the Buildings menu badge adds 1 for each planet with negative energy that the energy buildings already queued won't make up; hover \"Energy: Urik -120\".",
+            init() {
+                let last = "";
+                const put = (snap) => {
+                    const en = (snap && snap.en) || [], tip = en.map((x) => "Energy: " + x.planet + " -" + Number(x.deficit).toLocaleString("en-US")).join("\n"), key = en.length + "|" + tip;
+                    if (key === last)
+                        return;
+                    last = key;
+                    ((NL.navBadges = NL.navBadges || {})["/buildings"] = NL.navBadges["/buildings"] || {}).energy = { n: en.length, tip: en.length ? tip : "" };
+                    if (NL.navBadgeChanged)
+                        NL.navBadgeChanged("/buildings");
+                };
+                if (NL.taskData)
+                    NL.taskData.sub(put);
+            },
+        });
+    }
+    {
         const RE_FLAGS = ["data-nl2-relab", "data-nl2-reuw", "data-nl2-rehid"];
         const reActive = {};
         const reShare = {};
@@ -7701,14 +7827,17 @@
                     ".nl2-retb .nl2-retb-chip.nl2-u{border-color:#2a6a7a;color:#7fd0e0}",
                     ".nl2-retb .nl2-retb-cost span{display:inline-block;margin-right:8px;white-space:nowrap}",
                     ".nl2-retb .nl2-r{color:#e06c6c}.nl2-retb .nl2-g{color:#7fd6a0}.nl2-retb .nl2-y{color:#e6c34a}.nl2-retb .nl2-b{color:#6fb0ff}.nl2-retb .nl2-na,.nl2-retb .nl2-dim{color:#8a96a6}",
-                    ".nl2-retb .nl2-retb-act{display:flex;align-items:center;justify-content:flex-end;gap:8px}",
-                    ".nl2-retb .nl2-retb-fr{width:190px;display:flex;align-items:center;gap:6px;color:#c99fff;font-size:12px}.nl2-retb .nl2-retb-fr input{width:80px;accent-color:#8a5cff;margin:0}",
-                    ".nl2-retb .nl2-retb-fr.nl2-off{visibility:hidden}",
-                    ".nl2-retb button.nl2-retb-btn{width:124px;box-sizing:border-box;padding:4px 8px;border-radius:6px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(34,197,94,.15);border:1px solid #166534;color:#4ade80}",
+                    ".nl2-retb .nl2-retb-act{display:flex;align-items:center;justify-content:flex-end;gap:6px}",
+                    ".nl2-retb select.nl2-retb-fr{width:46px;height:24px;box-sizing:border-box;padding:0 2px;margin:0;background:#130f24;color:#c99fff;border:1px solid #4a3a7a;border-radius:5px;font:inherit;font-size:12px;cursor:pointer}",
+                    ".nl2-retb .nl2-retb-frph{display:inline-block;width:46px}",
+                    ".nl2-retbw{max-width:100%;overflow:hidden}",
+                    ".nl2-retb .nl2-retb-br{display:inline-block;width:18px;height:18px;border-radius:4px;text-align:center;font-size:11px;line-height:18px;font-weight:700;margin-right:7px;vertical-align:1px}",
+                    ".nl2-retb .nl2-retb-br.nl2-m{background:#3a1520;color:#ff6b7f;border:1px solid #6a2535}.nl2-retb .nl2-retb-br.nl2-e{background:#3a2a10;color:#f5b83d;border:1px solid #6a4a18}.nl2-retb .nl2-retb-br.nl2-s{background:#10243a;color:#6fb0ff;border:1px solid #1e4f7a}",
+                    ".nl2-retb button.nl2-retb-btn{width:118px;box-sizing:border-box;padding:4px 8px;border-radius:6px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(34,197,94,.15);border:1px solid #166534;color:#4ade80}",
                     ".nl2-retb button.nl2-retb-btn.nl2-bring{background:rgba(56,189,248,.12);border-color:#1e4f7a;color:#7cc4f5;font-weight:600}",
                     ".nl2-retb button.nl2-retb-btn:disabled{background:rgba(120,130,150,.12);border-color:#2a3446;color:#6b7686;cursor:default}",
-                    ".nl2-retb .nl2-retb-btnph{display:inline-block;width:124px;text-align:center;color:#8a96a6}",
-                    ".nl2-retb .nl2-retb-hide{display:flex;align-items:center;gap:4px;font-size:12px;color:#8a96a6;cursor:pointer}.nl2-retb .nl2-retb-hide input{margin:0;cursor:pointer}",
+                    ".nl2-retb .nl2-retb-btnph{display:inline-block;width:118px;text-align:center;color:#8a96a6}",
+                    ".nl2-retb .nl2-retb-hide{display:flex;align-items:center;justify-content:center;cursor:pointer}.nl2-retb .nl2-retb-hide input{margin:0;cursor:pointer}",
                     ".nl2-retb tr.nl2-retb-bar td{cursor:pointer;font-weight:600;color:#c9d4e3;user-select:none}.nl2-retb tr.nl2-retb-bar:hover td{background:#13213a}",
                     ".nl2-retb tr.nl2-retb-hid td{opacity:.6}",
                 ].join(""));
@@ -7849,7 +7978,7 @@
                     const cost = costOf(it);
                     let short = false;
                     r.cost = cost.map(([k, v]) => { const h = haveOf(ps.planet, k), s = h != null && h < v; if (s)
-                        short = true; return { t: (RES_LBL[k] || cap(k).replace(/ (Core|Dust|Extract|Ice)$/i, "")) + " " + NL.fmt(v), s, tip: h != null ? cap(k) + ": " + NL.fmt(h) + " here, " + NL.fmt(v) + " needed" : "" }; });
+                        short = true; return { t: (RES_LBL[k] || cap(k).replace(/ (Core|Dust|Extract|Ice)$/i, "")) + " " + NL.fmt(v, true), s, tip: cap(k) + ": " + NL.fmt(v) + " needed" + (h != null ? ", " + NL.fmt(h) + " here" : "") }; });
                     const roi = reShare.roi ? reShare.roi(it) : null;
                     r.roi = roi ? roi.txt : "";
                     r.roiCls = roi ? roi.cls : "";
@@ -7884,18 +8013,21 @@
                             r.stc = "nl2-dim";
                         }
                         else {
-                            r.st = "Underway";
+                            r.st = "\u23F3";
+                            r.tip = "Underway";
                             r.stc = "nl2-b";
                             r.end = it.endsAt ? Date.parse(it.endsAt) || 0 : 0;
                         }
                     }
                     else if (needs.length) {
-                        r.st = "Needs: " + needs.join(", ");
+                        r.st = "Needs (" + needs.length + ")";
+                        r.tip = "Needs: " + needs.join(", ");
                         r.stc = "nl2-r";
                         r.act = short || cardBring ? "bring" : "lvl-off";
                     }
                     else if (short || cardBring) {
-                        r.st = "Short of resources";
+                        r.st = "Short";
+                        r.tip = "Short of resources on this planet";
                         r.stc = "nl2-y";
                         r.act = "bring";
                     }
@@ -7914,7 +8046,9 @@
                     const f = fails[it.key];
                     if (f && f.until > Date.now()) {
                         r.st = f.msg;
+                        r.tip = f.msg;
                         r.stc = "nl2-r";
+                        r.end = 0;
                     }
                     return r;
                 }
@@ -7925,24 +8059,19 @@
                 function build() {
                     wrap = NL.h("div", { class: "nl2-retbw" });
                     tbl = NL.h("table", { class: "nl2-retb" });
-                    const cols = [["Research", 190], ["Type", 80], ["Level", 58], ["Lab", 42], ["Effects", null], ["Cost", 300], ["Time", 82], ["ROI", 82], ["Status", 180], ["Fragments \u00B7 Action", 336], ["", 70]];
+                    const cols = [["Research", 205], ["Lv \u00B7 Lab", 78], ["Effects", null], ["Cost", 300], ["Time", 76], ["ROI", 84], ["Status", 104], ["Fragments \u00B7 Action", 186], ["Hide", 44]];
                     tbl.appendChild(NL.h("colgroup", null, ...cols.map(([, w]) => NL.h("col", w ? { style: "width:" + w + "px" } : {}))));
-                    tbl.appendChild(NL.h("thead", null, NL.h("tr", null, ...cols.map(([t], i) => NL.h("th", i === 9 ? { style: "text-align:right" } : {}, t)))));
+                    tbl.appendChild(NL.h("thead", null, NL.h("tr", null, ...cols.map(([t], i) => NL.h("th", i === 7 ? { style: "text-align:right" } : i === 8 ? { style: "text-align:center" } : {}, t)))));
                     tbody = NL.h("tbody");
                     tbl.appendChild(tbody);
                     wrap.appendChild(tbl);
                     tbl.addEventListener("click", onClick);
-                    tbl.addEventListener("input", (e) => {
-                        const inp = e.target.closest("input[type=\"range\"]");
-                        if (!inp)
-                            return;
-                        const k = inp.closest("tr").getAttribute("data-k");
-                        frags[k] = +inp.value || 0;
-                        const v = inp.parentElement.querySelector(".nl2-retb-frv");
-                        if (v)
-                            v.textContent = String(frags[k]);
-                    });
                     tbl.addEventListener("change", (e) => {
+                        const sel = e.target.closest("select.nl2-retb-fr");
+                        if (sel) {
+                            frags[sel.closest("tr").getAttribute("data-k")] = +sel.value || 0;
+                            return;
+                        }
                         const cb = e.target.closest(".nl2-retb-hide input");
                         if (!cb || !reShare.hide)
                             return;
@@ -7954,25 +8083,27 @@
                 function rowEl(r, hid) {
                     const tr = NL.h("tr", { "data-k": r.key, class: hid ? "nl2-retb-hid" : "" });
                     const td = (cls, ...kids) => NL.h("td", cls ? { class: cls } : {}, ...kids);
-                    tr.appendChild(td("", NL.h("span", { class: "nl2-retb-n", "data-act": "open", "data-nl2-tip": r.name }, r.name)));
-                    tr.appendChild(td("", r.type));
-                    tr.appendChild(td("", r.lv));
-                    tr.appendChild(td("", r.lab));
+                    const bl = (r.type || "?")[0];
+                    tr.appendChild(td("", NL.h("span", { class: "nl2-retb-br nl2-" + bl.toLowerCase(), "data-nl2-tip": r.type }, bl), NL.h("span", { class: "nl2-retb-n", "data-act": "open", "data-nl2-tip": r.name }, r.name)));
+                    tr.appendChild(NL.h("td", { "data-nl2-tip": "Level " + r.lv + ", needs Research Lab " + r.lab }, r.lv + " \u00B7 L" + r.lab));
                     tr.appendChild(td("nl2-retb-fx", ...r.fx.map((c) => NL.h("span", { class: "nl2-retb-chip" + (/^unlocks?:/i.test(c) ? " nl2-u" : "") }, c))));
                     tr.appendChild(td("nl2-retb-cost", ...(r.cost.length ? r.cost.map((c) => NL.h("span", Object.assign({ class: c.s ? "nl2-r" : "" }, c.tip ? { "data-nl2-tip": c.tip } : {}), c.t)) : [NL.h("span", { class: "nl2-dim" }, "\u2014")])));
                     tr.appendChild(td("", r.maxed || r.underway ? "\u2014" : r.time));
                     tr.appendChild(NL.h("td", Object.assign({ class: r.roiCls || "" }, r.roiTip ? { "data-nl2-tip": r.roiTip } : {}), r.roi));
-                    const st = NL.h("td", { class: r.stc, "data-nl2-tip": r.st }, r.st);
+                    const st = NL.h("td", { class: r.stc, "data-nl2-tip": r.end ? (r.tip || r.st) + ", done " + NL.clock(r.end) : (r.tip || r.st) }, r.st);
                     if (r.end) {
-                        st.appendChild(document.createTextNode(" \u00B7 "));
-                        st.appendChild(NL.h("span", { class: "nl2-retb-cd", "data-end": String(r.end), "data-nl2-tip": NL.clock(r.end) }, NL.countdown(r.end - Date.now())));
+                        st.appendChild(document.createTextNode(" "));
+                        st.appendChild(NL.h("span", { class: "nl2-retb-cd", "data-end": String(r.end) }, NL.countdown(r.end - Date.now())));
                     }
                     tr.appendChild(st);
-                    const fr = NL.h("span", { class: "nl2-retb-fr" + (r.fmax >= 1 ? "" : " nl2-off") });
+                    let fr;
                     if (r.fmax >= 1) {
                         const v = Math.min(frags[r.key] || 0, r.fmax);
-                        fr.append("Fragments ", NL.h("input", { type: "range", min: "0", max: String(r.fmax), step: "1", value: String(v) }), NL.h("span", { class: "nl2-retb-frv" }, String(v)));
+                        fr = NL.h("select", { class: "nl2-retb-fr", "data-nl2-tip": "Precursor Fragments to use (cuts the research time)" }, ...Array.from({ length: r.fmax + 1 }, (_, i) => NL.h("option", { value: String(i) }, String(i))));
+                        fr.value = String(v);
                     }
+                    else
+                        fr = NL.h("span", { class: "nl2-retb-frph" });
                     let btn;
                     if (r.act === "lvl" || r.act === "lvl-off")
                         btn = NL.h("button", Object.assign({ class: "nl2-retb-btn", "data-act": "lvl" }, r.act === "lvl-off" ? { disabled: "" } : {}), "\u25B7 " + r.btn);
@@ -7983,7 +8114,7 @@
                     tr.appendChild(td("", NL.h("div", { class: "nl2-retb-act" }, fr, btn)));
                     const cb = NL.h("input", { type: "checkbox" });
                     cb.checked = hid;
-                    tr.appendChild(td("", NL.h("label", { class: "nl2-retb-hide", "data-nl2-tip": "Hide this research (same on every planet)" }, cb, "Hide")));
+                    tr.appendChild(td("", NL.h("label", { class: "nl2-retb-hide", "data-nl2-tip": hid ? "Show this research again" : "Hide this research (same on every planet)" }, cb)));
                     return tr;
                 }
                 function paint() {
@@ -8047,12 +8178,12 @@
                     const frag = document.createDocumentFragment();
                     vis.forEach((r) => frag.appendChild(rowEl(r, false)));
                     if (hid.length) {
-                        frag.appendChild(NL.h("tr", { class: "nl2-retb-bar", "data-act": "hidbar" }, NL.h("td", { colspan: "11" }, (hidOpen ? "\u25BE " : "\u25B8 ") + "Hidden (" + hid.length + ")")));
+                        frag.appendChild(NL.h("tr", { class: "nl2-retb-bar", "data-act": "hidbar" }, NL.h("td", { colspan: "9" }, (hidOpen ? "\u25BE " : "\u25B8 ") + "Hidden (" + hid.length + ")")));
                         if (hidOpen)
                             hid.forEach((r) => frag.appendChild(rowEl(r, true)));
                     }
                     if (!vis.length && !hid.length)
-                        frag.appendChild(NL.h("tr", null, NL.h("td", { colspan: "11", class: "nl2-dim" }, "No research to show")));
+                        frag.appendChild(NL.h("tr", null, NL.h("td", { colspan: "9", class: "nl2-dim" }, "No research to show")));
                     tbody.replaceChildren(frag);
                     reCount();
                     if (tbody.querySelector(".nl2-retb-cd") && !tick)
@@ -9200,9 +9331,13 @@
                     const order = (pid) => { const p = pl.find((x) => x.id === pid); return p ? p.sortOrder : 1000000000; };
                     const farMoons = moons.filter((m) => m.planetId !== src).map((m) => ({ ...m, ly: lyOf(m.planetId), sortOrder: order(m.planetId) })).sort(near);
                     const ly = (v) => (v != null ? " \u00B7 " + v.toFixed(1) + " ly" : "");
-                    return moons.filter((m) => m.planetId === src).map((m) => ({ id: m.id, label: m.name + " (moon)", kind: "moon" }))
+                    const list = moons.filter((m) => m.planetId === src).map((m) => ({ id: m.id, label: m.name + " (moon)", kind: "moon", planetId: m.planetId }))
                         .concat(others.map((p) => ({ id: p.id, label: p.name + ly(p.ly), kind: "planet" })))
-                        .concat(farMoons.map((m) => ({ id: m.id, label: m.name + " (moon)" + ly(m.ly), kind: "moon" })));
+                        .concat(farMoons.map((m) => ({ id: m.id, label: m.name + " (moon)" + ly(m.ly), kind: "moon", planetId: m.planetId })));
+                    if (!NL.planetPick || !list.length)
+                        return list;
+                    list[0].def = true;
+                    return NL.pickerSort(list, { kind: (t) => t.kind });
                 }
                 const shipsBody = (state) => {
                     const by = new Map();
@@ -10577,7 +10712,7 @@
             id: "fl-reports",
             set: "Fleet",
             name: "Reports tab table",
-            desc: "FL-094/095/100: Fleet > Reports as a table (Table View), combat rounds on raid and battle reports, Previous / Next between open reports.",
+            desc: "FL-094/095/100/105: Fleet > Reports as a table (Table View) with descriptive types, combat rounds on raid and battle reports, Previous / Next between open reports.",
             init(ctx) {
                 const S = ctx.store;
                 const tvGet = () => S.get("table", true) !== false;
@@ -10665,6 +10800,28 @@
                 const resTxt = (l) => l.map(([k, n]) => (RES[k] || k.replace(/_/g, " ")) + " " + fmtN(num(n))).join(" \u00B7 ");
                 const resCell = (l, cls) => l.flatMap(([k, n]) => [RES[k] ? NL.h("img", { class: "game-resource-icon", src: "/images/resources/" + k + ".webp", alt: "" }) : (k.replace(/_/g, " ") + " "), NL.h("span", { class: cls || "" }, (cls === "nl2-frp-bad" ? "\u2212" : "+") + fmtN(num(n)))]);
                 const lastAddr = (t) => { const p = String(t || "").split(/\s*\/\s*/).filter(Boolean); return p.length ? p[p.length - 1] : ""; };
+                const whId = /^[A-Z]-\d+\s*·\s*/;
+                const whName = (t) => String(t || "").replace(whId, "");
+                const isWormhole = (r, loc) => !!r && (whId.test(r.planetName || "") || (r.defenderId == null && [...(r.attackerLosses || []), ...(r.defenderLosses || [])].some((s) => /^wormhole_/.test((s && s.key) || ""))))
+                    || whId.test(lastAddr(loc));
+                function typeOf(kind, r, loc) {
+                    if (kind === "mine")
+                        return "Mining Complete";
+                    if (kind === "raid")
+                        return "Mining Raid";
+                    if (kind !== "bat")
+                        return "";
+                    if (isWormhole(r, loc))
+                        return "Wormhole Battle";
+                    const side = r && r.currentUserBattleSide, def = side === "defender", atk = side === "attacker";
+                    if (!def && !atk)
+                        return "Battle";
+                    if (/^Station\b/i.test((r && r.planetName) || lastAddr(loc)))
+                        return def ? "Station Defense" : "Station Attack";
+                    if (r && (r.attackerId != null && r.defenderId != null))
+                        return def ? "Player Defense" : "Player Attack";
+                    return "Battle";
+                }
                 let belts = S.get("belt", {}) || {};
                 function learnBelts(rows) {
                     let changed = false;
@@ -10695,8 +10852,10 @@
                     learnBelts(rows);
                     for (const x of rows) {
                         const r = x.r || {};
-                        x.type = txt(x.c, ".rep-type-label") || ({ mine: "Mining Complete", raid: "Pirate Raid", bat: "Battle" })[x.kind] || "Report";
+                        x.type = typeOf(x.kind, x.r, x.locTxt) || txt(x.c, ".rep-type-label") || "Report";
                         x.loc = x.kind === "mine" && r.missionId != null && belts[r.missionId] && !/\//.test(x.locTxt) ? belts[r.missionId] : lastAddr(x.locTxt);
+                        if (isWormhole(r, x.locTxt))
+                            x.loc = whName(x.loc);
                         x.colony = txt(x.c, ".rep-colony").replace(/^Colony:\s*/i, "");
                         x.rounds = rounds(x.kind, x.r);
                         const oc = x.c.querySelector(".rep-outcome");
@@ -11945,6 +12104,19 @@
             NL.option({ key: "fl-transfer.pltrig", group: "Fleet Transfer", label: "Make route, planet \u2192 planet (Move out rows): Trigger When (amount)", type: "number", def: 100000, min: 1, step: 1000 });
             NL.option({ key: "fl-transfer.plsend", group: "Fleet Transfer", label: "Make route, planet \u2192 planet (Move out rows): Send Amount", type: "number", def: 50000, min: 1, step: 1000 });
         }
+        NL.feature({
+            id: "fl-transfer-h2",
+            set: "Fleet",
+            name: "Transfer: hydrogen rows",
+            desc: "FL-107 / FL-108: a Supply hydrogen row on Fleet > Transfer for each planet under its hydrogen line (10,000, sends 50,000) and each outpost under its line (5,000, sends 10,000).",
+            init() { },
+        });
+        if (NL.option) {
+            NL.option({ key: "fl-transfer.h2.plow", group: "Fleet Transfer", label: "Supply hydrogen row: planet under (amount; a source planet also keeps this much)", type: "number", def: 10000, min: 0, step: 1000 });
+            NL.option({ key: "fl-transfer.h2.psend", group: "Fleet Transfer", label: "Supply hydrogen row: send to a planet", type: "number", def: 50000, min: 0, step: 1000 });
+            NL.option({ key: "fl-transfer.h2.olow", group: "Fleet Transfer", label: "Supply hydrogen row: outpost under (amount)", type: "number", def: 5000, min: 0, step: 1000 });
+            NL.option({ key: "fl-transfer.h2.osend", group: "Fleet Transfer", label: "Supply hydrogen row: send to an outpost", type: "number", def: 10000, min: 0, step: 1000 });
+        }
         const trRouteAmt = (planet, cap) => {
             const t = trOptN(planet ? "fl-transfer.pltrig" : "fl-transfer.outrig", planet ? 100000 : 10000) || (planet ? 100000 : 10000);
             const a = trOptN(planet ? "fl-transfer.plsend" : "fl-transfer.ousend", planet ? 50000 : 5000) || (planet ? 50000 : 5000);
@@ -12322,6 +12494,10 @@
                         const to = { t: "moon", id: m.id, name: m.name };
                         out.push({ key: "s" + m.id, kind: "supply", task: "Supply", from, to: { ...to, list: [to] }, res: miss, due: 0, at: m.at, why: "Below keep: " + why.join(" \u00B7 "), whyLines: ["Below keep:", ...why], ships: shipsFor("p" + from.id, Object.values(miss).reduce((a, b) => a + b, 0)), go: (mi) => +mi.targetMoonId === m.id && ["transfer", "deliver"].includes(mi.missionType) && mi.status === "outbound" && trCarries(mi, miss) });
                     }
+                    if (NL.enabled && NL.enabled("fl-transfer-h2") && NL.taskData && NL.taskData.snap)
+                        for (const h of NL.taskData.snap.h2 || []) {
+                            out.push({ key: "h" + h.key, kind: "h2", task: "Supply hydrogen", from: h.from, to: { ...h.to, list: [h.to] }, res: { hydrogen: h.send }, due: 0, at: 0, h2: h, why: "Hydrogen " + trFmt(h.have) + " / " + trFmt(h.low) + (h.from ? "" : " \u00B7 no planet can spare it"), whyLines: ["Hydrogen " + trFmt(h.have) + " / " + trFmt(h.low)].concat(h.from ? [] : ["No planet can send it and keep its own " + trFmt(h.low)]), ships: null, go: () => false });
+                        }
                     for (const t of out) {
                         t.covered = routes().filter((r) => covers(r, t));
                         const left = Object.keys(t.res).filter((k) => !t.covered.some((r) => rk(r) === k));
@@ -12344,6 +12520,8 @@
                         return r.routeMode === "supply" && +r.destinationPlanetId === t.to.id;
                     if (t.kind === "supply")
                         return r.routeMode === "supply_moon" && +r.destinationMoonId === t.to.id;
+                    if (t.kind === "h2")
+                        return t.to.t === "planet" ? r.routeMode === "supply" && +r.destinationPlanetId === t.to.id : r.routeMode === "supply_outpost" && +r.destinationOutpostId === t.to.id;
                     return false;
                 }
                 function moveTarget(me, res) {
@@ -12443,7 +12621,7 @@
                         const l = (t.rows || []).filter((x) => x.cap > 0 && isFinite(x.cap)).map((x) => ({ n: trName(x.k), p: Math.floor((100 * x.now) / x.cap) })).sort((a, b) => b.p - a.p);
                         return l.length ? " " + l.map((x) => x.n + " " + x.p + "%").join(", ") : "";
                     };
-                    const tip = act.map((t) => t.task + ": " + t.from.name + (t.kind === "bring" || t.kind === "supply" ? " \u2192 " + t.to.name : pctOf(t))).join("\n");
+                    const tip = act.map((t) => (t.kind === "h2" ? t.task + ": " + t.to.name : t.task + ": " + t.from.name + (t.kind === "bring" || t.kind === "supply" ? " \u2192 " + t.to.name : pctOf(t)))).join("\n");
                     const key = act.length + "|" + tip;
                     if (key !== lastBadge) {
                         lastBadge = key;
@@ -12503,7 +12681,11 @@
                 async function act(t, btn) {
                     btn.setAttribute("data-nl2-busy", "1");
                     try {
-                        if (t.kind === "move" || t.kind === "supply")
+                        if (t.kind === "h2") {
+                            if (t.h2 && t.h2.open)
+                                t.h2.open();
+                        }
+                        else if (t.kind === "move" || t.kind === "supply")
                             await moveOut(t, btn);
                         else if (t.kind === "relocate") {
                             if (NL.openOutpost)
@@ -12589,7 +12771,7 @@
                         const b = Number.isFinite(+m.systemX) && m.systemX != null ? { x: +m.systemX, y: +m.systemY } : m.systemId != null ? xy(m.systemId) : null;
                         const d = a && b ? Math.round(Math.hypot(a.x - b.x, a.y - b.y)) : null;
                         return { id: "hub:" + id, hubId: id, kind: "hub", name, d, label: "Hub: " + name + (d != null ? " \u00B7 " + d.toLocaleString("en-US") + " ly" : "") };
-                    }).sort((x, y) => (x.d == null) - (y.d == null) || (x.d || 0) - (y.d || 0));
+                    }).sort((x, y) => (NL.planetPick ? 0 : (x.d == null) - (y.d == null) || (x.d || 0) - (y.d || 0)));
                 }
                 function hubLabel() {
                     let n = 0;
@@ -12697,9 +12879,13 @@
                         return;
                     const src = t.from.id, list = (t.to && t.to.list) || [];
                     const first = list.findIndex((c) => c.t === t.to.t && c.id === t.to.id);
-                    const targets = (first > 0 ? [list[first], ...list.filter((c, i) => i !== first)] : list).map((c) => ({ id: c.id, label: c.name + (c.t === "moon" ? " (moon)" : ""), kind: c.t }));
+                    let targets = (first > 0 ? [list[first], ...list.filter((c, i) => i !== first)] : list).map((c) => ({ id: c.id, label: c.name + (c.t === "moon" ? " (moon)" : ""), kind: c.t, planetId: c.m ? +c.m.planetId : undefined }));
                     if (!targets.length)
                         return;
+                    if (NL.planetPick) {
+                        targets[0].def = true;
+                        targets = NL.pickerSort(targets, { kind: (c) => c.kind });
+                    }
                     if (t.kind !== "supply")
                         for (const h of await hubTargets(planetById(src) || { id: src }))
                             targets.push(h);
@@ -12930,7 +13116,7 @@
                     cb.addEventListener("change", () => setHide(k, cb.checked));
                     return NL.h("td", { class: "nl2-ftr-hide" }, cb);
                 };
-                const LABEL = { supply: "Supply", move: "Transfer", outpost: "Collect", moon: "Collect", bring: "Bring resources", relocate: "Open outpost" };
+                const LABEL = { h2: "Supply", supply: "Supply", move: "Transfer", outpost: "Collect", moon: "Collect", bring: "Bring resources", relocate: "Open outpost" };
                 const COLS = [["Task", "110px", (t) => t.task], ["From", "150px", (t) => t.from && t.from.name], ["To", "150px", (t) => t.to && t.to.name], ["To move", "", (t) => -Object.values(t.res).reduce((a, b) => a + b, 0)], ["Ships", "170px", (t) => t.ships && t.ships.text], ["Trip time", "100px", (t) => (t.mission ? homeAt(t.mission) : Infinity)], ["Why", "280px", (t) => t.due], ["Status", "100px", (t) => (t.mission ? 0 : 1)], ["", TR_ACTS_W, null], ["Hide", TR_HIDE_W, null]];
                 function activeTable(list) {
                     const sort = st.get("sort", { c: 6, d: 1 });
@@ -13024,7 +13210,7 @@
                         const hubPid = /^collect_/.test(r.routeMode) ? r.destinationPlanetId : r.sourcePlanetId, hub = hubs().find((h) => +h.planetId === +hubPid);
                         const cov = list.filter((t) => covers(r, t)), k = rk(r);
                         const paused = rtPaused(r);
-                        return NL.h("tr", null, NL.h("td", null, MODE[r.routeMode] || String(r.routeMode || "\u2014")), NL.h("td", null, place(from)), NL.h("td", null, place(to)), NL.h("td", null, k ? icon(k) : "", k ? trName(k) : String(r.resourceType || "\u2014")), NL.h("td", { class: "nl2-ftr-r" }, trFmt(r.threshold)), NL.h("td", { class: "nl2-ftr-r" }, trFmt(r.amount)), NL.h("td", null, hub ? trClean(hub.planetName) + " (" + trN(hub.routeCount) + "/" + trN(hub.hubLevel) + ")" : "\u2014"), NL.h("td", null, cov.length ? cov.map((t) => t.task + " " + t.from.name + " (" + t.why + ")").join("; ") : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", null, paused ? NL.h("label", { class: "nl2-ftr-resume", "data-nl2-tip": "Tick to resume this route" }, NL.h("input", { type: "checkbox", onchange: async (e) => {
+                        return NL.h("tr", null, NL.h("td", null, MODE[r.routeMode] || String(r.routeMode || "\u2014")), NL.h("td", null, place(from)), NL.h("td", null, place(to)), NL.h("td", null, k ? icon(k) : "", k ? trName(k) : String(r.resourceType || "\u2014")), NL.h("td", { class: "nl2-ftr-r" }, trFmt(r.threshold)), NL.h("td", { class: "nl2-ftr-r" }, trFmt(r.amount)), NL.h("td", null, hub ? trClean(hub.planetName) + " (" + trN(hub.routeCount) + "/" + trN(hub.hubLevel) + ")" : "\u2014"), NL.h("td", null, cov.length ? cov.map((t) => t.task + " " + t.from.name + " (" + t.why + ")").join("; ") : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", null, paused ? NL.h("label", { class: "nl2-ftr-resume", "data-nl2-tip": "Tick to resume this route" }, NL.h("span", { class: "nl2-ftr-st nl2-ftr-oth" }, "paused"), NL.h("input", { type: "checkbox", onchange: async (e) => {
                                 const box = e.currentTarget;
                                 box.disabled = true;
                                 const { done, err } = await resumeRoutes([r.id]);
@@ -13033,7 +13219,7 @@
                                     box.disabled = false;
                                     box.parentNode.setAttribute("data-nl2-tip", "Not resumed: " + err);
                                 }
-                            } }), NL.h("span", { class: "nl2-ftr-st nl2-ftr-oth" }, "paused")) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", { class: "nl2-ftr-acts" }), hideBox("rt" + r.id));
+                            } })) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", { class: "nl2-ftr-acts" }), hideBox("rt" + r.id));
                     });
                     return NL.h("table", null, NL.h("colgroup", null, ...["130px", "150px", "150px", "160px", "110px", "110px", "150px", "", "100px", TR_ACTS_W, TR_HIDE_W].map((w) => NL.h("col", { style: w ? "width:" + w : null }))), NL.h("thead", null, NL.h("tr", null, ...["Route", "From", "To", "Resource", "Trigger \u2265", "Send", "Hub", "Covers", "Status", "", "Hide"].map((l, i) => NL.h("th", { class: "nl2-ftr-nos" + (i === 4 || i === 5 ? " nl2-ftr-r" : "") + (l === "Hide" ? " nl2-ftr-hide" : "") }, l)))), NL.h("tbody", null, ...rows));
                 }
@@ -13050,15 +13236,20 @@
                 function routeDialog(t) {
                     if (dlg)
                         dlg.close();
-                    const hubsL = routeHubs(t);
+                    let hubsL = routeHubs(t);
                     if (!hubsL.length)
                         return;
+                    const nearHub = hubsL[0];
+                    if (NL.planetPick) {
+                        const g = freeHubs().map((h) => +h.planetId);
+                        hubsL = hubsL.slice().sort((a, b) => g.indexOf(a.id) - g.indexOf(b.id));
+                    }
                     const routed = new Set(t.covered.map(rk));
                     const lines = t.prod.map((x) => { const [trig, send] = TR_ROUTE_DEF(x.k); return { k: x.k, on: !routed.has(x.k) && x.now > TR_MOON_OVER(x.k), routed: routed.has(x.k), trig, send }; });
-                    let hubI = 0, busy = false;
+                    let hubI = Math.max(0, hubsL.indexOf(nearHub)), busy = false;
                     const msg = NL.h("div", { class: "nl2-ftr-dmsg" }), note = NL.h("div", { class: "nl2-ftr-dnote" });
                     const create = NL.h("button", { type: "button", class: "nl2-c-blue" }, "Create");
-                    const sel = NL.h("select", { onchange: () => { hubI = +sel.value; refresh(); } }, ...hubsL.map((h, i) => { const b = planetById(t.to && t.to.id), d = b && ly(b, h); return NL.h("option", { value: String(i) }, h.name + " (" + h.used + "/" + h.max + ")" + (d != null ? " \u00B7 " + Math.round(d) + " ly" : "")); }));
+                    const sel = NL.h("select", { onchange: () => { hubI = +sel.value; refresh(); } }, ...hubsL.map((h, i) => { const b = planetById(t.to && t.to.id), d = b && ly(b, h); return NL.h("option", { value: String(i), selected: i === hubI }, h.name + " (" + h.used + "/" + h.max + ")" + (d != null ? " \u00B7 " + Math.round(d) + " ly" : "")); }));
                     const num = (l, f) => { const i = NL.h("input", { type: "number", min: "1", step: "1000", value: String(l[f]), disabled: l.routed }); i.addEventListener("input", () => { l[f] = Math.floor(trN(i.value)); refresh(); }); return i; };
                     const keepTd = new Map();
                     const body = NL.h("tbody", null, ...lines.map((l) => {
@@ -13266,6 +13457,12 @@
                 setTimeout(() => badge(tasks()), 4000);
                 setInterval(() => { if (!document.querySelector(".fleet-page"))
                     badge(tasks()); }, 60000);
+                if (NL.taskData && NL.enabled && NL.enabled("fl-transfer-h2")) {
+                    let h2sig = "";
+                    NL.taskData.sub((snap) => { const k = JSON.stringify(snap.h2 || []); if (k === h2sig)
+                        return; h2sig = k; changed(); if (!document.querySelector(".fleet-page"))
+                        badge(tasks()); });
+                }
             },
         });
     }
@@ -13445,6 +13642,263 @@
                         NL._kick();
                     }
                 }
+            },
+        });
+    }
+    {
+        NL.flTrim = true;
+        const FT_OPTS = [
+            ["fl-trim.whbattle", "Reports: mark wormhole battles read"],
+            ["fl-trim.mining", "Reports: mark Mining Complete read"],
+            ["fl-trim.raid", "Reports: mark pirate raids read (unless losses)"],
+            ["fl-trim.scan", "Espionage: mark Mining Activity read"],
+            ["fl-trim.whrun", "Wormholes: mark new runs read (after a launch)"],
+            ["fl-trim.pirate", "Pirates: mark battle reports read (unless losses)"],
+            ["fl-trim.exp", "Expeditions: mark reports read"],
+            ["fl-trim.survey", "Surveys: mark reports read (unless losses)"],
+            ["fl-trim.debris", "Debris: hide the tab badge"],
+            ["fl-trim.expslot", "Expeditions: badge each open slot"],
+            ["fl-trim.patslot", "Patrol: badge each open slot"],
+        ];
+        FT_OPTS.forEach(([key, label]) => { if (NL.option)
+            NL.option({ key, group: "Fleet badges", label, type: "checkbox", def: true }); });
+        const FT_EXP_MAX = 2;
+        const FT_DONE = new Set(["returned", "completed", "complete", "cancelled", "canceled", "failed", "recalled", "destroyed"]);
+        function ftLoss(v) {
+            if (v == null)
+                return false;
+            if (typeof v === "number")
+                return v > 0;
+            if (Array.isArray(v))
+                return v.some((x) => (x && typeof x === "object") ? ["lost", "destroyed", "damaged", "quantity", "count", "amount"].some((k) => +x[k] > 0) || (x.losses != null && ftLoss(x.losses)) : +x > 0);
+            if (typeof v === "object")
+                return Object.values(v).some((x) => ftLoss(x));
+            return false;
+        }
+        const ftRaidOk = (r) => r.combatOutcome === "defender_won" && !ftLoss(r.shipsLost) && !ftLoss(r.cargoStolen) && !ftLoss(r.combatLog && r.combatLog.defenderLosses);
+        const ftPirateOk = (r) => r.outcome === "attacker_won" && !ftLoss(r.attackerLosses) && !ftLoss(r.participantBreakdown);
+        const ftSurveyOk = (r) => !ftLoss(r.shipsLost) && !ftLoss(r.shipsDamaged);
+        const ftNewRun = (r) => r.status === "traveling" || (!+r.currentEncounter && !(r.encounterLog || []).length && !FT_DONE.has(r.status) && r.status !== "inside");
+        const FT_LISTS = [
+            { path: "/api/fleet/reports", cats: ["battle"], items: (d) => d.reports, read: (id) => "/api/fleet/reports/" + id + "/read", pick: (r) => (!r.defenderId && !r.planetId && !r.moonId ? "fl-trim.whbattle" : null) },
+            { path: "/api/fleet/mining-reports", cats: ["mining"], items: (d) => d.reports, read: (id) => "/api/fleet/mining-reports/" + id + "/read", pick: (r) => (r.reportType === "delivery" ? "fl-trim.mining" : r.reportType === "pirate_raid" && ftRaidOk(r) ? "fl-trim.raid" : null) },
+            { path: "/api/fleet/field-scan-reports", cats: ["fieldScan"], items: (d) => d.reports, read: (id) => "/api/fleet/field-scan-reports/" + id + "/read", pick: () => "fl-trim.scan" },
+            { path: "/api/fleet/wormhole-runs", cats: ["wormhole"], items: (d) => d.runs, read: (id) => "/api/fleet/wormhole-runs/" + id + "/read", pick: (r) => (ftNewRun(r) ? "fl-trim.whrun" : null) },
+            { path: "/api/fleet/pirate-reports", cats: ["pirate"], items: (d) => d.reports, read: (id) => "/api/fleet/pirate-reports/" + id + "/read", pick: (r) => (ftPirateOk(r) ? "fl-trim.pirate" : null) },
+            { path: "/api/fleet/expedition-reports", cats: ["expedition"], items: (d) => d.reports, read: (id) => "/api/fleet/expedition-reports/" + id + "/read", pick: () => "fl-trim.exp" },
+            { path: "/api/fleet/survey-reports", cats: ["survey"], items: (d) => d.reports, read: (id) => "/api/fleet/survey-reports/" + id + "/read", pick: (r) => (ftSurveyOk(r) ? "fl-trim.survey" : null) },
+        ];
+        const ftRe = (p) => new RegExp("^" + p.replace(/[/.-]/g, "\\$&") + "(\\?|$)");
+        NL.feature({
+            id: "fl-badge-trim",
+            set: "Fleet",
+            name: "Trim Fleet badges",
+            desc: "FL-109 to FL-118: marks wormhole battles, mining, pirate raids and battles without losses, Mining Activity, new wormhole runs, expeditions and surveys without losses read at once (the game's own mark-read); hides Debris badges; badges each open expedition and patrol slot.",
+            init(ctx) {
+                const on = (k) => NL.opt(k) !== false;
+                const sent = new Set(), kept = {}, lastRead = {}, dead = new Set();
+                const queue = [];
+                let busy = false;
+                async function pump() {
+                    if (busy)
+                        return;
+                    busy = true;
+                    let n = 0;
+                    while (queue.length) {
+                        const q = queue.shift();
+                        if (dead.has(q.list))
+                            continue;
+                        const r = await NL.postJson(q.url, null, ctx);
+                        if (r && r.ok)
+                            n++;
+                        else if (r && !r.paused) {
+                            dead.add(q.list);
+                            NL.err("fl-badge-trim", new Error("mark read failed " + r.status + " " + q.url));
+                        }
+                        await new Promise((res) => setTimeout(res, 400));
+                    }
+                    busy = false;
+                    if (n) {
+                        NL.flTrimAt = Date.now();
+                        NL.getJson("/api/fleet/report-unread-summary", ctx);
+                    }
+                }
+                function handle(L, d) {
+                    const xs = d && L.items(d);
+                    if (!Array.isArray(xs))
+                        return;
+                    const keep = new Set();
+                    for (const r of xs) {
+                        if (!r || r.isRead !== false || r.id == null)
+                            continue;
+                        const k = L.pick(r);
+                        if (!k || !on(k)) {
+                            keep.add(r.id);
+                            continue;
+                        }
+                        if (sent.has(L.path + r.id))
+                            continue;
+                        sent.add(L.path + r.id);
+                        queue.push({ list: L.path, url: L.read(r.id) });
+                    }
+                    kept[L.path] = keep;
+                    if (queue.length)
+                        pump();
+                }
+                for (const L of FT_LISTS)
+                    NL.onData(ftRe(L.path), (p, d, at) => { lastRead[L.path] = Math.max(lastRead[L.path] || 0, at || Date.now()); handle(L, d); });
+                NL.onData(/^\/api\/fleet\/report-unread-summary(\?|$)/, (p, d) => {
+                    const c = (d && d.counts) || {};
+                    let delay = 0;
+                    for (const L of FT_LISTS) {
+                        if (dead.has(L.path))
+                            continue;
+                        const n = L.cats.reduce((t, k) => t + (+c[k] || 0), 0);
+                        if (!n)
+                            continue;
+                        if (n <= (kept[L.path] ? kept[L.path].size : 0))
+                            continue;
+                        if (Date.now() - (lastRead[L.path] || 0) < 20000)
+                            continue;
+                        lastRead[L.path] = Date.now();
+                        setTimeout(() => NL.getJson(L.path, ctx), delay);
+                        delay += 1500;
+                    }
+                });
+                NL.css("nl2-fl-trim", `
+      html[data-nl2-fl-debris] .fleet-page .fleet-tab .unread-badge.debris{display:none!important}
+      .fleet-page .fleet-tab .nl2-flt-badge{background:#f59e0b!important;color:#111!important}`);
+                const debris = () => { if (on("fl-trim.debris"))
+                    document.documentElement.setAttribute("data-nl2-fl-debris", "");
+                else
+                    document.documentElement.removeAttribute("data-nl2-fl-debris"); };
+                debris();
+                if (NL.onOpt)
+                    NL.onOpt("fl-trim.debris", debris);
+                const st = ctx.store;
+                let missions = null, missionsAt = 0, cap = st.get("patcap", null);
+                NL.onData(/^\/api\/fleet\/missions(\?|$)/, (p, d, at) => { if (d && Array.isArray(d.missions)) {
+                    missions = d.missions;
+                    missionsAt = at || Date.now();
+                    paint();
+                } });
+                NL.onData(/^\/api\/command-center\/fleet-overview$/, (p, d, at) => {
+                    if (d && Array.isArray(d.missions) && (at || 0) >= missionsAt) {
+                        missions = d.missions;
+                        missionsAt = at || Date.now();
+                    }
+                    const pc = d && d.summary && d.summary.patrolCapacity;
+                    if (pc && +pc.total >= 0) {
+                        cap = { total: +pc.total, used: +pc.used || 0, at: at || Date.now() };
+                        st.set("patcap", cap);
+                    }
+                    paint();
+                });
+                NL.onData(/^\/api\/fleet\/patrol\/capacity(\?|$)/, (p, d, at) => { if (d && +d.total >= 0) {
+                    cap = { total: +d.total, used: +d.used || 0, at: at || Date.now() };
+                    st.set("patcap", cap);
+                    paint();
+                } });
+                if (!cap || Date.now() - (cap.at || 0) > 6 * 3600000)
+                    setTimeout(() => { if (!cap || Date.now() - (cap.at || 0) > 6 * 3600000)
+                        NL.getJson("/api/fleet/patrol/capacity", ctx); }, 4000);
+                NL.onWrite(/^\/api\/fleet\/patrol$/, () => setTimeout(() => NL.getJson("/api/fleet/patrol/capacity", ctx), 1200));
+                const live = (type) => (missions || []).filter((m) => m && m.missionType === type && !FT_DONE.has(m.status)).length;
+                function slots() {
+                    const out = { exp: 0, pat: 0 };
+                    if (missions && on("fl-trim.expslot"))
+                        out.exp = Math.max(0, FT_EXP_MAX - live("expedition"));
+                    if (cap && on("fl-trim.patslot")) {
+                        const used = missions && missionsAt > (cap.at || 0) ? live("patrol") : cap.used;
+                        out.pat = Math.max(0, cap.total - used);
+                    }
+                    return out;
+                }
+                let last = "";
+                function paint() {
+                    const s = slots(), key = s.exp + "/" + s.pat;
+                    const nb = (NL.navBadges = NL.navBadges || {});
+                    nb["/fleet"] = nb["/fleet"] || {};
+                    nb["/fleet"].flExpSlot = { n: s.exp, tip: s.exp ? "Expedition slot: " + s.exp + " open" : "" };
+                    nb["/fleet"].flPatSlot = { n: s.pat, tip: s.pat ? "Patrol slot: " + s.pat + " open" : "" };
+                    if (key !== last) {
+                        last = key;
+                        if (NL.navBadgeChanged)
+                            NL.navBadgeChanged("/fleet");
+                    }
+                    tabs(s);
+                }
+                function tabs(s) {
+                    const pg = document.querySelector(".fleet-page");
+                    if (!pg)
+                        return;
+                    for (const b of pg.querySelectorAll(".fleet-command-navigation .fleet-tab")) {
+                        const lab = ((b.querySelector(".fleet-activity-label > span") || b).textContent || "").trim().toLowerCase();
+                        const n = /^expedition/.test(lab) ? s.exp : /^patrol/.test(lab) ? s.pat : -1;
+                        if (n < 0)
+                            continue;
+                        let x = b.querySelector(":scope > .nl2-flt-badge, .nl2-flt-badge");
+                        if (!n) {
+                            if (x)
+                                x.remove();
+                            continue;
+                        }
+                        if (!x) {
+                            x = NL.h("span", { class: "unread-badge nl2-flt-badge" });
+                            b.appendChild(x);
+                        }
+                        if (x.textContent !== String(n))
+                            x.textContent = String(n);
+                        const tip = (/^expedition/.test(lab) ? "Expedition slot: " : "Patrol slot: ") + n + " open";
+                        if (x.getAttribute("data-nl2-tip") !== tip)
+                            x.setAttribute("data-nl2-tip", tip);
+                    }
+                }
+                NL.watch(".fleet-page .fleet-command-navigation", () => tabs(slots()));
+                ["fl-trim.expslot", "fl-trim.patslot"].forEach((k) => NL.onOpt && NL.onOpt(k, () => { last = ""; paint(); }));
+                paint();
+            },
+        });
+    }
+    {
+        NL.feature({
+            id: "fl-contracts-badge",
+            set: "Fleet",
+            name: "Contracts badge",
+            desc: "FL-106: an amber badge on the Fleet page's Pirates tab and a line on the Fleet menu badge for each contract reward ready to claim.",
+            init() {
+                let n = 0, last = -1;
+                NL.css("fl-contracts", `.fleet-page .fleet-tab .nl2-fct-badge{background:#f59e0b!important;color:#111!important;margin-left:6px}`);
+                const put = (snap) => {
+                    n = Math.max(0, Number(snap && snap.con) || 0);
+                    if (n === last)
+                        return;
+                    last = n;
+                    ((NL.navBadges = NL.navBadges || {})["/fleet"] = NL.navBadges["/fleet"] || {}).contracts = { n, tip: n ? "Contracts: " + n + " to claim" : "" };
+                    if (NL.navBadgeChanged)
+                        NL.navBadgeChanged("/fleet");
+                    NL._kick();
+                };
+                if (NL.taskData)
+                    NL.taskData.sub(put);
+                const label = (b) => { const s = b.querySelector(".fleet-activity-label > span"); return ((s ? s.textContent : [...b.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join("")) || "").trim().toLowerCase(); };
+                NL.watch(".fleet-page .fleet-command-navigation", (nav) => {
+                    const tab = [...nav.querySelectorAll(".fleet-tab")].find((b) => /^pirates?\b/.test(label(b)));
+                    if (!tab)
+                        return;
+                    let bd = tab.querySelector(":scope > .nl2-fct-badge");
+                    if (!n) {
+                        if (bd)
+                            bd.remove();
+                        return;
+                    }
+                    if (!bd) {
+                        bd = NL.h("span", { class: "unread-badge nl2-fct-badge", "data-nl2-tip": "Contracts ready to claim" });
+                        tab.appendChild(bd);
+                    }
+                    if (bd.textContent !== String(n))
+                        bd.textContent = String(n);
+                });
             },
         });
     }
@@ -15291,6 +15745,15 @@
         });
     }
     {
+        NL.feature({
+            id: "mo-page",
+            set: "Moons",
+            name: "Moons page",
+            desc: "MO-019: clicking Moons in the left menu also opens a Moons page; it holds the Moon Scans table (moved from Tasks).",
+            init() { },
+        });
+    }
+    {
         const OU_RES = [["ore", "ore"], ["silicates", "silicates"], ["alloys", "alloys"], ["cryo_ice", "cryoIce"], ["quantum_dust", "quantumDust"], ["plasma_core", "plasmaCore"], ["bio_extract", "bioExtract"], ["dark_matter", "darkMatter"]];
         const OU_NAME = { ore: "Ore", silicates: "Silicates", alloys: "Alloys", cryo_ice: "Cryo-Ice", quantum_dust: "Quantum Dust", plasma_core: "Plasma Core", bio_extract: "Bio-Extract", dark_matter: "Dark Matter" };
         const OU_FRESH = 60 * 1000;
@@ -15414,7 +15877,11 @@
                             await planetPos(pl);
                             if (target && pl.every((p) => placeOf(p)))
                                 pl.sort((a, b) => lyTo(a) - lyTo(b));
-                            return pl.map((p) => { const ly = lyTo(p); return { id: p.id, name: p.name, note: ly != null ? Math.round(ly) + " ly" : "" }; });
+                            const out = pl.map((p) => { const ly = lyTo(p); return { id: p.id, name: p.name, note: ly != null ? Math.round(ly) + " ly" : "" }; });
+                            if (!NL.planetPick || !out.length)
+                                return out;
+                            out[0].def = true;
+                            return NL.pickerSort(out);
                         },
                         prepare: async (sourceId) => {
                             const d = detailOf(op.id) || ((await read("/api/outposts/" + op.id)) || {});
@@ -15617,7 +16084,8 @@
                             full.add(String(op.id));
                         const over = top.length ? top : moved.fill || ouCollectFor(missions, op) ? [] : fill(op, snap);
                         const dry = !moved.drift && (!!op.isDrifting || dryHint.has(String(op.name))) && !op.isRelocating;
-                        const count = (over.length ? 1 : 0) + (dry ? 1 : 0), tip = [dry ? "Belt mined out" : "", over.join(", ")].filter(Boolean).join(", ");
+                        const up = NL.enabled && NL.enabled("ou-upgrade-badge") && NL.taskData && NL.taskData.snap && NL.taskData.snap.up ? NL.taskData.snap.up[op.id] : null;
+                        const count = (over.length ? 1 : 0) + (dry ? 1 : 0) + (up ? 1 : 0), tip = [dry ? "Belt mined out" : "", up ? "Upgrade " + up : "", over.join(", ")].filter(Boolean).join(", ");
                         NL.menuBadge("outpost", op.id, count ? { count, tip } : null);
                         if (count)
                             shown.add(op.id);
@@ -15634,6 +16102,51 @@
                         sf.outposts = full;
                 }
                 NL.watch("body", () => update(false));
+                if (NL.taskData)
+                    NL.taskData.sub(() => update(true));
+            },
+        });
+        NL.feature({
+            id: "ou-upgrade-badge",
+            set: "Outposts",
+            name: "Outpost upgrade badge",
+            desc: "OU-011: an outpost's menu badge adds 1 when it can start an Extractor or Storage upgrade now (resources there, nothing upgrading); hover \"Upgrade ready: DM2 Extractor 4 \u2192 5\".",
+            init() { },
+        });
+        NL.feature({
+            id: "ou-upgrade-send",
+            set: "Outposts",
+            name: "Send for upgrade",
+            desc: "OU-012: a Send for upgrade button on each outpost: pick Extractor and/or Storage and send what is short for the next level.",
+            init() {
+                let outposts = [];
+                NL.onData(/^\/api\/outposts$/, (p, d) => { outposts = ouList(d, "outposts"); NL._kick(); });
+                if (NL.taskData)
+                    NL.taskData.sub(() => NL._kick());
+                NL.watch(".outpost-detail > .entity-hero", (hero) => {
+                    let bar = hero.querySelector(":scope > .nl2-ou-bar");
+                    if (!bar) {
+                        bar = NL.h("div", { class: "nl2-ou-bar" });
+                        hero.insertBefore(bar, hero.firstChild);
+                    }
+                    let b = bar.querySelector(".nl2-ou-upsend");
+                    if (!b) {
+                        b = NL.h("button", { type: "button", class: "nl2-ou-collect nl2-ou-upsend nl2-c-blue" }, "Send for upgrade");
+                        b.addEventListener("click", () => { const o = ouCurrent(hero, outposts); if (o && !b.disabled && NL.taskData && NL.taskData.upgradeDialog)
+                            NL.taskData.upgradeDialog(o.id); });
+                        const c = bar.querySelector(".nl2-ou-collect:not(.nl2-ou-upsend)");
+                        if (c)
+                            c.after(b);
+                        else
+                            bar.prepend(b);
+                    }
+                    const o = ouCurrent(hero, outposts), info = o && NL.taskData && NL.taskData.upgradeInfo ? NL.taskData.upgradeInfo(o.id) : null;
+                    const off = !info || !info.on, tip = info ? info.tip : "Outpost data is still loading";
+                    if (b.disabled !== off)
+                        b.disabled = off;
+                    if (b.getAttribute("data-nl2-tip") !== tip)
+                        b.setAttribute("data-nl2-tip", tip);
+                });
             },
         });
         const OU_TYPES = [["ore", "Ore"], ["gas", "Gas"], ["plasma", "Plasma"], ["ice", "Cryo-Ice"], ["quantum", "Quantum Dust"], ["dark", "Dark Matter"]];
@@ -16494,7 +17007,7 @@
                     localStorage.setItem(k, JSON.stringify(v));
                 }
                 catch (e) { } };
-                const GAP_MS = window.__nxsTestGap != null ? +window.__nxsTestGap : 5000, OPEN_GAP = window.__nxsTestGap != null ? +window.__nxsTestGap : 1000, READ_TIMEOUT = 15000, SLOW_RE = /^\/api\/(planets$|research|outposts|moons\/owned|station-operations|fleet\/(mining|pirate|expedition|patrol)-reports)/;
+                const GAP_MS = window.__nxsTestGap != null ? +window.__nxsTestGap : 5000, OPEN_GAP = window.__nxsTestGap != null ? +window.__nxsTestGap : 1000, READ_TIMEOUT = window.__nxsTestReadTimeout != null ? +window.__nxsTestReadTimeout : 15000, SLOW_RE = /^\/api\/(planets$|research|outposts|moons\/owned|station-operations|fleet\/(mining|pirate|expedition|patrol)-reports)/;
                 let userRead = false, soloChain = Promise.resolve(), soloLast = 0, soloBlock = 0, soloBackoff = 0;
                 const U = (fn) => { userRead = true; try {
                     return fn();
@@ -16820,9 +17333,19 @@
                             }
                         }
                         if (transportOff) {
-                            const url = PLAIN_CALL[key](payload), t0 = Date.now();
-                            const r = method === "GET" ? await fetch(url, { credentials: "include", headers: { Accept: "application/json" } })
-                                : await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify((payload && payload.body) || {}) });
+                            const url = PLAIN_CALL[key](payload), t0 = Date.now(), ac = new AbortController(), to = setTimeout(() => ac.abort(), READ_TIMEOUT);
+                            let r;
+                            try {
+                                r = method === "GET" ? await fetch(url, { credentials: "include", headers: { Accept: "application/json" }, signal: ac.signal })
+                                    : await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify((payload && payload.body) || {}), signal: ac.signal });
+                            }
+                            catch (e) {
+                                logRead(url, Date.now() - t0, "timeout");
+                                throw e;
+                            }
+                            finally {
+                                clearTimeout(to);
+                            }
                             logRead(url, Date.now() - t0, r.status);
                             if (r.status === 429)
                                 noteThrottled();
@@ -18983,7 +19506,7 @@
                     ov.innerHTML = "<div class=\"nxs-modal\" role=\"dialog\" aria-modal=\"true\"><div class=\"nxs-mh\"><strong>" + esc(cfg.title) + "</strong>"
                         + "<button type=\"button\" class=\"nxs-x\" data-close aria-label=\"Close\">\u00D7</button></div><div class=\"nxs-mb\">"
                         + "<div class=\"nxs-grid\">" + cfg.infoHtml
-                        + "<span class=\"nxs-dim\">Send From</span><span><select class=\"nxs-sel\" data-src>" + allowed.map((p) => "<option value=\"" + p.id + "\"" + (p.id === st.src ? " selected" : "") + ">" + esc(p.name) + (cfg.distTo ? " \u00B7 " + cfg.distTo(p).toFixed(1) + " ly" : "") + "</option>").join("") + "</select></span>"
+                        + "<span class=\"nxs-dim\">Send From</span><span><select class=\"nxs-sel\" data-src>" + NL.pickList(allowed).map((p) => "<option value=\"" + p.id + "\"" + (p.id === st.src ? " selected" : "") + ">" + esc(p.name) + (cfg.distTo ? " \u00B7 " + cfg.distTo(p).toFixed(1) + " ly" : "") + "</option>").join("") + "</select></span>"
                         + (cfg.noLeader ? "" : "<span class=\"nxs-dim\">Leader</span><span class=\"nxs-ld\"></span>")
                         + (cfg.cp ? "<span class=\"nxs-dim\">Fleet CP</span><span class=\"nxs-cp\"></span>" : "")
                         + (cfg.noTpl ? "" : tplBarHtml(st.tpl, tplKey))
@@ -19821,26 +20344,35 @@
                         paintRuins();
                     return true;
                 }
+                const RUIN_HANG_MS = 45000, RUIN_ERR_MS = window.__nxsTestGap != null ? 2000 : 15000;
+                let ruinTried = false;
                 async function ruinWatch() {
                     let next = 60000;
                     try {
-                        if (!document.hidden && S.root && !S.loading && soloPending)
+                        if (!document.hidden && S.root && soloPending)
                             next = 3000;
-                        else if (!document.hidden && S.root && !S.loading && document.querySelector(".sidebar-nav")) {
+                        else if (!document.hidden && S.root && document.querySelector(".sidebar-nav")) {
                             if (!S.cache) {
                                 const c = lsGet(MAP_CACHE_KEY, null);
                                 if (c && Array.isArray(c.wide))
                                     S.cache = c;
                             }
-                            if (await ruinStep())
-                                next = RUIN_GAP;
+                            if (!S.xenoArch || !S.cache || !S.cache.wide || !S.planets.length)
+                                next = 5000;
+                            else {
+                                ruinTried = true;
+                                const ok = await Promise.race([ruinStep(), sleep(RUIN_HANG_MS).then(() => { throw new Error("system read timed out"); })]);
+                                next = ok ? RUIN_GAP : 60000;
+                            }
                         }
                     }
                     catch (e) {
                         console.warn("[pve] ruins", e && e.message || e);
-                        next = 60000;
+                        next = RUIN_ERR_MS;
                     }
-                    setTimeout(ruinWatch, next);
+                    finally {
+                        setTimeout(ruinWatch, next);
+                    }
                 }
                 function ruinTarget(m) {
                     const rp = m.raidParams || {};
@@ -19911,14 +20443,14 @@
                     if (sec.hidden)
                         return;
                     const sel = sec.querySelector("[data-ruinsrc]"), src = ruinSrc();
-                    const opts = S.planets.map((p) => "<option value=\"" + p.id + "\"" + (src && p.id === src.id ? " selected" : "") + ">" + esc(p.name) + "</option>").join("");
+                    const opts = NL.pickList(S.planets).map((p) => "<option value=\"" + p.id + "\"" + (src && p.id === src.id ? " selected" : "") + ">" + esc(p.name) + "</option>").join("");
                     if (sel.__html !== opts) {
                         sel.innerHTML = opts;
                         sel.__html = opts;
                     }
                     const more = ruinNext();
                     const info = sec.querySelector(".nxs-info");
-                    const txt = !S.cache ? "waiting for the galaxy map\u2026" : RUIN_ROWS + " nearest Ancient moons" + (more && todo.length ? " \u00B7 checking systems: " + (wide.length - todo.length) + " of " + wide.length : "");
+                    const txt = !S.cache ? "waiting for the galaxy map\u2026" : RUIN_ROWS + " nearest Ancient moons" + (more && todo.length ? (!ruinTried && todo.length === wide.length ? " \u00B7 waiting to start\u2026" : " \u00B7 checking systems: " + (wide.length - todo.length) + " of " + wide.length) : "");
                     if (info.textContent !== txt)
                         info.textContent = txt;
                     const html = rows.length ? rows.map(({ m, dist, own }) => "<tr><td>" + esc(m.name) + (own ? " <span class=\"nxs-dim nxs-ruinown\">yours</span>" : "") + "</td><td>" + sysLinkHtml(m.sysId, m.sysName) + "</td>"
@@ -21616,7 +22148,7 @@
                     ov.className = "nxs-overlay";
                     ov.innerHTML = "<div class=\"nxs-modal\" role=\"dialog\" aria-modal=\"true\"><div class=\"nxs-mh\"><strong>" + esc(R.label) + " belts \u00B7 Dead Space</strong>"
                         + "<button type=\"button\" class=\"nxs-x\" data-close aria-label=\"Close\">\u00D7</button></div><div class=\"nxs-mb\">"
-                        + "<div class=\"nxs-grid\"><span class=\"nxs-dim\">Send From</span><span><select class=\"nxs-sel\" data-bsrc>" + srcs.map((p) => "<option value=\"" + p.id + "\"" + (p.id === st.src ? " selected" : "") + ">" + esc(p.name) + "</option>").join("") + "</select></span>"
+                        + "<div class=\"nxs-grid\"><span class=\"nxs-dim\">Send From</span><span><select class=\"nxs-sel\" data-bsrc>" + NL.pickList(srcs).map((p) => "<option value=\"" + p.id + "\"" + (p.id === st.src ? " selected" : "") + ">" + esc(p.name) + "</option>").join("") + "</select></span>"
                         + "<span class=\"nxs-dim\">Range</span><span class=\"nxs-lc\"><input type=\"text\" inputmode=\"numeric\" autocomplete=\"off\" class=\"nxs-in\" data-brange value=\"" + st.range + "\"> <span class=\"nxs-of\">ly</span></span>"
                         + "<span class=\"nxs-dim\">Show</span><span><label class=\"nxs-chk\"><input type=\"checkbox\" data-bfull" + (st.full ? " checked" : "") + "> Only 100% belts <span class=\"nxs-dim\">(untouched)</span></label></span></div>"
                         + "<table class=\"nxs-ships nxs-beltt\"><thead><tr><th>Belt</th><th>Distance</th><th>Richness</th><th>Remaining</th><th>% Remaining</th><th></th></tr></thead><tbody class=\"nxs-beltbody\"><tr><td colspan=\"6\" class=\"nxs-dim\">Loading belts\u2026</td></tr></tbody></table>"
@@ -21724,7 +22256,7 @@
                         + "<button type=\"button\" class=\"nxs-x\" data-close aria-label=\"Close\">\u00D7</button></div><div class=\"nxs-mb\">"
                         + "<div class=\"nxs-grid\"><span class=\"nxs-dim\">Resource</span><span>" + esc(R.label) + " <span class=\"nxs-dim\">\u00B7 richness " + num(f.richness).toFixed(2) + " \u00B7 " + zoneHtml(zone) + "</span></span>"
                         + "<span class=\"nxs-dim\">Remaining</span><span>" + fmt(f.remaining) + " <span class=\"nxs-dim\">of " + fmt(f.capacity) + " (" + pct + "%)</span></span>"
-                        + "<span class=\"nxs-dim\">Send From</span><span><select class=\"nxs-sel\" data-src>" + srcs.map((p) => "<option value=\"" + p.id + "\"" + (p.id === st.src ? " selected" : "") + ">" + esc(p.name) + " \u00B7 " + dOf(p).toFixed(1) + " ly</option>").join("") + "</select></span>"
+                        + "<span class=\"nxs-dim\">Send From</span><span><select class=\"nxs-sel\" data-src>" + NL.pickList(srcs).map((p) => "<option value=\"" + p.id + "\"" + (p.id === st.src ? " selected" : "") + ">" + esc(p.name) + " \u00B7 " + dOf(p).toFixed(1) + " ly</option>").join("") + "</select></span>"
                         + "<span class=\"nxs-dim\">Leader</span><span class=\"nxs-ld\"></span>"
                         + "<span class=\"nxs-dim\">Mining ships</span><span class=\"nxs-lc\"><span class=\"nxs-mneed\"></span> <select class=\"nxs-sel\" data-multsel title=\"Times the miners needed to empty the belt (at least " + MINE_FLOOR() + ")\">" + Array.from({ length: 20 }, (_, i) => "<option value=\"" + (i + 1) + "\">" + (i + 1) + "x</option>").join("") + "</select></span>"
                         + tplBarHtml(st.tpl, tplKey) + "</div>"
@@ -22244,6 +22776,22 @@
             init() { if (tasksBoot)
                 tasksBoot(); },
         });
+        NL.feature({
+            id: "gl-task-data",
+            set: "Global",
+            name: "Badge data (Tasks reads)",
+            desc: "GL-128: the reads that keep the Shipyard (ship repairs), Buildings (building repairs) and Research (artifact study) badges current run on their own, with or without Dashboards > Tasks. Also feeds the Contracts, Energy, outpost upgrade and hydrogen badges and the Moons page.",
+            init() { if (tasksBoot)
+                tasksBoot(); },
+        });
+        NL.taskData = NL.taskData || { snap: null, subs: [], sub(fn) { this.subs.push(fn); if (this.snap) {
+                try {
+                    fn(this.snap);
+                }
+                catch (e) {
+                    NL.err("task-data", e);
+                }
+            } } };
         const TASKS_MOON_OFF = true;
         const TASKS_OPTS = [
             ["tasks.planetH.low", "Planet hydrogen: alert below (a source planet also keeps this much)", 20000],
@@ -22264,7 +22812,7 @@
             for (const [key, label, def] of TASKS_OPTS)
                 if (!(TASKS_MOON_OFF && key.startsWith("tasks.moon.")))
                     NL.option({ key, set: "Global", group: "Tasks", label, type: "number", def, min: key.startsWith("tasks.outFull") ? 1 : 0, max: key.startsWith("tasks.outFull") ? 100 : undefined, step: key.startsWith("tasks.outFull") ? 1 : 1000 });
-        if (NL.enabled("tasks"))
+        if (NL.enabled("tasks") || NL.enabled("gl-task-data"))
             (function dashTasks() {
                 "use strict";
                 if (window.__nxDashTasks)
@@ -22332,6 +22880,8 @@
                 };
                 function boot() {
                     const KEY = "tasks";
+                    const TASKS_UI = NL.enabled("tasks");
+                    const MO_PAGE = NL.enabled("mo-page"), MO_HASH = "#moons";
                     const LABEL = "Tasks";
                     const HASH = "#tasks";
                     const PAGE = "/overview";
@@ -22360,11 +22910,21 @@
                         PLANET_H_LOW = optN("tasks.planetH.low");
                         PLANET_H_SEND = optN("tasks.planetH.send");
                         SRC_H_KEEP = PLANET_H_LOW;
+                        const h2 = NL.enabled("fl-transfer-h2"), optD = (k, d) => { const v = +NL.opt(k); return Number.isFinite(v) && v >= 0 ? v : d; };
+                        if (h2) {
+                            PLANET_H_LOW = optD("fl-transfer.h2.plow", 10000);
+                            PLANET_H_SEND = optD("fl-transfer.h2.psend", 50000);
+                            SRC_H_KEEP = PLANET_H_LOW;
+                        }
                         MOON_LOW = Object.fromEntries(MOON_KEYS.map((k) => [k, optN("tasks.moon." + k + ".low")]));
                         MOON_SEND = Object.fromEntries(MOON_KEYS.map((k) => [k, optN("tasks.moon." + k + ".send")]));
                         OUT_H_LOW = optN("tasks.outH.low");
                         OUT_H_SEND = optN("tasks.outH.send");
                         OUT_H_KEEP = optN("tasks.outH.keep");
+                        if (h2) {
+                            OUT_H_LOW = optD("fl-transfer.h2.olow", 5000);
+                            OUT_H_SEND = optD("fl-transfer.h2.osend", 10000);
+                        }
                         OUT_FULL_Y = optN("tasks.outFull.y");
                         OUT_FULL_R = optN("tasks.outFull.r");
                         const bd = +NL.opt("gl-biowarn.days");
@@ -22676,7 +23236,8 @@
                         catch (e) { }
                         return false;
                     }
-                    const onView = () => location.pathname === PAGE && location.hash === HASH;
+                    const onView = () => TASKS_UI && location.pathname === PAGE && location.hash === HASH;
+                    const onMoons = () => MO_PAGE && location.pathname === PAGE && location.hash === MO_HASH;
                     const SHARED_SEL = ".sidebar-section[data-nx-custom], .sidebar-section[data-nxl]";
                     let ownSection = null, link = null;
                     function makeLink() {
@@ -22699,7 +23260,7 @@
                     }
                     function ensureSidebar() {
                         const nav = document.querySelector(".sidebar-nav");
-                        if (!nav)
+                        if (!nav || !TASKS_UI)
                             return;
                         if (!link) {
                             link = makeLink();
@@ -23377,18 +23938,72 @@
                         rep.ships = [];
                         rep.maint = [];
                         const leadOff = NL.enabled && NL.enabled("gl-core-badge");
-                        const count = [...(leadOff ? [] : lead), ...mods, ...bio, ...(NL.badgeRows ? [] : rep.bld), ...en, ...hyd, ...moon, ...out, ...con].filter((r) => r.act).length;
+                        publishMoved({ con, en, hyd, out });
+                        const on = (id) => NL.enabled && NL.enabled(id), upReady = (r) => r.key && r.act && isEmpty(r.short);
+                        const outC = out.filter((r) => !(on("fl-transfer-h2") && r.type === "hydro") && !(on("ou-upgrade-badge") && upReady(r)));
+                        const count = [...(leadOff ? [] : lead), ...mods, ...bio, ...(NL.badgeRows ? [] : rep.bld), ...(on("bu-energy-badge") ? [] : en), ...(on("fl-transfer-h2") ? [] : hyd), ...moon, ...outC, ...(on("fl-contracts-badge") ? [] : con)].filter((r) => r.act).length;
                         return { lead, mods, bio, rep, en, hyd, moon, scan, out, st, con, count };
+                    }
+                    let movedSig = "";
+                    function publishMoved({ con, en, hyd, out }) {
+                        const up = {};
+                        for (const r of out)
+                            if (r.key && r.act && isEmpty(r.short) && up[r.o.id] == null)
+                                up[r.o.id] = r.name + " " + r.level + " \u2192 " + (r.level + 1);
+                        const h2 = [];
+                        for (const r of hyd)
+                            if (r.act)
+                                h2.push({ key: "p" + r.pid, to: { t: "planet", id: r.pid, name: r.planet }, have: r.have, low: PLANET_H_LOW, send: r.send, from: h2Source({ hydrogen: r.send }, coordsOfPlanet(S.d.planets.find((p) => p.id === r.pid)), r.pid) });
+                        for (const r of out)
+                            if (r.type === "hydro" && r.act)
+                                h2.push({ key: "o" + r.o.id, to: { t: "outpost", id: +r.o.id, name: String(r.o.name || "Outpost") }, have: r.h, low: OUT_H_LOW, send: num(r.send.hydrogen), from: h2Source(r.send, r.o.systemX != null && r.o.systemY != null ? { x: num(r.o.systemX), y: num(r.o.systemY) } : null, null) });
+                        const snap = { con: con.length, en: en.map((r) => ({ pid: r.pid, planet: r.planet, deficit: Math.round(r.deficit) })), up, h2 };
+                        const sig = JSON.stringify(snap);
+                        if (sig === movedSig)
+                            return;
+                        movedSig = sig;
+                        for (const r of h2)
+                            r.open = () => openH2(r.key);
+                        NL.taskData.snap = snap;
+                        for (const fn of NL.taskData.subs) {
+                            try {
+                                fn(snap);
+                            }
+                            catch (e) {
+                                NL.err("task-data", e);
+                            }
+                        }
+                    }
+                    function h2Source(need, tc, skip) {
+                        const srcs = S.d.planets.filter((p) => p.id !== skip).map((p) => ({ p, dist: distBetween(coordsOfPlanet(p), tc) })).sort((a, b) => a.dist - b.dist || a.p.sortOrder - b.p.sortOrder);
+                        const ok = srcs.find((x) => planetStock(x.p.id).hydrogen - SRC_H_KEEP >= num(need.hydrogen));
+                        return ok ? { t: "planet", id: ok.p.id, name: ok.p.name } : null;
+                    }
+                    function openH2(key) {
+                        if (!S.d)
+                            return;
+                        const c = computeAll(), id = +key.slice(1);
+                        if (key[0] === "p") {
+                            const r = c.hyd.find((x) => x.pid === id);
+                            if (r)
+                                sendToPlanet(r.pid, { hydrogen: r.send }, "Supply hydrogen");
+                            return;
+                        }
+                        const r = c.out.find((x) => x.type === "hydro" && +x.o.id === id);
+                        if (r)
+                            sendToOutpost(r.o, r.send, r.capped, "Supply hydrogen");
                     }
                     function paintBadge() {
                         const el = link && link.querySelector(".nxt-badge");
-                        if (!el || !S.d)
+                        if (!S.d)
                             return;
                         const c = computeAll(), n = c.count, t = n ? String(n) : "";
+                        if (!el)
+                            return;
                         if (el.textContent !== t)
                             el.textContent = t;
                         const acts = (a) => a.filter((r) => r.act).length;
-                        const by = [["Leader", NL.enabled && NL.enabled("gl-core-badge") ? 0 : acts(c.lead)], ["Modules & Crew", acts(c.mods)], ["Contracts", acts(c.con)], ["Fleet Bio", acts(c.bio)], ["Repair", (NL.badgeRows ? 0 : acts(c.rep.bld)) + acts(c.rep.ships) + acts(c.rep.maint)], ["Energy", acts(c.en)], ["Planet Hydrogen", acts(c.hyd)], ["Moon Supplies", acts(c.moon)], ["Outposts", acts(c.out)]];
+                        const by = [["Leader", NL.enabled && NL.enabled("gl-core-badge") ? 0 : acts(c.lead)], ["Modules & Crew", acts(c.mods)], ["Contracts", NL.enabled("fl-contracts-badge") ? 0 : acts(c.con)], ["Fleet Bio", acts(c.bio)], ["Repair", (NL.badgeRows ? 0 : acts(c.rep.bld)) + acts(c.rep.ships) + acts(c.rep.maint)], ["Energy", NL.enabled("bu-energy-badge") ? 0 : acts(c.en)], ["Planet Hydrogen", NL.enabled("fl-transfer-h2") ? 0 : acts(c.hyd)], ["Moon Supplies", acts(c.moon)], ["Outposts", c.out.filter((r) => r.act && !(NL.enabled("fl-transfer-h2") && r.type === "hydro") && !(NL.enabled("ou-upgrade-badge") && r.key && isEmpty(r.short))).length]];
                         const tip = n ? by.filter(([, k]) => k > 0).map(([w, k]) => w + ": " + k).join("\n") : "";
                         if (link && link.title !== tip)
                             link.title = tip;
@@ -23512,7 +24127,63 @@
                         if (info.textContent !== txt)
                             info.textContent = txt;
                     }
+                    function scanHtml(scan) {
+                        const hid = scannedSectors(), hrs = scanHours();
+                        const shortSec = (n) => { const m = /^\s*([A-Za-z])\S*\s+Arm\s*[-–]\s*Sector\s+(\d+)/i.exec(String(n || "")); return m ? m[1].toUpperCase() + m[2] : String(n || ""); };
+                        const cool = (type) => {
+                            const list = Object.entries(hid[type] || {}).sort((a, b) => a[1].until - b[1].until);
+                            return list.length ? list.map(([, e]) => esc(shortSec(e.name)) + " \u00B7 <span data-cd=\"" + e.until + "\">" + dur((e.until - Date.now()) / 1000) + "</span>").join(", ") : "<span class=\"nxt-dim\">none</span>";
+                        };
+                        const coolLabel = { wormhole: "Wormhole sectors on cooldown", activity: "Pirate sectors on cooldown" };
+                        return "<section class=\"nxd-wrap\"><div class=\"nxt-wh\"><strong>Moon Scans</strong><span class=\"nxt-sum\">not counted as tasks</span></div>"
+                            + "<div class=\"nxt-cfg\"><span><span class=\"nxt-dim\">Keep a scanned sector out of every moon's list for</span> <select class=\"nxt-sel\" data-scanh>"
+                            + [1, 2, 3, 4, 5, 6, 7, 8].map((h) => "<option value=\"" + h + "\"" + (h === hrs ? " selected" : "") + ">" + h + (h === 1 ? " Hour" : " Hours") + "</option>").join("") + "</select></span></div>"
+                            + SCAN_TYPES.map(([type]) => "<div class=\"nxt-line\"><span class=\"nxt-dim\">" + coolLabel[type] + ":</span> " + cool(type) + "</div>").join("")
+                            + "<table class=\"nxt-table\"><thead><tr><th>Moon</th>"
+                            + SCAN_TYPES.map(([, label]) => "<th>" + label + "</th>").join("") + "</tr></thead><tbody>"
+                            + scan.map((r, i) => "<tr><td>" + esc(r.name) + "</td>" + SCAN_TYPES.map(([type]) => {
+                                const t = r.types[type];
+                                return "<td class=\"nxt-act\">" + (t.ready ? btn("Scan", "data-sc=\"" + i + "|" + type + "\"") : "<span class=\"nxt-dim\">ready in " + dur(t.left / 1000) + "</span>") + "</td>";
+                            }).join("") + "</tr>").join("")
+                            + "</tbody></table></section>";
+                    }
+                    let mroot = null;
+                    function mountMoons(host) {
+                        mroot = document.createElement("div");
+                        mroot.className = "nxd-page";
+                        mroot.dataset.nxd = "moons";
+                        mroot.innerHTML = "<section class=\"nxd-wrap\"><div class=\"nxt-head\"><strong>Moons</strong></div></section><div class=\"nxt-body\"></div>";
+                        mroot.addEventListener("click", (e) => {
+                            const t = e.target.closest && e.target.closest("button[data-sc]");
+                            if (!t || t.disabled || !mroot.contains(t) || !S.d)
+                                return;
+                            const [i, type] = t.dataset.sc.split("|"), r = computeAll().scan[+i];
+                            if (r)
+                                scanDialog(r, type);
+                        });
+                        mroot.addEventListener("change", (e) => { if (e.target.closest && e.target.closest("[data-scanh]")) {
+                            lsSet(SCAN_HOURS_KEY, num(e.target.value));
+                            paint();
+                        } });
+                        host.insertBefore(mroot, host.firstChild);
+                        paintMoons();
+                        loadAll();
+                    }
+                    function paintMoons() {
+                        if (!mroot)
+                            return;
+                        const body = mroot.querySelector(".nxt-body");
+                        if (!S.d) {
+                            body.innerHTML = "<section class=\"nxd-wrap\"><span class=\"nxt-dim\">" + esc(S.err || "Loading\u2026") + "</span></section>";
+                            return;
+                        }
+                        const scan = computeAll().scan;
+                        const html = scan.length ? scanHtml(scan) : "<section class=\"nxd-wrap\"><div class=\"nxt-wh\"><strong>Moon Scans</strong></div><span class=\"nxt-dim\">No moon has a Sensor Array yet.</span></section>";
+                        if (body.innerHTML !== html)
+                            body.innerHTML = html;
+                    }
                     function paint() {
+                        paintMoons();
                         if (!root)
                             return;
                         const body = root.querySelector(".nxt-body");
@@ -23611,26 +24282,8 @@
                                     + "<td class=\"nxt-act\">" + (r.act ? btn("Start Study", "data-st=\"" + i + "\"") : noteTd(r)) + "</td></tr>").join("")
                                 + "</tbody></table></section>");
                         }
-                        if (scan.length) {
-                            const hid = scannedSectors(), hrs = scanHours();
-                            const shortSec = (n) => { const m = /^\s*([A-Za-z])\S*\s+Arm\s*[-–]\s*Sector\s+(\d+)/i.exec(String(n || "")); return m ? m[1].toUpperCase() + m[2] : String(n || ""); };
-                            const cool = (type) => {
-                                const list = Object.entries(hid[type] || {}).sort((a, b) => a[1].until - b[1].until);
-                                return list.length ? list.map(([, e]) => esc(shortSec(e.name)) + " \u00B7 <span data-cd=\"" + e.until + "\">" + dur((e.until - Date.now()) / 1000) + "</span>").join(", ") : "<span class=\"nxt-dim\">none</span>";
-                            };
-                            const coolLabel = { wormhole: "Wormhole sectors on cooldown", activity: "Pirate sectors on cooldown" };
-                            parts.push("<section class=\"nxd-wrap\"><div class=\"nxt-wh\"><strong>Moon Scans</strong><span class=\"nxt-sum\">not counted as tasks</span></div>"
-                                + "<div class=\"nxt-cfg\"><span><span class=\"nxt-dim\">Keep a scanned sector out of every moon's list for</span> <select class=\"nxt-sel\" data-scanh>"
-                                + [1, 2, 3, 4, 5, 6, 7, 8].map((h) => "<option value=\"" + h + "\"" + (h === hrs ? " selected" : "") + ">" + h + (h === 1 ? " Hour" : " Hours") + "</option>").join("") + "</select></span></div>"
-                                + SCAN_TYPES.map(([type]) => "<div class=\"nxt-line\"><span class=\"nxt-dim\">" + coolLabel[type] + ":</span> " + cool(type) + "</div>").join("")
-                                + "<table class=\"nxt-table\"><thead><tr><th>Moon</th>"
-                                + SCAN_TYPES.map(([, label]) => "<th>" + label + "</th>").join("") + "</tr></thead><tbody>"
-                                + scan.map((r, i) => "<tr><td>" + esc(r.name) + "</td>" + SCAN_TYPES.map(([type]) => {
-                                    const t = r.types[type];
-                                    return "<td class=\"nxt-act\">" + (t.ready ? btn("Scan", "data-sc=\"" + i + "|" + type + "\"") : "<span class=\"nxt-dim\">ready in " + dur(t.left / 1000) + "</span>") + "</td>";
-                                }).join("") + "</tr>").join("")
-                                + "</tbody></table></section>");
-                        }
+                        if (scan.length && !MO_PAGE)
+                            parts.push(scanHtml(scan));
                         if (con.length) {
                             parts.push("<section class=\"nxd-wrap\"><div class=\"nxt-wh\"><strong>Contracts</strong></div><table class=\"nxt-table\"><thead><tr><th>Contract</th><th>Objective</th><th>Reward</th><th></th></tr></thead><tbody>"
                                 + con.map((r, i) => "<tr><td>" + esc(cap(r.b.bountyType)) + "</td><td>" + esc(OBJ[r.b.objectiveType] || cap(String(r.b.objectiveType || "").replace(/_/g, " "))) + " " + fmt(r.b.completedCount) + "/" + fmt(r.b.targetCount) + "</td>"
@@ -23892,7 +24545,7 @@
                         const cur = currentPlanetId();
                         const ov = openModal("Claim \u00B7 " + cap(b.bountyType) + " contract", "<div class=\"nxt-grid\">"
                             + "<span class=\"nxt-dim\">Reward</span><span>" + esc(rewardTxt(b)) + "</span>"
-                            + "<span class=\"nxt-dim\">Claim To</span><span><select class=\"nxt-sel\" data-pl>" + S.d.planets.map((p) => "<option value=\"" + p.id + "\"" + (p.id === cur ? " selected" : "") + ">" + esc(p.name) + "</option>").join("") + "</select></span>"
+                            + "<span class=\"nxt-dim\">Claim To</span><span><select class=\"nxt-sel\" data-pl>" + NL.pickList(S.d.planets).map((p) => "<option value=\"" + p.id + "\"" + (p.id === cur ? " selected" : "") + ">" + esc(p.name) + "</option>").join("") + "</select></span>"
                             + "</div><p class=\"nxt-msg\"></p><div class=\"nxt-mf\"><button type=\"button\" class=\"nxt-btn\" data-close>Cancel</button><button type=\"button\" class=\"nxt-btn nxt-go\" data-go>Claim</button></div>");
                         const go = ov.querySelector("[data-go]"), msg = ov.querySelector(".nxt-msg");
                         go.addEventListener("click", async () => {
@@ -24012,7 +24665,7 @@
                         const total = () => Object.values(st.res).reduce((a, b) => a + num(b), 0);
                         const editKeys = cfg.edit ? RES.map(([k]) => k).filter((k) => k in cfg.edit) : [];
                         const ov = openModal(cfg.title, "<div class=\"nxt-grid\">"
-                            + "<span class=\"nxt-dim\">Send From</span><span><select class=\"nxt-sel\" data-src>" + srcs.map((s) => "<option value=\"" + s.p.id + "\"" + (s === first ? " selected" : "") + ">" + esc(s.p.name) + (Number.isFinite(s.dist) ? " \u00B7 " + s.dist.toFixed(1) + " ly" : "") + "</option>").join("") + "</select></span>"
+                            + "<span class=\"nxt-dim\">Send From</span><span><select class=\"nxt-sel\" data-src>" + NL.pickList(srcs, { id: (s) => s.p.id }).map((s) => "<option value=\"" + s.p.id + "\"" + (s === first ? " selected" : "") + ">" + esc(s.p.name) + (Number.isFinite(s.dist) ? " \u00B7 " + s.dist.toFixed(1) + " ly" : "") + "</option>").join("") + "</select></span>"
                             + (cfg.modes ? "<span class=\"nxt-dim\">Mission</span><span><select class=\"nxt-sel\" data-mode><option value=\"deliver\" selected>Deliver</option><option value=\"transfer\">Transfer</option></select></span>" : "")
                             + "<span class=\"nxt-dim\">For</span><span>" + esc(cfg.what) + "</span>"
                             + (cfg.note ? "<span></span><span class=\"nxt-y\">" + esc(cfg.note) + "</span>" : "")
@@ -24205,8 +24858,85 @@
                         });
                         loadSrc();
                     }
+                    if (MO_PAGE)
+                        document.addEventListener("click", (e) => {
+                            const g = e.target.closest && e.target.closest(".sidebar-nav .nl2-grp[data-nl2-grp=\"moons\"]");
+                            if (!g || e.button || e.ctrlKey || e.metaKey || e.shiftKey)
+                                return;
+                            if (!onMoons() && !routerPush(PAGE + MO_HASH))
+                                location.href = PAGE + MO_HASH;
+                        });
+                    function upgradeList(o) {
+                        const have = outpostStock(o);
+                        return Object.keys(OUTPOST_BLD).map((key) => {
+                            const b = (o.buildings || []).find((x) => x.buildingKey === key), level = num(b && b.level);
+                            const max = S.d.advOutposts ? OUTPOST_BLD[key].maxAdv : OUTPOST_BLD[key].max, cost = level < max ? outpostCost(key, level) : null;
+                            return { key, name: OUTPOST_BLD[key].name, level, max, cost, short: cost ? shortOf(cost, have) : {} };
+                        });
+                    }
+                    function upgradeInfo(oid) {
+                        const o = S.d && S.at && S.d.outposts.find((x) => +x.id === +oid);
+                        if (!o)
+                            return null;
+                        const l = upgradeList(o).filter((x) => x.cost);
+                        if (!l.length)
+                            return { on: false, tip: "Extractor and Storage are both at their highest level" };
+                        if (!l.some((x) => !isEmpty(x.short)))
+                            return { on: false, tip: "The outpost already holds enough for the next " + l.map((x) => x.name).join(" and ") + " level" };
+                        return { on: true, tip: "Send what the outpost is short for its next upgrade" };
+                    }
+                    function upgradeDialog(oid) {
+                        const o = S.d && S.at && S.d.outposts.find((x) => +x.id === +oid);
+                        if (!o) {
+                            toast("Outpost data is still loading. Try again in a moment.", true);
+                            return;
+                        }
+                        const list = upgradeList(o), first = list.find((x) => x.cost);
+                        const row = (x) => "<label><input type=\"checkbox\" data-up=\"" + x.key + "\"" + (x === first ? " checked" : "") + (x.cost ? "" : " disabled") + "><span><strong>" + esc(x.name) + "</strong> "
+                            + (x.cost ? x.level + " \u2192 " + (x.level + 1) + " <span class=\"nxt-dim\">\u00B7 costs " + esc(costHtml(x.cost)) + "</span> \u00B7 " + availTxt(x.short) : "<span class=\"nxt-dim\">level " + x.level + ", the highest</span>") + "</span></label>";
+                        const ov = openModal("Send for upgrade \u00B7 " + (o.name || "Outpost"), "<div class=\"nxt-up\">" + list.map(row).join("") + "</div>"
+                            + "<p class=\"nxt-msg\"></p><div class=\"nxt-mf\"><button type=\"button\" class=\"nxt-btn\" data-close>Cancel</button><button type=\"button\" class=\"nxt-btn nxt-go\" data-go>Next</button></div>");
+                        const go = ov.querySelector("[data-go]"), msg = ov.querySelector(".nxt-msg");
+                        const pick = () => list.filter((x) => x.cost && ov.querySelector("[data-up=\"" + x.key + "\"]").checked);
+                        const calc = () => {
+                            const p = pick(), both = {};
+                            for (const x of p)
+                                for (const [r, v] of Object.entries(x.cost))
+                                    both[r] = num(both[r]) + v;
+                            const need = shortOf(both, outpostStock(o)), send = capToRoom(need, outpostRoom(o));
+                            return { p, need, send, capped: !isEmpty(shortOf(need, send)) };
+                        };
+                        const check = () => {
+                            const c = calc();
+                            const why = !c.p.length ? "Pick at least one upgrade." : isEmpty(c.need) ? "The outpost already holds enough for this." : isEmpty(c.send) ? "No free storage at the outpost." : "";
+                            msg.innerHTML = why ? "<span class=\"nxt-y\">" + esc(why) + "</span>" : "Short: " + esc(costHtml(c.need)) + (c.capped ? " <span class=\"nxt-y\">(cut to the free storage)</span>" : "");
+                            go.disabled = !!why;
+                        };
+                        ov.addEventListener("change", check);
+                        go.addEventListener("click", () => {
+                            const c = calc();
+                            if (go.disabled || isEmpty(c.send))
+                                return;
+                            closeModal();
+                            sendToOutpost(o, c.send, c.capped, "Next " + c.p.map((x) => x.name + " level (" + (x.level + 1) + ")").join(" and "));
+                        });
+                        check();
+                    }
+                    Object.assign(NL.taskData, { upgradeInfo, upgradeDialog, refresh: () => loadAll({ reads: false }) });
                     function tick() {
                         ensureSidebar();
+                        document.body.classList.toggle("nxd-view-moons", onMoons());
+                        if (onMoons()) {
+                            const host = document.querySelector(HOST_SEL);
+                            if (host && (!mroot || !mroot.isConnected))
+                                mountMoons(host);
+                            else if (host && mroot.parentNode === host && host.firstChild !== mroot)
+                                host.insertBefore(mroot, host.firstChild);
+                        }
+                        else if (mroot) {
+                            mroot.remove();
+                            mroot = null;
+                        }
                         document.body.classList.toggle("nxd-view-" + KEY, onView());
                         if (onView()) {
                             const host = document.querySelector(HOST_SEL);
@@ -24220,7 +24950,7 @@
                         else if (root)
                             unmount();
                     }
-                    for (const [key] of TASKS_OPTS.concat([["gl-biowarn.days"]]))
+                    for (const [key] of TASKS_OPTS.concat([["gl-biowarn.days"], ["fl-transfer.h2.plow"], ["fl-transfer.h2.psend"], ["fl-transfer.h2.olow"], ["fl-transfer.h2.osend"]]))
                         NL.onOpt(key, () => { readTaskOpts(); paint(); paintBadge(); });
                     loadAll({ reads: false });
                     setTimeout(() => loadAll({ startup: true }), 4000);
@@ -24285,6 +25015,15 @@
     body.nxd-view-${KEY} .sidebar-link.active:not([data-nx-dash="${KEY}"]){background:transparent!important;box-shadow:none!important;border-color:transparent!important;color:rgb(217,230,247)!important;font-weight:500!important}
     body.nxd-view-${KEY} .sidebar-link.active:not([data-nx-dash="${KEY}"])::before{display:none!important}
     body.nxd-view-${KEY} .sidebar-link.active:not([data-nx-dash="${KEY}"]) .sidebar-link-icon{color:rgb(192,204,224)!important}
+    
+    body.nxd-view-moons .game-content > :not(.nxd-page[data-nxd="moons"]){display:none!important}
+    body.nxd-view-moons .sidebar-link.active:not(.nl2-grp){background:transparent!important;box-shadow:none!important;border-color:transparent!important;color:rgb(217,230,247)!important;font-weight:500!important}
+    body.nxd-view-moons .sidebar-link.active:not(.nl2-grp)::before{display:none!important}
+    body.nxd-view-moons .sidebar-link.active:not(.nl2-grp) .sidebar-link-icon{color:rgb(192,204,224)!important}
+    .nxt-up{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:start}
+    .nxt-up label{display:contents;cursor:pointer}
+    .nxt-up input{margin-top:3px}
+    .nxt-up input:disabled+span{opacity:.45}
   `;
                     document.head.appendChild(style);
                     for (const m of ["pushState", "replaceState"]) {
@@ -24298,9 +25037,7 @@
                     window.addEventListener("popstate", tick);
                     setInterval(tick, 500);
                     setInterval(() => {
-                        if (!root)
-                            return;
-                        for (const el of root.querySelectorAll("[data-cd]")) {
+                        for (const el of [root, mroot].filter(Boolean).flatMap((x) => [...x.querySelectorAll("[data-cd]")])) {
                             if (el.dataset.cdh && +el.dataset.cd <= Date.now())
                                 el.dataset.cd = nextTick(+el.dataset.cd);
                             const left = (+el.dataset.cd - Date.now()) / 1000;
@@ -24309,7 +25046,9 @@
                     }, 1000);
                     tick();
                 }
-                tasksBoot = boot;
+                let booted = false;
+                tasksBoot = () => { if (booted)
+                    return; booted = true; boot(); };
             })();
     }
     function nl2Start() {

@@ -1,5 +1,31 @@
 # Release notes
 
+## v0.5.92 · Nov 4, 2026
+- Routes: resume tick right of PAUSED
+- Fleet Reports: descriptive types and wormhole names
+- Research table fits the page
+- Recycling then Wandering Trader Modules
+- Planet lists in the game's picker order
+- Simpler crew cards with roles
+- Survey Ruins: a stuck read gives up
+- Fleet badges trimmed
+- Espionage badge: mining activity only
+- Wormholes badge: new runs
+- Pirates badge: exceptions only
+- Expeditions badge trimmed
+- Open expedition slots on the badge
+- Surveys badge: exceptions only
+- Debris tab badge hidden
+- Open patrol slots on the badge
+- Badge data runs without the Tasks page
+- Contracts badge
+- Energy badge on Buildings
+- Supply hydrogen rows for planets
+- Supply hydrogen rows for outposts
+- Outpost upgrade ready badge
+- Send for upgrade on outposts
+- Moons page with Moon Scans
+
 ## v0.5.91 · Nov 4, 2026
 - Fleet Reports: Table View
 - Fleet Reports: combat rounds
