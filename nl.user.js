@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.92
+// @version      0.5.93
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.92", features: [] };
+    const NL = window.__nl2 = { version: "0.5.93", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1236,17 +1236,28 @@
                 })().catch(() => null).finally(() => { opTablePromise = null; });
             return opTablePromise;
         };
-        const opIndex = async (route, nOps) => {
-            const [m, p] = route.split(" ");
-            const t = await loadOpTable();
-            if (!t || t.length !== nOps)
-                throw new Error("route table unreadable");
+        const specOf = (route) => { if (typeof route !== "string")
+            return route; const [m, path] = route.split(" "); return { m, path, act: true, label: route }; };
+        const opIndex = async (sp, nOps, notFound) => {
+            const label = sp.label || sp.key || String(sp.re || sp.path);
+            let t = await loadOpTable();
+            if (t && t.length !== nOps)
+                t = null;
+            if (!t) {
+                if (!sp.act)
+                    return sp.fb;
+                throw new Error(notFound || "route table unreadable");
+            }
             const hits = [];
-            t.forEach((x, i) => { if (x[0] === m && x[1] === p)
+            t.forEach((x, i) => { if (x[0] === (sp.m || "GET") && ((sp.path ? x[1] === sp.path : sp.re && sp.re.test(x[1])) || (sp.name && x[2] === sp.name)))
                 hits.push(i); });
-            if (hits.length !== 1)
-                throw new Error("could not find the game\u2019s " + route + " route (the game may have updated)");
-            return hits[0];
+            if (sp.fb != null && hits.includes(sp.fb))
+                return sp.fb;
+            if (hits.length === 1 || (hits.length && !sp.act))
+                return hits[0];
+            if (!sp.act)
+                return sp.fb;
+            throw new Error(notFound || "could not find the game\u2019s " + label + " route (the game may have updated)");
         };
         const SEED_RE = /\[\s*(\d+(?:\s*,\s*\d+){15})\s*\]/, OPS_RE = /"operations":\[([^\]]*)\]/, TTL_RE = /"ttlMs":(\d+)/;
         const makeCodec = (seed) => {
@@ -1280,8 +1291,16 @@
                 return Promise.resolve(tctx);
             if (!tctxPromise) {
                 const p = tctxPromise = (async () => {
-                    const br = await fetch("/api/transport/bootstrap", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: "{}" });
-                    const boot = br.ok ? await br.json().catch(() => null) : null;
+                    let boot = null;
+                    try {
+                        const br = await fetch("/api/transport/bootstrap", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: "{}" });
+                        boot = br.ok ? await br.json().catch(() => null) : null;
+                    }
+                    catch (e) {
+                        boot = null;
+                    }
+                    if (boot && boot.enabled === false)
+                        NL.transportDisabled = true;
                     if (!boot || !boot.enabled || !boot.moduleUrl || !boot.id)
                         throw new Error("transport disabled");
                     const src = await (await fetch(boot.moduleUrl, { credentials: "include" })).text();
@@ -1299,43 +1318,77 @@
             return tctxPromise;
         };
         const net = { until: 0, backoff: 0 };
-        const call = async (route, id, payload, signal) => {
-            if (Date.now() < net.until)
+        const call = async (route, method, payload, o) => {
+            o = o || {};
+            const sp = specOf(route), pause = o.pause !== false, isGet = method === "GET", what = "t:" + (sp.key || sp.label);
+            if (pause && Date.now() < net.until)
                 throw Object.assign(new Error("paused after the game asked us to slow down"), { status: 429 });
-            const isGet = route.startsWith("GET ");
             for (let attempt = 0; attempt < 2; attempt++) {
                 const c = await transport();
-                const op = c.ops[await opIndex(route, c.ops.length)];
+                const op = c.ops[await opIndex(sp, c.ops.length, o.notFound)];
                 if (!op)
                     throw new Error("bad op index");
                 const base = "/api/transport/r/" + c.id + "/" + op, enc = c.codec.encode(payload);
-                const r = isGet
-                    ? await fetch(base + "?d=" + encodeURIComponent(JSON.stringify(enc)), { credentials: "include", headers: { Accept: "application/json" }, signal })
-                    : await fetch(base, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(enc), signal });
+                let ac = null, to = 0, signal = o.signal;
+                if (o.timeout) {
+                    ac = new AbortController();
+                    to = setTimeout(() => ac.abort(), o.timeout);
+                    signal = ac.signal;
+                    if (o.signal) {
+                        if (o.signal.aborted)
+                            ac.abort();
+                        else
+                            o.signal.addEventListener("abort", () => ac.abort(), { once: true });
+                    }
+                }
+                const t0 = Date.now();
+                let r;
+                try {
+                    r = isGet
+                        ? await fetch(base + "?d=" + encodeURIComponent(JSON.stringify(enc)), { credentials: "include", headers: { Accept: "application/json" }, signal })
+                        : await fetch(base, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(enc), signal });
+                }
+                catch (e) {
+                    if (o.log)
+                        o.log(what, Date.now() - t0, "timeout");
+                    throw e;
+                }
+                finally {
+                    if (to)
+                        clearTimeout(to);
+                }
+                if (o.log)
+                    o.log(what, Date.now() - t0, r.status);
                 const j = await r.json().catch(() => null);
                 if (r.status === 403 && j && j.code === "DYNAMIC_API_REQUIRED") {
                     tctx = null;
                     continue;
                 }
-                if (r.status === 429 || r.status === 403) {
-                    net.backoff = Math.min((net.backoff || 30000) * 2, 600000);
-                    net.until = Date.now() + net.backoff;
-                    console.warn("[NL] transport", route, r.status, "pausing for", net.backoff / 1000, "s");
+                if (r.status === 429 && o.on429)
+                    o.on429();
+                if (pause) {
+                    if (r.status === 429 || r.status === 403) {
+                        net.backoff = Math.min((net.backoff || 30000) * 2, 600000);
+                        net.until = Date.now() + net.backoff;
+                        console.warn("[NL] transport", sp.label || what, r.status, "pausing for", net.backoff / 1000, "s");
+                    }
+                    else
+                        net.backoff = 0;
                 }
-                else
-                    net.backoff = 0;
                 if (!r.ok)
                     throw Object.assign(new Error((j && (j.error || j.message)) || ("HTTP " + r.status)), { status: r.status });
                 if (!j)
                     throw new Error("empty body");
-                if (!isGet && /^POST \/(fleet|outposts|stations|moons)\//.test(route) && !/estimate|preview/.test(route) && NL.fleetChanged)
+                if (typeof route === "string" && !isGet && /^POST \/(fleet|outposts|stations|moons)\//.test(route) && !/estimate|preview/.test(route) && NL.fleetChanged)
                     NL.fleetChanged(route);
                 return c.codec.decode(j);
             }
             throw new Error("transport unavailable");
         };
-        NL.transportPost = (route, id, body, signal) => call(route, id, { id: id == null ? null : String(id), query: {}, body }, signal);
-        NL.transportGet = (route, id, query, signal) => call(route, id, { id: id == null ? null : String(id), query: query || {} }, signal);
+        NL.transportPost = (route, id, body, signal) => call(route, "POST", { id: id == null ? null : String(id), query: {}, body }, { signal });
+        NL.transportGet = (route, id, query, signal) => call(route, "GET", { id: id == null ? null : String(id), query: query || {} }, { signal });
+        NL.transportCall = call;
+        NL.transportReady = transport;
     }
     {
         const GL_KEY = (k) => "nl2.gl." + k;
@@ -17134,20 +17187,6 @@
                 finally {
                     quiet--;
                 } };
-                async function postRaw(url, body) {
-                    try {
-                        const r = await fetch(url, {
-                            method: "POST",
-                            credentials: "include",
-                            headers: { "Content-Type": "application/json", Accept: "application/json" },
-                            body: JSON.stringify(body || {}),
-                        });
-                        return r.ok ? await r.json().catch(() => null) : null;
-                    }
-                    catch (e) {
-                        return null;
-                    }
-                }
                 const OP_ROUTES = {
                     sysPlanets: { m: "GET", re: /^\/galaxy\/systems\/:id\/planets$/, fb: 0 },
                     estimate: { m: "POST", re: /^\/fleet\/fuel-estimate$/, fb: 1 },
@@ -17164,141 +17203,12 @@
                     collect: { m: "POST", re: /^\/fleet\/collect-debris$/, name: "collect_debris", act: true },
                     salvage: { m: "POST", re: /^\/fleet\/collect-salvage$/, name: "collect_salvage", act: true },
                 };
-                let opTable = null, opTablePromise = null;
-                function loadOpTable() {
-                    if (opTable)
-                        return Promise.resolve(opTable);
-                    if (!opTablePromise)
-                        opTablePromise = (async () => {
-                            const u = [...document.scripts].map((x) => x.src).find((x) => /\/assets\/index-[^/]+\.js$/.test(x));
-                            if (!u)
-                                return null;
-                            const src = await (await fetch(u)).text();
-                            const lists = [...src.matchAll(/=\[(\["(?:GET|POST|PUT|PATCH|DELETE)","\/[^\]]*\](?:,\["(?:GET|POST|PUT|PATCH|DELETE)","\/[^\]]*\])*)\]/g)].map((m) => JSON.parse("[" + m[1] + "]"));
-                            const acts = lists.find((l) => l.some((x) => x[1] === "/fleet/survey"));
-                            const at = src.indexOf("[\"POST\",\"/fleet/fuel-estimate\"]");
-                            if (!acts || at < 0)
-                                return null;
-                            let i = src.lastIndexOf("=[", at) + 2;
-                            const out = [];
-                            for (;;) {
-                                while (/[\s,]/.test(src[i]))
-                                    i++;
-                                if (src[i] === "]")
-                                    break;
-                                if (src[i] === "[") {
-                                    const j = src.indexOf("]", i);
-                                    out.push(JSON.parse(src.slice(i, j + 1)));
-                                    i = j + 1;
-                                    continue;
-                                }
-                                if (src.startsWith("...", i)) {
-                                    let d = 0, j = i;
-                                    for (; j < src.length; j++) {
-                                        if (src[j] === "(")
-                                            d++;
-                                        else if (src[j] === ")" && --d === 0)
-                                            break;
-                                    }
-                                    if (d !== 0)
-                                        return null;
-                                    acts.forEach((x) => out.push(x));
-                                    i = j + 1;
-                                    continue;
-                                }
-                                return null;
-                            }
-                            if (!out.some((x) => x[1] === "/fleet/survey"))
-                                return null;
-                            opTable = out;
-                            return opTable;
-                        })().catch(() => null).finally(() => { opTablePromise = null; });
-                    return opTablePromise;
-                }
-                async function opIndex(key, nOps) {
-                    const r = OP_ROUTES[key];
-                    if (!r)
-                        throw new Error("unknown route " + key);
-                    let t = await loadOpTable();
-                    if (t && t.length !== nOps)
-                        t = null;
-                    if (t) {
-                        const hits = [];
-                        t.forEach((x, i) => { if (x[0] === r.m && (r.re.test(x[1]) || (r.name && x[2] === r.name)))
-                            hits.push(i); });
-                        if (r.fb != null && hits.includes(r.fb))
-                            return r.fb;
-                        if (hits.length === 1 || (hits.length && !r.act))
-                            return hits[0];
-                    }
-                    else if (!r.act)
-                        return r.fb;
-                    if (!r.act)
-                        return r.fb;
-                    throw new Error("Launch blocked: could not find the game\u2019s " + key + " route (the game may have updated)");
-                }
-                const SEED_RE = /\[\s*(\d+(?:\s*,\s*\d+){15})\s*\]/;
-                const OPS_RE = /"operations":\[([^\]]*)\]/;
-                const TTL_RE = /"ttlMs":(\d+)/;
-                function makeCodec(seed) {
-                    const rename = (input, reverse) => {
-                        let out = "";
-                        if (reverse) {
-                            for (let i = 1, j = 0; i < input.length; i += 4, j++)
-                                out += String.fromCharCode(parseInt(input.slice(i, i + 4), 16) ^ seed[j % 16]);
-                            return out;
-                        }
-                        out = "k";
-                        for (let i = 0; i < input.length; i++)
-                            out += (input.charCodeAt(i) ^ seed[i % 16]).toString(16).padStart(4, "0");
-                        return out;
-                    };
-                    const walk = (v, reverse) => {
-                        if (v === null || typeof v !== "object")
-                            return v;
-                        if (Array.isArray(v))
-                            return v.map((x) => walk(x, reverse));
-                        const out = {};
-                        for (const name of Object.keys(v))
-                            out[rename(name, reverse)] = walk(v[name], reverse);
-                        return out;
-                    };
-                    return { encode: (v) => walk(v, false), decode: (v) => walk(v, true) };
-                }
-                let tctx = null, tctxPromise = null;
-                function transport() {
-                    if (tctx && tctx.expiresAt - 60000 > Date.now())
-                        return Promise.resolve(tctx);
-                    if (!tctxPromise) {
-                        const p = tctxPromise = (async () => {
-                            const boot = await postRaw("/api/transport/bootstrap");
-                            if (boot && boot.enabled === false)
-                                transportOff = true;
-                            if (!boot || !boot.enabled || !boot.moduleUrl || !boot.id)
-                                throw new Error("transport disabled");
-                            const src = await (await fetch(boot.moduleUrl, { credentials: "include" })).text();
-                            const sm = SEED_RE.exec(src), om = OPS_RE.exec(src);
-                            if (!sm || !om)
-                                throw new Error("transport module unreadable");
-                            const ttl = +((TTL_RE.exec(src) || [])[1] || 600000);
-                            tctx = {
-                                id: boot.id,
-                                ops: om[1].split(",").map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean),
-                                codec: makeCodec(JSON.parse("[" + sm[1] + "]")),
-                                expiresAt: Date.now() + ttl,
-                            };
-                            return tctx;
-                        })();
-                        p.then(() => { if (tctxPromise === p)
-                            tctxPromise = null; }, () => { if (tctxPromise === p)
-                            tctxPromise = null; });
-                    }
-                    return tctxPromise;
-                }
+                for (const k of Object.keys(OP_ROUTES))
+                    OP_ROUTES[k].key = k;
                 const TCACHE_MS = { [DETAIL_OP]: 600000 };
                 const tcache = new Map();
                 async function transportCall(key, method, payload) {
-                    if (transportOff && !PLAIN_CALL[key])
+                    if ((transportOff || NL.transportDisabled) && !PLAIN_CALL[key])
                         throw new Error("transport disabled");
                     const isRead = method === "GET" && key !== MAP_OP && key !== SYSP_OP;
                     const u = userRead, ck = isRead ? key + "|" + ((payload && payload.id) || "") : null;
@@ -17324,7 +17234,7 @@
                     if (PLAIN_CALL[key]) {
                         if (!transportOff) {
                             try {
-                                await transport();
+                                await NL.transportReady();
                             }
                             catch (e) {
                                 if (!/transport disabled/.test(String(e && e.message || e)))
@@ -17357,42 +17267,10 @@
                     return transportRaw2(key, method, payload);
                 }
                 async function transportRaw2(key, method, payload) {
-                    for (let attempt = 0; attempt < 2; attempt++) {
-                        const c = await transport();
-                        const op = c.ops[await opIndex(key, c.ops.length)];
-                        if (!op)
-                            throw new Error("bad op index");
-                        const base = "/api/transport/r/" + c.id + "/" + op;
-                        const enc = c.codec.encode(payload);
-                        const t0 = Date.now(), ac = new AbortController(), to = setTimeout(() => ac.abort(), READ_TIMEOUT);
-                        let r;
-                        try {
-                            r = method === "GET"
-                                ? await fetch(base + "?d=" + encodeURIComponent(JSON.stringify(enc)), { credentials: "include", headers: { Accept: "application/json" }, signal: ac.signal })
-                                : await fetch(base, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(enc), signal: ac.signal });
-                        }
-                        catch (e) {
-                            logRead("t:" + key, Date.now() - t0, "timeout");
-                            throw e;
-                        }
-                        finally {
-                            clearTimeout(to);
-                        }
-                        logRead("t:" + key, Date.now() - t0, r.status);
-                        const body = await r.json().catch(() => null);
-                        if (r.status === 403 && body && body.code === "DYNAMIC_API_REQUIRED") {
-                            tctx = null;
-                            continue;
-                        }
-                        if (r.status === 429)
-                            noteThrottled();
-                        if (!r.ok)
-                            throw Object.assign(new Error((body && (body.error || body.message)) || ("HTTP " + r.status)), { status: r.status });
-                        if (!body)
-                            throw new Error("empty body");
-                        return c.codec.decode(body);
-                    }
-                    throw new Error("transport unavailable");
+                    const sp = OP_ROUTES[key];
+                    if (!sp)
+                        throw new Error("unknown route " + key);
+                    return NL.transportCall(sp, method, payload, { timeout: READ_TIMEOUT, log: logRead, on429: noteThrottled, pause: false, notFound: sp.act ? "Launch blocked: could not find the game\u2019s " + key + " route (the game may have updated)" : undefined });
                 }
                 const limiter = { until: 0 };
                 const queue = [];
@@ -23052,164 +22930,10 @@
                         fuelEstimate: { m: "POST", re: /^\/fleet\/fuel-estimate$/ },
                         moonSendEstimate: { m: "POST", re: /^\/moons\/:id\/send-estimate$/ },
                     };
-                    let opTable = null, opTablePromise = null;
-                    function loadOpTable() {
-                        if (opTable)
-                            return Promise.resolve(opTable);
-                        if (!opTablePromise)
-                            opTablePromise = (async () => {
-                                const u = [...document.scripts].map((x) => x.src).find((x) => /\/assets\/index-[^/]+\.js$/.test(x));
-                                if (!u)
-                                    return null;
-                                const src = await (await fetch(u)).text();
-                                const lists = [...src.matchAll(/=\[(\["(?:GET|POST|PUT|PATCH|DELETE)","\/[^\]]*\](?:,\["(?:GET|POST|PUT|PATCH|DELETE)","\/[^\]]*\])*)\]/g)].map((m) => JSON.parse("[" + m[1] + "]"));
-                                const acts = lists.find((l) => l.some((x) => x[1] === "/fleet/survey"));
-                                const at = src.indexOf("[\"POST\",\"/fleet/fuel-estimate\"]");
-                                if (!acts || at < 0)
-                                    return null;
-                                let i = src.lastIndexOf("=[", at) + 2;
-                                const out = [];
-                                for (;;) {
-                                    while (/[\s,]/.test(src[i]))
-                                        i++;
-                                    if (src[i] === "]")
-                                        break;
-                                    if (src[i] === "[") {
-                                        const j = src.indexOf("]", i);
-                                        out.push(JSON.parse(src.slice(i, j + 1)));
-                                        i = j + 1;
-                                        continue;
-                                    }
-                                    if (src.startsWith("...", i)) {
-                                        let d = 0, j = i;
-                                        for (; j < src.length; j++) {
-                                            if (src[j] === "(")
-                                                d++;
-                                            else if (src[j] === ")" && --d === 0)
-                                                break;
-                                        }
-                                        if (d !== 0)
-                                            return null;
-                                        acts.forEach((x) => out.push(x));
-                                        i = j + 1;
-                                        continue;
-                                    }
-                                    return null;
-                                }
-                                if (!out.some((x) => x[1] === "/fleet/survey"))
-                                    return null;
-                                opTable = out;
-                                return opTable;
-                            })().catch(() => null).finally(() => { opTablePromise = null; });
-                        return opTablePromise;
-                    }
-                    async function opIndex(key, nOps) {
-                        const t = await loadOpTable();
-                        if (!t || t.length !== nOps)
-                            throw new Error("route table unreadable");
-                        const hits = [];
-                        t.forEach((x, i) => { if (x[0] === (TX_ROUTES[key].m || "GET") && TX_ROUTES[key].re.test(x[1]))
-                            hits.push(i); });
-                        if (hits.length !== 1)
-                            throw new Error("could not find the game\u2019s " + key + " route (the game may have updated)");
-                        return hits[0];
-                    }
-                    const SEED_RE = /\[\s*(\d+(?:\s*,\s*\d+){15})\s*\]/, OPS_RE = /"operations":\[([^\]]*)\]/, TTL_RE = /"ttlMs":(\d+)/;
-                    function makeCodec(seed) {
-                        const rename = (input, reverse) => {
-                            let out = "";
-                            if (reverse) {
-                                for (let i = 1, j = 0; i < input.length; i += 4, j++)
-                                    out += String.fromCharCode(parseInt(input.slice(i, i + 4), 16) ^ seed[j % 16]);
-                                return out;
-                            }
-                            out = "k";
-                            for (let i = 0; i < input.length; i++)
-                                out += (input.charCodeAt(i) ^ seed[i % 16]).toString(16).padStart(4, "0");
-                            return out;
-                        };
-                        const walk = (v, reverse) => {
-                            if (v === null || typeof v !== "object")
-                                return v;
-                            if (Array.isArray(v))
-                                return v.map((x) => walk(x, reverse));
-                            const out = {};
-                            for (const name of Object.keys(v))
-                                out[rename(name, reverse)] = walk(v[name], reverse);
-                            return out;
-                        };
-                        return { encode: (v) => walk(v, false), decode: (v) => walk(v, true) };
-                    }
-                    let tctx = null, tctxPromise = null;
-                    function transport() {
-                        if (tctx && tctx.expiresAt - 60000 > Date.now())
-                            return Promise.resolve(tctx);
-                        if (!tctxPromise) {
-                            const p = tctxPromise = (async () => {
-                                const br = await fetch("/api/transport/bootstrap", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: "{}" });
-                                const boot = br.ok ? await br.json().catch(() => null) : null;
-                                if (!boot || !boot.enabled || !boot.moduleUrl || !boot.id)
-                                    throw new Error("transport disabled");
-                                const src = await (await fetch(boot.moduleUrl, { credentials: "include" })).text();
-                                const sm = SEED_RE.exec(src), om = OPS_RE.exec(src);
-                                if (!sm || !om)
-                                    throw new Error("transport module unreadable");
-                                const ttl = +((TTL_RE.exec(src) || [])[1] || 600000);
-                                tctx = { id: boot.id, ops: om[1].split(",").map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean), codec: makeCodec(JSON.parse("[" + sm[1] + "]")), expiresAt: Date.now() + ttl };
-                                return tctx;
-                            })();
-                            p.then(() => { if (tctxPromise === p)
-                                tctxPromise = null; }, () => { if (tctxPromise === p)
-                                tctxPromise = null; });
-                        }
-                        return tctxPromise;
-                    }
-                    async function transportGet(key, id, query) {
-                        for (let attempt = 0; attempt < 2; attempt++) {
-                            const c = await transport();
-                            const op = c.ops[await opIndex(key, c.ops.length)];
-                            if (!op)
-                                throw new Error("bad op index");
-                            const enc = c.codec.encode({ id: String(id), query: query || {} });
-                            const r = await fetch("/api/transport/r/" + c.id + "/" + op + "?d=" + encodeURIComponent(JSON.stringify(enc)), { credentials: "include", headers: { Accept: "application/json" } });
-                            const body = await r.json().catch(() => null);
-                            if (r.status === 403 && body && body.code === "DYNAMIC_API_REQUIRED") {
-                                tctx = null;
-                                continue;
-                            }
-                            if (!r.ok)
-                                throw new Error((body && (body.error || body.message)) || ("HTTP " + r.status));
-                            if (!body)
-                                throw new Error("empty body");
-                            return c.codec.decode(body);
-                        }
-                        throw new Error("transport unavailable");
-                    }
-                    async function transportPost(key, id, body) {
-                        for (let attempt = 0; attempt < 2; attempt++) {
-                            const c = await transport();
-                            const op = c.ops[await opIndex(key, c.ops.length)];
-                            if (!op)
-                                throw new Error("bad op index");
-                            const r = await fetch("/api/transport/r/" + c.id + "/" + op, {
-                                method: "POST",
-                                credentials: "include",
-                                headers: { "Content-Type": "application/json", Accept: "application/json" },
-                                body: JSON.stringify(c.codec.encode({ id: id == null ? null : String(id), query: {}, body })),
-                            });
-                            const j = await r.json().catch(() => null);
-                            if (r.status === 403 && j && j.code === "DYNAMIC_API_REQUIRED") {
-                                tctx = null;
-                                continue;
-                            }
-                            if (!r.ok)
-                                throw new Error((j && (j.error || j.message)) || ("HTTP " + r.status));
-                            if (!j)
-                                throw new Error("empty body");
-                            return c.codec.decode(j);
-                        }
-                        throw new Error("transport unavailable");
-                    }
+                    for (const k of Object.keys(TX_ROUTES))
+                        Object.assign(TX_ROUTES[k], { key: k, act: true });
+                    const transportGet = (key, id, query) => NL.transportCall(TX_ROUTES[key], "GET", { id: String(id), query: query || {} }, { pause: false });
+                    const transportPost = (key, id, body) => NL.transportCall(TX_ROUTES[key], "POST", { id: id == null ? null : String(id), query: {}, body }, { pause: false });
                     function homeBy(t) {
                         const d = new Date(t), today = d.toDateString() === new Date().toDateString();
                         return (today ? "" : d.toLocaleDateString([], { weekday: "short" }) + " ") + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });

@@ -1,5 +1,8 @@
 # Release notes
 
+## v0.5.93 · Nov 4, 2026
+- Internal cleanup: one shared copy of the game's transport code
+
 ## v0.5.92 · Nov 4, 2026
 - Routes: resume tick right of PAUSED
 - Fleet Reports: descriptive types and wormhole names
