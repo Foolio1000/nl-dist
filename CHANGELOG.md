@@ -1,5 +1,21 @@
 # Release notes
 
+## v0.5.91 · Nov 4, 2026
+- Fleet Reports: Table View
+- Fleet Reports: combat rounds
+- Transfer tab after Espionage
+- Routes: tick to resume a paused route
+- Relocated outposts resume their routes
+- Transfer: Covered by a route is now Routes
+- Fleet Reports: Next and Back
+- Transfer: Move out rows only flag the issue
+- Fleet page: condensed banner
+- Fleet badge: game's own count plus ours
+- Ship maintenance badge on landing
+- Shipyard: Gather Fleets
+- Shipyard: Table View
+- Survey Ruins fills in S0
+
 ## v0.5.90 · Nov 4, 2026
 - Fire Sale: review dialog with a Post button per row
 - Fire Sale: posted rows with Cancel; repeat sales
