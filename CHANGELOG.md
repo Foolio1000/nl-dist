@@ -1,5 +1,8 @@
 # Release notes
 
+## v0.5.96 · Nov 5, 2026
+- Internal cleanup: the Global module split into smaller files
+
 ## v0.5.95 · Nov 5, 2026
 - Internal cleanup: page switching uses the shared route and page watchers
 

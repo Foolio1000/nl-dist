@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.95
+// @version      0.5.96
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.95", features: [] };
+    const NL = window.__nl2 = { version: "0.5.96", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -3150,6 +3150,11 @@
                 NL.watch(".topbar", ensureOptions);
             },
         });
+        NL._g = Object.defineProperties(NL._g || {}, Object.getOwnPropertyDescriptors({ get actPlanets() { return actPlanets; }, cleanName, curPlanet, glEsc, glLoad, glSave, moonHere, get moonIds() { return moonIds; }, get moons() { return moons; }, onMoon, pickerBtn, pickerDd, quietClick, routerPush, sleep, withPicker }));
+    }
+    {
+        const G = NL._g;
+        const { cleanName, curPlanet, glEsc, glLoad, glSave, moonHere, onMoon, pickerBtn, pickerDd, quietClick, routerPush, sleep, withPicker } = NL._g;
         const glNum = (t) => Number(String(t || "").replace(/[^\d.]/g, "")) || 0;
         function dispatchReasons(ws) {
             const out = [], src = ws.querySelector(".location-select .location-select-row-label");
@@ -3306,7 +3311,7 @@
                 let at = 0, label = "", status = "";
                 const type = String(m.missionType || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
                 if (m.status === "outbound" && (m.missionType === "deliver" || m.missionType === "transfer") && (mid != null ? toMoon : toHere && m.targetMoonId == null)) {
-                    const moon = m.sourceMoonId != null ? Object.keys(moonIds).find((n) => +moonIds[n] === +m.sourceMoonId) : "";
+                    const moon = m.sourceMoonId != null ? Object.keys(G.moonIds).find((n) => +G.moonIds[n] === +m.sourceMoonId) : "";
                     const from = moon || (m.sourceMoonId == null && m.sourceOutpostId == null ? m.sourcePlanetName : "") || (m.sourceOutpostId != null ? "an outpost" : m.sourceMoonId != null ? "a moon" : "");
                     at = inTs(m.arrivesAt);
                     label = type;
@@ -3345,7 +3350,7 @@
         }
         function ensureInbound(hero) {
             const mm = hero.parentElement.classList.contains("moon-page") && location.pathname.match(/^\/moons\/(\d+)/), mid = mm ? Number(mm[1]) : null;
-            const cur = mid != null ? moonHere() || curPlanet() : curPlanet(), p = mid == null && actPlanets.find((x) => x.name === cur), pid = p ? p.id : null;
+            const cur = mid != null ? moonHere() || curPlanet() : curPlanet(), p = mid == null && G.actPlanets.find((x) => x.name === cur), pid = p ? p.id : null;
             let strip = hero.parentElement.querySelector(":scope > .nl2-inbound");
             if (!cur || (mid == null && onMoon())) {
                 if (strip)
@@ -3471,7 +3476,7 @@
                 glSave("shipBio", shipBio);
         }
         const bioOf = (c) => Object.keys(c && typeof c === "object" ? c : {}).filter((k) => /bio/i.test(k)).reduce((t, k) => t + (Number(c[k]) || 0), 0);
-        const curPlanetId = () => { const p = actPlanets.find((x) => x.name === curPlanet()); return p ? Number(p.id) : NaN; };
+        const curPlanetId = () => { const p = G.actPlanets.find((x) => x.name === curPlanet()); return p ? Number(p.id) : NaN; };
         function bioSpend(url, body) {
             let b = null, m = null;
             try {
@@ -3689,7 +3694,7 @@
             }
         }
         function supPlanetOf(name) {
-            const n = cleanName(name), m = moons.find((x) => x.name === n), pn = m && m.planet ? m.planet : n;
+            const n = cleanName(name), m = G.moons.find((x) => x.name === n), pn = m && m.planet ? m.planet : n;
             return (supPlanets || []).find((p) => p.name === pn) || null;
         }
         function supHomeHere() {
@@ -3806,7 +3811,7 @@
             if (sels[0] !== sel)
                 return;
             const onMoonPage = /^\/moons\/\d+\/?$/.test(location.pathname), here = (typeof moonHere === "function" && moonHere()) || curPlanet();
-            const m = moons.find((x) => x.name === here), mid = (location.pathname.match(/^\/moons\/(\d+)/) || [])[1];
+            const m = G.moons.find((x) => x.name === here), mid = (location.pathname.match(/^\/moons\/(\d+)/) || [])[1];
             const md = mid && NL.cache.latest(new RegExp("^/api/moons/" + mid + "$")), mo = md && md.data && (md.data.moon || md.data);
             const pid = (mo && Number(mo.planetId)) || (m && m.planet && supPlanets && (supPlanets.find((p) => p.name === m.planet) || {}).id);
             const pname = (m && m.planet) || (pid && supPlanets && (supPlanets.find((p) => p.id === pid) || {}).name) || "";
@@ -4087,6 +4092,8 @@
                 window.addEventListener("input", hubPicked, true);
             },
         });
+    }
+    {
         const FS_ST = ["outbound", "returning", "in_combat", "raiding", "mining", "exploring", "surveying", "stationed", "collecting", "inside_wormhole"];
         const FS_WRITE = /^\/api\/(fleet\/|moons\/\d+\/(send|dispatch)$|stations\/\d+\/send$|outposts\/\d+\/(collect|dispatch-mining)$|market\/.*(pickup|deliver))/;
         const FS_NOT_LAUNCH = /recall|cancel|abort|estimate|preview|rename|preset|favou?rite|template|unread|seen|clear|patrol|leader/i;
@@ -4422,6 +4429,9 @@
                 NL.onData(/^\/api\/fleet\/missions(\?|$)/, () => ldRender());
             },
         });
+    }
+    {
+        const { glLoad, glSave } = NL._g;
         const UPD_BASE = "https://raw.githubusercontent.com/Foolio1000/nl-dist/main/";
         const UPD_NOTES = "https://github.com/Foolio1000/nl-dist/blob/main/CHANGELOG.md";
         const verNewer = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) {
@@ -4482,6 +4492,9 @@
                     again(); });
             },
         });
+    }
+    {
+        const { glEsc } = NL._g;
         const SO_RE = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*[—–-]\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*$/;
         const soClock = (t) => { const d = new Date(t), today = d.toDateString() === new Date().toDateString(); return (today ? "" : d.toLocaleDateString([], { weekday: "short" }) + " ") + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }); };
         const soDur = (ms) => { const s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? h + "h " + String(m).padStart(2, "0") + "m" : m + "m " + String(s % 60).padStart(2, "0") + "s"; };
