@@ -1,5 +1,31 @@
 # Release notes
 
+## v0.5.94 · Nov 5, 2026
+- Shipyard: build boxes use projected stock
+- Shipyard: costs update with quantity
+- Research cards: no picture and Hide at top right
+- Tasks tab removed
+- Moons badge opens the right page
+- Defense2 improvements
+- Defense2 improvements
+- Defense2 improvements
+- Defense2 narrower columns
+- Defense2 improvements
+- Defense2 improvements
+- Defense2 improvements
+- Defense2 improvements
+- Defense2 improvements
+- Defense2 improvements
+- Defense2 improvements
+- Defense2 narrower columns
+- Defense2 improvements
+- Defense2 one Attackers column
+- Crew: Table View
+- Crew: Hide all-marked
+- Crew: sort by grade
+- Survey Ruins: dead-space list
+- Fleet Transfer: fewer hover boxes
+
 ## v0.5.93 · Nov 4, 2026
 - Internal cleanup: one shared copy of the game's transport code
 

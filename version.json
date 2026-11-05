@@ -1,13 +1,114 @@
 {
-  "version": "0.5.93",
-  "built": "2026-11-05T04:31:32.558Z",
+  "version": "0.5.94",
+  "built": "2026-11-05T08:05:16.666Z",
   "items": [
-    "GL-089"
+    "SH-021",
+    "SH-022",
+    "RE-018",
+    "GL-129",
+    "MO-020",
+    "GL-134",
+    "GL-135",
+    "GL-136",
+    "GL-137",
+    "GL-138",
+    "GL-139",
+    "GL-140",
+    "GL-141",
+    "GL-142",
+    "GL-143",
+    "GL-144",
+    "GL-145",
+    "GL-146",
+    "GL-147",
+    "GL-130",
+    "GL-132",
+    "GL-133",
+    "GL-148",
+    "FL-120"
   ],
   "notes": {
-    "GL-089": "Internal cleanup: one shared copy of the game's transport code"
+    "SH-021": "Shipyard: build boxes use projected stock",
+    "SH-022": "Shipyard: costs update with quantity",
+    "RE-018": "Research cards: no picture and Hide at top right",
+    "GL-129": "Tasks tab removed",
+    "MO-020": "Moons badge opens the right page",
+    "GL-134": "Defense2 improvements",
+    "GL-135": "Defense2 improvements",
+    "GL-136": "Defense2 improvements",
+    "GL-137": "Defense2 narrower columns",
+    "GL-138": "Defense2 improvements",
+    "GL-139": "Defense2 improvements",
+    "GL-140": "Defense2 improvements",
+    "GL-141": "Defense2 improvements",
+    "GL-142": "Defense2 improvements",
+    "GL-143": "Defense2 improvements",
+    "GL-144": "Defense2 improvements",
+    "GL-145": "Defense2 narrower columns",
+    "GL-146": "Defense2 improvements",
+    "GL-147": "Defense2 one Attackers column",
+    "GL-130": "Crew: Table View",
+    "GL-132": "Crew: Hide all-marked",
+    "GL-133": "Crew: sort by grade",
+    "GL-148": "Survey Ruins: dead-space list",
+    "FL-120": "Fleet Transfer: fewer hover boxes"
   },
   "history": [
+    {
+      "version": "0.5.94",
+      "items": [
+        "SH-021",
+        "SH-022",
+        "RE-018",
+        "GL-129",
+        "MO-020",
+        "GL-134",
+        "GL-135",
+        "GL-136",
+        "GL-137",
+        "GL-138",
+        "GL-139",
+        "GL-140",
+        "GL-141",
+        "GL-142",
+        "GL-143",
+        "GL-144",
+        "GL-145",
+        "GL-146",
+        "GL-147",
+        "GL-130",
+        "GL-132",
+        "GL-133",
+        "GL-148",
+        "FL-120"
+      ],
+      "notes": {
+        "SH-021": "Shipyard: build boxes use projected stock",
+        "SH-022": "Shipyard: costs update with quantity",
+        "RE-018": "Research cards: no picture and Hide at top right",
+        "GL-129": "Tasks tab removed",
+        "MO-020": "Moons badge opens the right page",
+        "GL-134": "Defense2 improvements",
+        "GL-135": "Defense2 improvements",
+        "GL-136": "Defense2 improvements",
+        "GL-137": "Defense2 narrower columns",
+        "GL-138": "Defense2 improvements",
+        "GL-139": "Defense2 improvements",
+        "GL-140": "Defense2 improvements",
+        "GL-141": "Defense2 improvements",
+        "GL-142": "Defense2 improvements",
+        "GL-143": "Defense2 improvements",
+        "GL-144": "Defense2 improvements",
+        "GL-145": "Defense2 narrower columns",
+        "GL-146": "Defense2 improvements",
+        "GL-147": "Defense2 one Attackers column",
+        "GL-130": "Crew: Table View",
+        "GL-132": "Crew: Hide all-marked",
+        "GL-133": "Crew: sort by grade",
+        "GL-148": "Survey Ruins: dead-space list",
+        "FL-120": "Fleet Transfer: fewer hover boxes"
+      }
+    },
     {
       "version": "0.5.93",
       "items": [
@@ -517,17 +618,6 @@
         "FL-045": "Transfer moon rows: over 10k (H 50k) collects above reserves",
         "FL-046": "Transfer moon routes with own defaults dialog",
         "GL-054": "Moon Supplies switched off"
-      }
-    },
-    {
-      "version": "0.5.74",
-      "items": [
-        "RE-004",
-        "FL-047"
-      ],
-      "notes": {
-        "RE-004": "Hide underway no longer amber",
-        "FL-047": "Fleet Active table truncates instead of wrapping"
       }
     }
   ]
