@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.94
+// @version      0.5.95
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.94", features: [] };
+    const NL = window.__nl2 = { version: "0.5.95", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -230,7 +230,7 @@
     let lastRoute = location.pathname;
     NL.route = () => location.pathname;
     NL.onRoute = (fn) => routeSubs.push(fn);
-    const routeCheck = () => { if (location.pathname === lastRoute)
+    const routeCheck = () => { navCheck(); if (location.pathname === lastRoute)
         return; lastRoute = location.pathname; for (const fn of routeSubs) {
         try {
             fn(lastRoute);
@@ -244,6 +244,22 @@
         history[k] = function () { const r = o.apply(this, arguments); setTimeout(routeCheck, 0); return r; };
     }
     window.addEventListener("popstate", routeCheck);
+    const navSubs = [];
+    let lastUrl = location.pathname + location.search + location.hash;
+    NL.onNav = (fn) => navSubs.push(fn);
+    function navCheck() { const u = location.pathname + location.search + location.hash; if (u === lastUrl)
+        return; lastUrl = u; for (const fn of navSubs) {
+        try {
+            fn(u);
+        }
+        catch (e) {
+            if (NL.err)
+                NL.err("onNav", e);
+            else
+                console.warn("[NL] onNav", e);
+        }
+    } }
+    window.addEventListener("hashchange", routeCheck);
     {
         let tipEl = null, tipFor = null, tipTimer = 0;
         const hide = () => { clearTimeout(tipTimer); tipFor = null; if (tipEl)
@@ -23178,16 +23194,10 @@
     .nxs-toast-err{border-color:rgba(224,108,117,.6);color:#e06c75}
   `;
                 document.head.appendChild(style);
-                for (const m of ["pushState", "replaceState"]) {
-                    const orig = history[m];
-                    history[m] = function () { const r = orig.apply(this, arguments); try {
-                        tick();
-                    }
-                    catch (e) { } return r; };
-                }
-                window.addEventListener("hashchange", tick);
-                window.addEventListener("popstate", tick);
-                setInterval(tick, 500);
+                NL.onNav(tick);
+                let tickQ = 0;
+                NL.watch(HOST_SEL, () => { if (!tickQ)
+                    tickQ = setTimeout(() => { tickQ = 0; tick(); }, 100); });
                 tick();
             })();
         }
@@ -24579,16 +24589,10 @@
     .nxt-up input:disabled+span{opacity:.45}
   `;
                     document.head.appendChild(style);
-                    for (const m of ["pushState", "replaceState"]) {
-                        const orig = history[m];
-                        history[m] = function () { const r = orig.apply(this, arguments); try {
-                            tick();
-                        }
-                        catch (e) { } return r; };
-                    }
-                    window.addEventListener("hashchange", tick);
-                    window.addEventListener("popstate", tick);
-                    setInterval(tick, 500);
+                    NL.onNav(tick);
+                    let tickQ = 0;
+                    NL.watch(HOST_SEL, () => { if (!tickQ)
+                        tickQ = setTimeout(() => { tickQ = 0; tick(); }, 100); });
                     setInterval(() => {
                         for (const el of [mroot].filter(Boolean).flatMap((x) => [...x.querySelectorAll("[data-cd]")])) {
                             if (el.dataset.cdh && +el.dataset.cd <= Date.now())

@@ -1,5 +1,8 @@
 # Release notes
 
+## v0.5.95 · Nov 5, 2026
+- Internal cleanup: page switching uses the shared route and page watchers
+
 ## v0.5.94 · Nov 5, 2026
 - Shipyard: build boxes use projected stock
 - Shipyard: costs update with quantity
