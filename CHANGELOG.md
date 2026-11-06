@@ -1,5 +1,35 @@
 # Release notes
 
+## v0.5.99 · Nov 5, 2026
+- BU-026
+- FL-142
+- FL-144
+- FL-145
+- FL-146
+- FL-147
+- FL-148
+- FL-149
+- FL-150
+- FL-151
+- FL-152
+- FL-153
+- FL-154
+- FL-155
+- FL-156
+- FL-157
+- FL-158
+- FL-159
+- GL-177
+- GL-178
+- GL-180
+- MO-024
+- MO-025
+- MO-026
+- MO-027
+- MO-028
+- RE-022
+- SH-025
+
 ## v0.5.98 · Nov 5, 2026
 - Fleet slots count right after Fleet
 - Transfer improvements
