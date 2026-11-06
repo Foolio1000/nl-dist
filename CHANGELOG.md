@@ -6,115 +6,115 @@
 - Pirates, Surveys, Debris, Mining and Ruins are now Fleet tabs with Table View
   <details><summary>Details</summary>
 
-  - New Fleet > Mining tab: the mining belt list as a table, with Mine opening the Mining dialog
-  - New Fleet > Ruins tab: the Survey Ruins table
-  - Pirates Table View with Nearest Planet, Distance and Attack (template dialog)
-  - Detected Wormholes Table View with Nearest Planet, Distance, Hide and Attack
-  - Surveys Table View with Investigate, Send Freighters / Clear Guards and an "Open only" filter
-  - Debris Table View with Nearest Planet, Distance, Hide and Collect
-  - PVE's background data keeps running without the PVE page
+  - New Fleet > Mining tab: the mining belt list as a table, with Mine opening the Mining dialog (FL-164)
+  - New Fleet > Ruins tab: the Survey Ruins table (FL-165)
+  - Pirates Table View with Nearest Planet, Distance and Attack (template dialog) (FL-166)
+  - Detected Wormholes Table View with Nearest Planet, Distance, Hide and Attack (FL-167)
+  - Surveys Table View with Investigate, Send Freighters / Clear Guards and an "Open only" filter (FL-168)
+  - Debris Table View with Nearest Planet, Distance, Hide and Collect (FL-169)
+  - PVE's background data keeps running without the PVE page (GL-185)
   </details>
 - New **One click mode** launches with defaults (the dialog still opens if anything's off)
   <details><summary>Details</summary>
 
-  - One click mode checkbox on the Surveys, Debris and Pirates tables
+  - One click mode checkbox on the Surveys, Debris and Pirates tables (FL-185)
   </details>
 - Ruins table now pages 10 at a time
   <details><summary>Details</summary>
 
-  - < and > arrows page through the nearest Ancient moons, with a "11–20 of 465" count
+  - < and > arrows page through the nearest Ancient moons, with a "11–20 of 465" count (FL-186)
   </details>
 
 **🏗 Buildings**
 - Clean status pills: Max Level, Building, Queued
   <details><summary>Details</summary>
 
-  - One centred pill style for Max Level, Building, Queued and "No rare resource on this planet"; "Requires" rows without the lock icon
+  - One centred pill style for Max Level, Building, Queued and "No rare resource on this planet"; "Requires" rows without the lock icon (BU-028)
   </details>
 - All tab grouped into sections; Defense split into Fleet and Ground
   <details><summary>Details</summary>
 
-  - Section headings per building category on the All tab, with Fleet Defense and Ground Defense
+  - Section headings per building category on the All tab, with Fleet Defense and Ground Defense (BU-030)
   </details>
 - Hover any energy gain to see **RSS per energy**, with the cheapest upgrade ringed green
   <details><summary>Details</summary>
 
-  - RSS per point of energy on hover, using the energy after research bonuses
+  - RSS per point of energy on hover, using the energy after research bonuses (BU-031)
   </details>
 
 **🔬 Research**
 - Plan checkbox, every rare resource shown, and "Lab busy" while researching
   <details><summary>Details</summary>
 
-  - A Plan checkbox column adds or removes a research from the game's Research Plan
-  - The Cost "Other" column shows every rare resource, exact amounts on hover
-  - While a research is underway, other rows show "Lab busy" instead of a Start that can't work
+  - A Plan checkbox column adds or removes a research from the game's Research Plan (RE-024)
+  - The Cost "Other" column shows every rare resource, exact amounts on hover (RE-025)
+  - While a research is underway, other rows show "Lab busy" instead of a Start that can't work (RE-026)
   </details>
 
 **📊 Table cleanup**
 - Consistent tables across Research, Shipyard, Fleet, Moons, Empire and Overview
   <details><summary>Details</summary>
 
-  - Research: the Cost column is wide enough for the rare resource list
-  - Buildings: more room for Effect
-  - Shipyard and Command Center fleet matrix: long ship names show in full on hover
-  - Moons list: fixed column widths
-  - Fire Sale dialog: even rows and one button width
-  - Fleet Reports: the expand arrow is no longer clipped, Location fits wormhole names, and its hover never shows wormhole IDs
+  - Research: the Cost column is wide enough for the rare resource list (RE-027)
+  - Buildings: more room for Effect (BU-029)
+  - Shipyard and Command Center fleet matrix: long ship names show in full on hover (SH-027, EM-027)
+  - Moons list: fixed column widths (MO-030)
+  - Fire Sale dialog: even rows and one button width (OV-016)
+  - Fleet Reports: the expand arrow is no longer clipped, Location fits wormhole names, and its hover never shows wormhole IDs (FL-170, FL-171)
   </details>
 - Even row heights in Fleet Active, and the Wormholes run tables tidied up
   <details><summary>Details</summary>
 
-  - Fleet Active: even 30px rows, "—" for empty times, and no icon in front of the mission name
-  - Wormholes run tables: one line per cell with the rest on hover, Finished as "Fri 17:58", equal Go Deeper and Retreat buttons, uppercase headers
+  - Fleet Active: even 30px rows, "—" for empty times, and no icon in front of the mission name (FL-176, FL-160)
+  - Wormholes run tables: one line per cell with the rest on hover, Finished as "Fri 17:58", equal Go Deeper and Retreat buttons, uppercase headers (FL-175)
   </details>
 
 **🔕 Quieter badges**
 - No badges for Mining Complete, Wormhole Battles, successful mining raids, or Survey and Pirate reports where no ships were lost
   <details><summary>Details</summary>
 
-  - Mining Complete and Wormhole battle reports raise no Fleet badge
-  - Mining Raid reports raise a badge only when something went wrong
-  - Survey and Pirate reports raise a badge only when ships were destroyed
-  - The quiet list is easy to extend with more report types
+  - Mining Complete and Wormhole battle reports raise no Fleet badge (FL-182, FL-184)
+  - Mining Raid reports raise a badge only when something went wrong (FL-183)
+  - Survey and Pirate reports raise a badge only when ships were destroyed (FL-161, FL-162)
+  - The quiet list is easy to extend with more report types (FL-163)
   </details>
 - Hover a left-menu badge for a clickable menu of its lines
   <details><summary>Details</summary>
 
-  - The hover lists each badge line and each line goes to its own place; the menu lines up with the top of the badge
+  - The hover lists each badge line and each line goes to its own place; the menu lines up with the top of the badge (GL-183, GL-184)
   </details>
-- Leader badge now jumps to Fleet > Active
+- Leader badge now jumps to Fleet > Active (GL-188)
 
 **🛰 Fleet**
 - Fleet Active: a Detail column, a leader star, and two-click Recall
   <details><summary>Details</summary>
 
-  - Detail column shows what each mission is doing (resource, wormhole class and stage, zone, camp, station)
-  - A star marks the fleet carrying your leader
-  - Every Recall needs a second click to confirm
+  - Detail column shows what each mission is doing (resource, wormhole class and stage, zone, camp, station) (FL-178)
+  - A star marks the fleet carrying your leader (FL-181)
+  - Every Recall needs a second click to confirm (FL-179)
   </details>
-- Recalling a fleet that would end a station capture now gives a clear 24h warning
+- Recalling a fleet that would end a station capture now gives a clear 24h warning (FL-180)
 - Espionage and Transfer improvements
   <details><summary>Details</summary>
 
-  - Spy tables use the full page width with the buttons on the right
-  - Spy mission times in local time, and even rows
-  - Quick Spy buttons are one width
-  - Transfer: the full Covers text on hover, and data left-aligned
+  - Spy tables use the full page width with the buttons on the right (FL-172)
+  - Spy mission times in local time, and even rows (FL-173)
+  - Quick Spy buttons are one width (FL-177)
+  - Transfer: the full Covers text on hover, and data left-aligned (FL-174)
   </details>
 
 **🚢 Shipyard**
-- Fleet on Planet shows which facility builds each ship
-- Cancelling the ship build in progress now asks first (no accidental cancel penalty)
+- Fleet on Planet shows which facility builds each ship (SH-029)
+- Cancelling the ship build in progress now asks first (no accidental cancel penalty) (SH-026)
 
 **🐛 Fixes**
-- Low Bio warning now fires on Shipyard builds
-- Survey Ruins cooldown is 48 hours, and a refused send hides the moon for the time the game names
-- Hover tooltips no longer flicker on tables that refresh every second
-- The Research Plan cleanup no longer misses a research that is already underway
+- Low Bio warning now fires on Shipyard builds (GL-189)
+- Survey Ruins cooldown is 48 hours, and a refused send hides the moon for the time the game names (GL-181)
+- Hover tooltips no longer flicker on tables that refresh every second (GL-182)
+- The Research Plan cleanup no longer misses a research that is already underway (RE-019 fix)
 
 **🧩 Other**
-- More automated checks for table layout, and two flaky tests fixed
+- More automated checks for table layout, and two flaky tests fixed (GL-187)
 
 ## v0.5.100 · Nov 6, 2026
 - BU-027
