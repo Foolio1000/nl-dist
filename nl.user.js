@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.99
+// @version      0.5.100
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.99", features: [] };
+    const NL = window.__nl2 = { version: "0.5.100", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -8430,7 +8430,7 @@
                 const st = ctx.store, P = ".buildings-page[data-nl2-bt] ";
                 const RES_COL = { ore: 1, silicates: 2, hydrogen: 3, alloys: 4 };
                 const COLS = { name: 1, type: 2, level: 3, effect: 4, roi: 5, cost1: 6, time: 11, btn: 12, tools: 13 };
-                const GRID = "165px 78px 62px minmax(0,1fr) 82px 56px 56px 56px 56px 50px 80px 104px 70px";
+                const GRID = "165px 74px 62px minmax(0,1fr) 74px 56px 56px 56px 56px 50px 80px 104px 70px";
                 const BTN = "width:104px!important;min-width:0!important;max-width:104px!important;box-sizing:border-box!important;justify-content:center!important;text-align:center!important;padding:2px 6px!important;min-height:0!important;height:24px!important;font-size:13px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;justify-self:end;display:inline-flex!important;align-items:center;gap:4px";
                 const FLAT = "padding:0!important;border:0!important;background:none!important;box-shadow:none!important;height:auto!important;min-height:0!important;width:auto!important;border-radius:0!important";
                 const col = (a, b) => "grid-column:" + a + (b ? "/" + b : "") + "!important";
@@ -8440,8 +8440,8 @@
                     "nav.bld-tabs[data-nl2-bt-nav]{display:flex;align-items:center}",
                     P + ".buildings-grid{display:flex!important;flex-direction:column!important;gap:0!important}",
                     P + ".building-card{display:grid!important;grid-template-columns:" + GRID + "!important;grid-template-rows:auto!important;align-items:center!important;column-gap:6px;min-height:0!important;height:auto!important;padding:3px 8px!important;margin:0!important;border-width:0 0 1px!important;border-radius:0!important;position:relative;box-sizing:border-box}",
-                    P + ".building-card>*," + P + ".building-card-header>*," + P + ".building-header-text>*," + P + ".building-header-text>div:first-child>*," + P + ".building-action-area>*," + P + ".building-costs>*," + P + ".building-upgrading>*{grid-row:1!important;margin:0!important;min-height:0!important;min-width:0}",
-                    P + ".building-card-header," + P + ".building-header-text," + P + ".building-header-text>div:first-child," + P + ".building-action-area," + P + ".building-costs," + P + ".building-upgrading{display:contents!important}",
+                    P + ".building-card>*," + P + ".building-card-header>*," + P + ".building-header-text>*," + P + ".building-header-text>div:first-child>*," + P + ".building-action-area>*," + P + ".building-costs>*," + P + ".building-upgrading>*," + P + ".building-upgrading-main>*," + P + ".building-upgrading-line>*," + P + ".qol-completion>*," + P + ".qol-completion>span>*{grid-row:1!important;margin:0!important;min-height:0!important;min-width:0}",
+                    P + ".building-card-header," + P + ".building-header-text," + P + ".building-header-text>div:first-child," + P + ".building-action-area," + P + ".building-costs," + P + ".building-upgrading," + P + ".building-upgrading-main," + P + ".building-upgrading-line," + P + ".qol-completion," + P + ".qol-completion>span{display:contents!important}",
                     P + ".building-card .entity-image," + P + ".building-card .building-desc," + P + ".building-card img:not(.game-resource-icon){display:none!important}",
                     P + "h4.building-name{" + col(COLS.name) + ";margin:0!important;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
                     P + ".building-category{" + col(COLS.type) + ";justify-self:start;font-size:12px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}",
@@ -8449,14 +8449,16 @@
                     P + ".building-level[data-nl2-bt-lv]{font-size:0!important}",
                     P + ".building-level[data-nl2-bt-lv] *{display:none!important}",
                     P + ".building-level[data-nl2-bt-lv]::before{content:attr(data-nl2-bt-lv);font-size:14px}",
-                    P + ".building-effect{" + col(COLS.effect) + ";display:flex!important;flex-wrap:nowrap!important;gap:6px;white-space:nowrap;overflow:hidden;font-size:13px;" + "padding:0!important}",
-                    P + ".building-effect>*{flex:0 0 auto;white-space:nowrap}",
+                    P + ".building-effect{" + col(COLS.effect) + ";display:flex!important;flex-wrap:wrap!important;gap:2px 6px;align-items:center;white-space:normal;overflow:hidden;font-size:13px;padding:0!important}",
+                    P + ".building-effect>*{flex:0 0 auto;white-space:nowrap;max-width:100%}",
+                    P + ".building-card>.building-effect{position:relative;padding-left:64px!important;box-sizing:border-box;min-height:18px!important}",
+                    P + ".building-effect>[data-nl2-bt-en]{position:absolute;left:0;top:50%;transform:translateY(-50%);width:58px;box-sizing:border-box;overflow:hidden}",
                     P + ".building-action-area>.nl2-roi{" + col(COLS.roi) + ";padding:0!important;font-size:14px;white-space:nowrap;overflow:hidden}",
                     P + ".building-costs>*{display:inline-flex!important;align-items:center;gap:3px;white-space:nowrap;overflow:hidden;justify-self:start;max-width:100%;font-size:14px;padding:0!important;background:none!important;border:0!important}",
                     [1, 2, 3, 4, 5].map((c) => P + ".building-costs>[data-nl2-bt-c=\"" + c + "\"]{" + col(COLS.cost1 + c - 1) + "}").join(""),
                     P + ".building-costs>.build-time{" + col(COLS.time) + "}",
                     P + ".building-costs>[data-nl2-bt-v]," + P + ".building-costs>[data-nl2-bt-v] *:not(img):not(svg){font-size:0!important}",
-                    P + ".building-costs>[data-nl2-bt-v]::before{content:attr(data-nl2-bt-v);font-size:14px;margin-right:3px}",
+                    P + ".building-costs>[data-nl2-bt-v]::after{content:attr(data-nl2-bt-v);font-size:14px;margin-left:3px}",
                     P + ".building-action-area>.upgrade-btn," + P + ".building-action-area>.construction-supply-trigger," + P + ".building-upgrading>.cancel-btn{" + col(COLS.btn) + ";" + BTN + "}",
                     P + ".building-action-area>.demolish-btn{" + col(COLS.roi) + ";width:100%!important;padding:2px 4px!important;min-height:0!important;height:24px!important;font-size:12px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}",
                     P + ".building-action-area:has(>.demolish-btn:not([style*=\"none\"]))>.nl2-roi{display:none!important}",
@@ -8467,10 +8469,9 @@
                     P + ".building-action-area>.construction-supply-trigger>span{font-size:0!important;overflow:hidden}",
                     P + ".building-action-area>.construction-supply-trigger>span::after{content:\"Bring resources\";font-size:13px}",
                     P + ".building-action-area>.construction-supply-trigger>svg{display:none!important}",
-                    P + ".building-upgrading-main{" + col(COLS.cost1, COLS.btn) + ";display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start;gap:8px;white-space:nowrap;overflow:hidden;" + FLAT + "}",
-                    P + ".building-upgrading-main *{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;margin:0!important;padding:0!important;white-space:nowrap;font-size:14px!important;line-height:1.2!important;" + "background:none!important;border:0!important}",
-                    P + ".building-upgrading-main time[data-nl2-bt-at]{font-size:0!important}",
-                    P + ".building-upgrading-main time[data-nl2-bt-at]::after{content:attr(data-nl2-bt-at);font-size:14px;color:#8a96a6}",
+                    P + ".building-upgrading-line>svg," + P + ".building-upgrading-separator," + P + ".qol-completion time{display:none!important}",
+                    P + ".building-upgrading-line>span:not(.building-upgrading-separator):not(.qol-completion){" + col(COLS.cost1, COLS.time) + ";justify-self:start;white-space:nowrap;overflow:hidden;font-size:14px!important;" + FLAT + "}",
+                    P + ".qol-completion .countdown{" + col(COLS.time) + ";justify-self:start;white-space:nowrap;font-size:14px!important;" + FLAT + "}",
                     P + ".building-action-area>.building-maxed{" + col(COLS.cost1, COLS.btn) + ";justify-self:start;" + FLAT + ";color:#4ade80;font-size:13px!important;letter-spacing:.5px;white-space:nowrap}",
                     P + ".building-action-area>.building-sentinel-disabled{" + col(COLS.roi, COLS.tools) + ";display:flex!important;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;" + FLAT + "}",
                     P + ".building-sentinel-disabled>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}",
@@ -8537,6 +8538,10 @@
                 NL.watch(".buildings-page .building-upgrading-main time", (t) => {
                     const m = /(\d{4}-\d\d-\d\d)[ T](\d\d:\d\d(?::\d\d)?)\s*UTC/i.exec(t.textContent || "");
                     setAttr(t, "data-nl2-bt-at", m ? NL.clock(m[1] + "T" + m[2] + "Z") : null);
+                });
+                NL.watch(".buildings-page .building-effect > *", (sp) => {
+                    const en = !!sp.querySelector("svg") && !sp.querySelector("img.game-resource-icon") && /^[+\-−]?\s*[\d.,]+(\/h)?$/.test((sp.textContent || "").trim());
+                    setAttr(sp, "data-nl2-bt-en", en ? "" : null);
                 });
                 NL.watch(".buildings-page[data-nl2-bt] .building-effect", (el) => {
                     const cut = el.scrollWidth > el.clientWidth + 1;
@@ -9549,19 +9554,19 @@
                     const b = (ps.buildings || []).find((x) => /research[\s_-]*lab/i.test(String((x.definition && (x.definition.key || x.definition.name)) || "")));
                     return b ? +b.level || 0 : null;
                 };
-                let us = null, usAsked = false;
+                let us = null, usAsked = false, rsS = null, speedSeen = 0;
                 function fragHave() {
                     if (!us && !usAsked) {
                         usAsked = true;
                         try {
                             const u = performance.getEntriesByType("resource").map((e) => e.name.split("?")[0]).find((n) => /\/mountApp[^/]*\.js$/.test(n));
                             if (u)
-                                import(u).then((mod) => { us = Object.values(mod).find((v) => { try {
-                                    return typeof v === "function" && typeof v.getState === "function" && "user" in v.getState();
+                                import(u).then((mod) => { const find = (key) => Object.values(mod).find((v) => { try {
+                                    return typeof v === "function" && typeof v.getState === "function" && key in v.getState();
                                 }
                                 catch (e) {
                                     return false;
-                                } }) || null; if (us)
+                                } }) || null; us = find("user"); rsS = find("startResearch"); if (us || rsS)
                                     NL._kick(); }).catch(() => { });
                         }
                         catch (e) { }
@@ -9574,6 +9579,39 @@
                     catch (e) { }
                     const m = /Precursor Fragments\s*\(([\d,]+)\s*available/i.exec((page() || {}).textContent || "");
                     return m ? +m[1].replace(/,/g, "") : 0;
+                }
+                function speedMult(list) {
+                    try {
+                        const m = rsS && +rsS.getState().researchSpeedMult;
+                        if (m > 0 && isFinite(m))
+                            return (speedSeen = m);
+                    }
+                    catch (e) { }
+                    if (!speedSeen)
+                        for (const it of list || []) {
+                            const c = cardFor(it.key), t = c && c.querySelector(".research-time"), base = +it.nextResearchTime || 0;
+                            const sec = t ? NL.parseDur ? NL.parseDur(t.textContent) : durSec(t.textContent) : 0;
+                            if (sec > 0 && base > 0) {
+                                speedSeen = sec / base;
+                                break;
+                            }
+                        }
+                    return speedSeen || 1;
+                }
+                const durSec = (txt) => { let s = 0; String(txt || "").replace(/(\d+)\s*([dhms])/g, (_, n, u) => { s += +n * { d: 86400, h: 3600, m: 60, s: 1 }[u]; }); return s; };
+                function fragCut(n) {
+                    let bonus = 0, mult = 0;
+                    try {
+                        const st = rsS && rsS.getState();
+                        bonus = +st.precursorFragmentEffectBonus || 0;
+                        mult = +st.precursorFragmentEffectMultiplierBonus || 0;
+                    }
+                    catch (e) { }
+                    return n > 0 ? Math.max(0.1, 1 - n * (0.05 + bonus) * (1 + mult)) : 1;
+                }
+                function timeView(sec, n) {
+                    const cut = fragCut(n);
+                    return { txt: NL.fmtDur(Math.round(sec * cut)), tip: n > 0 ? n + " fragment" + (n > 1 ? "s" : "") + " \u2212" + Math.round((1 - cut) * 100) + "%, from " + NL.fmtDur(Math.round(sec)) : null };
                 }
                 const fxSeen = ctx.store.get("fx", {});
                 let fxDirty = false;
@@ -9658,7 +9696,8 @@
                 const cardSeen = {};
                 function rowOf(it, byKey, ps, lab, have) {
                     const level = +it.level || 0, max = +it.maxLevel || 0;
-                    const r = { key: it.key, name: it.name || cap(it.key), type: cap(it.branch || ""), lv: level + "/" + (max || "?"), lab: it.requiredLabLevel != null ? String(it.requiredLabLevel) : "\u2014", fx: fxOf(it), time: NL.fmtDur(+it.nextResearchTime || 0), maxed: !!it.isMaxed };
+                    const r = { key: it.key, name: it.name || cap(it.key), type: cap(it.branch || ""), lv: level + "/" + (max || "?"), lab: it.requiredLabLevel != null ? String(it.requiredLabLevel) : "\u2014", fx: fxOf(it), sec: (+it.nextResearchTime || 0) * speedMult([it]), maxed: !!it.isMaxed };
+                    r.time = NL.fmtDur(Math.round(r.sec));
                     const cost = costOf(it);
                     let short = false;
                     r.cost = cost.map(([k, v]) => { const h = haveOf(ps.planet, k), s = h != null && h < v; if (s)
@@ -9761,7 +9800,17 @@
                     tbl.addEventListener("change", (e) => {
                         const sel = e.target.closest("select.nl2-retb-fr");
                         if (sel) {
-                            frags[sel.closest("tr").getAttribute("data-k")] = +sel.value || 0;
+                            const tr = sel.closest("tr");
+                            frags[tr.getAttribute("data-k")] = +sel.value || 0;
+                            const tc = tr.querySelector("td.nl2-retb-time");
+                            if (tc) {
+                                const tv = timeView(+tc.getAttribute("data-sec") || 0, +sel.value || 0);
+                                tc.textContent = tv.txt;
+                                if (tv.tip)
+                                    tc.setAttribute("data-nl2-tip", tv.tip);
+                                else
+                                    tc.removeAttribute("data-nl2-tip");
+                            }
                             return;
                         }
                         const cb = e.target.closest(".nl2-retb-hide input");
@@ -9783,7 +9832,12 @@
                         tr.appendChild(td("nl2-retb-cost nl2-retb-c2", costSlots(r)));
                     else
                         tr.appendChild(td("nl2-retb-cost", ...(r.cost.length ? r.cost.map((c) => NL.h("span", Object.assign({ class: c.s ? "nl2-r" : "" }, c.tip ? { "data-nl2-tip": c.tip } : {}), c.t)) : [NL.h("span", { class: "nl2-dim" }, "\u2014")])));
-                    tr.appendChild(td("", r.maxed || r.underway ? "\u2014" : r.time));
+                    if (r.maxed || r.underway)
+                        tr.appendChild(td("", "\u2014"));
+                    else {
+                        const tv = timeView(r.sec, Math.min(frags[r.key] || 0, r.fmax || 0));
+                        tr.appendChild(NL.h("td", Object.assign({ class: "nl2-retb-time", "data-sec": String(r.sec) }, tv.tip ? { "data-nl2-tip": tv.tip } : {}), tv.txt));
+                    }
                     tr.appendChild(NL.h("td", Object.assign({ class: r.roiCls || "" }, r.roiTip ? { "data-nl2-tip": r.roiTip } : {}), r.roi));
                     const st = NL.h("td", { class: r.stc, "data-nl2-tip": r.end ? (r.tip || r.st) + ", done " + NL.clock(r.end) : (r.tip || r.st) }, r.st);
                     if (r.end) {
@@ -18089,7 +18143,7 @@
                 const st = ctx.store, P = ".moon-view[data-nl2-mt] ";
                 const RES = ["ore", "silicates", "hydrogen", "alloys"];
                 const COLS = { name: 1, level: 2, effect: 3, slider: 4, roi: 5, cost1: 6, time: 11, btn: 12, tools: 13 };
-                const GRID = "165px 44px minmax(0,1fr) 112px 82px 56px 56px 56px 56px 50px 80px 104px 70px";
+                const GRID = "155px 40px minmax(0,1fr) 96px 74px 56px 56px 56px 56px 50px 80px 104px 70px";
                 const BTN = "width:104px!important;min-width:0!important;max-width:104px!important;box-sizing:border-box!important;justify-content:center!important;text-align:center!important;padding:2px 6px!important;min-height:0!important;height:24px!important;font-size:13px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;justify-self:end;display:inline-flex!important;align-items:center;gap:4px;flex:0 0 auto";
                 const FLAT = "padding:0!important;border:0!important;background:none!important;box-shadow:none!important;height:auto!important;min-height:0!important;width:auto!important;border-radius:0!important";
                 const col = (a, b) => "grid-column:" + a + (b ? "/" + b : "") + "!important";
@@ -18106,11 +18160,15 @@
                     P + ".entity-bcard-level{" + col(COLS.level) + ";justify-self:start;white-space:nowrap;" + FLAT + ";font-size:14px!important}",
                     P + ".entity-bcard-level[data-nl2-mt-lv]{font-size:0!important}",
                     P + ".entity-bcard-level[data-nl2-mt-lv]::before{content:attr(data-nl2-mt-lv);font-size:14px}",
-                    P + ".entity-bcard-stats{" + col(COLS.effect) + ";display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;gap:8px;white-space:nowrap;overflow:hidden;font-size:13px;" + FLAT + "}",
-                    P + ".entity-bcard-stat{display:inline-flex!important;align-items:center;gap:3px;white-space:nowrap;flex:0 0 auto}",
+                    P + ".entity-bcard-stats{" + col(COLS.effect) + ";display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:2px 8px;align-items:center;white-space:normal;overflow:hidden;font-size:13px;" + FLAT + "}",
+                    P + ".entity-bcard-stat{display:inline-flex!important;align-items:center;gap:3px;white-space:nowrap;flex:0 0 auto;max-width:100%}",
+                    P + ".entity-bcard-stats{position:relative;padding-left:72px!important;box-sizing:border-box;min-height:18px!important}",
+                    P + ".entity-bcard-stat[data-nl2-mt-en]{position:absolute;left:0;top:50%;transform:translateY(-50%);width:64px;overflow:hidden}",
+                    P + ".entity-bcard-stat[data-nl2-mt-en]>span{font-size:0!important}",
+                    P + ".entity-bcard-stat[data-nl2-mt-en]>span::after{content:attr(data-nl2-mt-en);font-size:13px}",
                     P + ".entity-bcard>.moon-power-slider{" + col(COLS.slider) + ";display:flex!important;flex-direction:row!important;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;" + FLAT + "}",
                     P + ".moon-power-slider>svg{display:none!important}",
-                    P + ".moon-power-slider>input{width:66px!important;min-width:0!important;flex:0 0 66px;margin:0!important}",
+                    P + ".moon-power-slider>input{width:54px!important;min-width:0!important;flex:0 0 54px;margin:0!important}",
                     P + ".moon-power-slider>.moon-power-value{font-size:13px;flex:0 0 auto}",
                     P + ".moon-bcard-footer>.nl2-moroi{" + col(COLS.roi) + ";padding:0!important;font-size:14px;white-space:nowrap;overflow:hidden}",
                     P + ".entity-bcard-costs>*{display:inline-flex!important;align-items:center;gap:3px;white-space:nowrap;overflow:hidden;justify-self:start;max-width:100%;font-size:14px;" + FLAT + "}",
@@ -18126,9 +18184,11 @@
                     P + ".moon-bcard-upgrade>.entity-btn[data-nl2-mt-up]{font-size:0!important}",
                     P + ".moon-bcard-upgrade>.entity-btn[data-nl2-mt-up]>svg{display:none!important}",
                     P + ".moon-bcard-upgrade>.entity-btn[data-nl2-mt-up]::after{content:\"\u2191 \" attr(data-nl2-mt-up);font-size:13px}",
-                    P + ".moon-bcard-footer>.moon-bcard-upgrading{" + col(COLS.cost1, COLS.tools) + ";display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start;gap:8px;white-space:nowrap;overflow:hidden;font-size:14px;" + FLAT + "}",
+                    P + ".moon-bcard-footer>.moon-bcard-upgrading{" + col(COLS.cost1, COLS.tools) + ";display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start;gap:6px;white-space:nowrap;overflow:hidden;font-size:14px;" + FLAT + "}",
                     P + ".moon-bcard-upgrading>*{flex:0 0 auto;margin:0!important}",
-                    P + ".moon-bcard-upgrading>button{margin-left:auto!important;" + BTN + "}",
+                    P + ".moon-bcard-upgrading>.countdown{margin-left:auto!important;flex:0 0 80px!important;width:80px;overflow:hidden}",
+                    P + ".moon-bcard-upgrading>button{margin-left:0!important;" + BTN + "}",
+                    P + ".moon-bcard-upgrading:not(:has(>.countdown))>button{margin-left:auto!important}",
                     P + ".moon-bcard-footer>.entity-max-level{" + col(COLS.cost1, COLS.btn) + ";justify-self:start;" + FLAT + ";color:#4ade80;font-size:13px!important;letter-spacing:.5px;white-space:nowrap}",
                     P + ".moon-bcard-footer>div:not(.moon-bcard-upgrade):not(.moon-bcard-upgrading):not(.nl2-moroi):not(.entity-max-level){" + col(COLS.roi) + ";overflow:hidden}",
                     P + ".moon-bcard-footer .entity-btn-demolish{width:100%!important;padding:2px 4px!important;min-height:0!important;height:24px!important;font-size:12px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
@@ -18162,6 +18222,13 @@
                         b.classList.add("nl2-c-blue");
                     const up = b.parentElement.querySelector(":scope > .entity-btn"), why = up ? (up.textContent || "").trim() : "";
                     NL.tip(b, "Bring missing resources" + (why ? "\nUpgrade: " + why : ""));
+                });
+                NL.watch(".moon-view .entity-bcard-stat", (st2) => {
+                    const sp = st2.querySelector(":scope > span"), m = sp && !st2.querySelector("img.game-resource-icon") && /^([+\-−]?\s*[\d.,]+)\s*energy$/i.exec((sp.textContent || "").trim());
+                    setAttr(st2, "data-nl2-mt-en", m ? m[1].replace(/\s+/g, "") : null);
+                    if (sp)
+                        setAttr(sp, "data-nl2-mt-en", m ? m[1].replace(/\s+/g, "") : null);
+                    NL.tip(st2, m ? sp.textContent.trim() : "");
                 });
                 NL.watch(".moon-view[data-nl2-mt] .entity-bcard-stats", (el) => {
                     NL.tip(el, el.scrollWidth > el.clientWidth + 1 ? [...el.children].map((k) => (k.textContent || "").trim()).filter(Boolean).join("  ") : "");
@@ -18265,6 +18332,7 @@
                     ".nl2-mthr-head h3{margin:0;font-size:18px;font-weight:700;color:#e6eefa}",
                     ".nl2-mthr-head .nl2-mthr-sp{flex:1}",
                     ".nl2-mthr-note{font-size:13.5px;color:#9fb0c8;margin:0 0 8px}",
+                    ".nl2-mthr-desc{margin:0 0 10px;padding-left:20px;font-size:14px;color:#9fb0c8}.nl2-mthr-desc li{margin:2px 0}.nl2-mthr-desc b{color:#e6eefa;font-weight:700}",
                     ".nl2-mthr table{border-collapse:collapse;table-layout:fixed;width:100%;max-width:1140px}",
                     ".nl2-mthr th,.nl2-mthr td{text-align:left;padding:3px 8px;height:30px;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(120,150,190,.15)}",
                     ".nl2-mthr th{font-size:13.5px;color:#9fb0c8;font-weight:600}",
@@ -18381,7 +18449,7 @@
                         NL.navBadgeChanged("/fleet"); });
                     const copy = NL.h("button", { type: "button", class: "nl2-c-blue", title: "Copy these thresholds to other moons" }, "Copy to other moons");
                     copy.addEventListener("click", () => copyDialog(id));
-                    box.append(NL.h("div", { class: "nl2-mthr-head" }, NL.h("h3", null, "Thresholds" + (m.name ? " \u00B7 " + String(m.name).replace(/\s*\[[^\]]*\]\s*$/, "") : "")), NL.h("span", { class: "nl2-mthr-sp" }), reset, copy), NL.h("div", { class: "nl2-mthr-note" }, "Under Maintain: a Supply row on Fleet > Transfer fills back to Supply. Over Collect: a Collect row takes everything above Supply. 0 = off."), table);
+                    box.append(NL.h("div", { class: "nl2-mthr-head" }, NL.h("h3", null, "Thresholds" + (m.name ? " \u00B7 " + String(m.name).replace(/\s*\[[^\]]*\]\s*$/, "") : "")), NL.h("span", { class: "nl2-mthr-sp" }), reset, copy), NL.h("ul", { class: "nl2-mthr-desc" }, NL.h("li", null, NL.h("b", null, "Maintain"), ": when the moon drops below this, Fleet > Transfer shows a Supply row. 0 = never supply."), NL.h("li", null, NL.h("b", null, "Supply"), ": a Supply run fills the moon back up to this (up to storage), and a Collect leaves this much behind."), NL.h("li", null, NL.h("b", null, "Collect"), ": when the moon goes above this, Fleet > Transfer shows a Collect row that takes everything above Supply. 0 = never collect.")), table);
                 }
                 function copyDialog(id) {
                     const others = moonList.filter((x) => String(x.id) !== String(id));

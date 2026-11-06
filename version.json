@@ -1,38 +1,22 @@
 {
-  "version": "0.5.99",
-  "built": "2026-11-06T07:24:47.880Z",
+  "version": "0.5.100",
+  "built": "2026-11-06T09:13:15.841Z",
   "items": [
-    "BU-026",
-    "FL-142",
-    "FL-144",
-    "FL-145",
-    "FL-146",
-    "FL-147",
-    "FL-148",
-    "FL-149",
-    "FL-150",
-    "FL-151",
-    "FL-152",
-    "FL-153",
-    "FL-154",
-    "FL-155",
-    "FL-156",
-    "FL-157",
-    "FL-158",
-    "FL-159",
-    "GL-177",
-    "GL-178",
-    "GL-180",
-    "MO-024",
-    "MO-025",
-    "MO-026",
-    "MO-027",
-    "MO-028",
-    "RE-022",
-    "SH-025"
+    "BU-027",
+    "MO-029",
+    "RE-023"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.100",
+      "items": [
+        "BU-027",
+        "MO-029",
+        "RE-023"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.99",
       "items": [
@@ -681,45 +665,6 @@
         "SH-012": "Shipyard hover says ship repairs",
         "GL-070": "One format for badge hovers",
         "GL-071": "Release notes link in the update bar"
-      }
-    },
-    {
-      "version": "0.5.80",
-      "items": [
-        "GL-060",
-        "GL-061",
-        "GL-062",
-        "GL-063",
-        "GL-064",
-        "MO-017",
-        "FL-055",
-        "FL-056",
-        "BU-015",
-        "GL-065",
-        "GL-066",
-        "EM-021",
-        "GL-067",
-        "GL-068",
-        "GL-069",
-        "OU-008"
-      ],
-      "notes": {
-        "GL-060": "Tasks hydrogen settings",
-        "GL-061": "Tasks moon supply settings",
-        "GL-062": "Tasks outpost settings",
-        "GL-063": "Tasks Bio uses Bio warning days",
-        "GL-064": "Bio warning days setting",
-        "MO-017": "Moon Collect keeps setting",
-        "FL-055": "Collect outpost at % setting",
-        "FL-056": "Bad run loss % setting",
-        "BU-015": "Build Next list size setting",
-        "GL-065": "PVE settings group",
-        "GL-066": "PVE source not tied to one planet",
-        "EM-021": "Fleet ratio targets start at 0",
-        "GL-067": "Generic example names",
-        "GL-068": "Published script has no comments",
-        "GL-069": "Old dashboard planet links off for new players",
-        "OU-008": "Relocate rows off Fleet Transfer"
       }
     }
   ]
