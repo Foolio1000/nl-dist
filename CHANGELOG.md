@@ -1,5 +1,44 @@
 # Release notes
 
+## v0.5.103 · Nov 6, 2026
+
+**🏴‍☠️ Pirates**
+- Hide camps, a cleaner contracts line, and Battle Reports that fit the page
+  <details><summary>Details</summary>
+
+  - A Hide button on each camp and a Hidden section; the Pirates tab badge counts visible camps only, in the game's badge style, never on the Fleet menu (FL-212)
+  - A camp you attacked stays out of the table until the fight (FL-213)
+  - Battle Reports fit the page width, with the buttons on the right and rare resources in one column (FL-211)
+  - Merchant Contracts line spaced out, no ✓, and "Claimed" in the same style as the other tags (FL-210)
+  </details>
+
+**♻️ Debris**
+- Two sections: piles to collect, and piles with a fleet already on them
+  <details><summary>Details</summary>
+
+  - Split table, new column order, and a clicked Collect moves its row down right away (FL-214)
+  - Send more is yellow (FL-219)
+  - The Debris tab badge counts only piles still to collect (FL-220)
+  </details>
+
+**🔭 Surveys and Mining**
+- Investigate rows leave the table as soon as you launch, and come back if the launch fails (FL-215)
+- "Anomaly: Anomaly Detected" now reads "Anomaly Detected" (FL-216)
+- Mining controls tidied: resource buttons top left, everything else top right, and the idle ships on one line (FL-217)
+
+**🛰 Fleet**
+- Fleet Active: no game icon before any mission name, Collect Debris included (FL-218)
+
+**🔔 Badges and dialogs**
+- Clicking the Messages badge opens the Messages window, like the menu item (GL-202)
+- Bring missing resources: hub rows read like planet rows, "all" or "short <resource> <amount>" (GL-201)
+
+**🔬 Research**
+- A gap between the visible rows and the "Hidden (N)" bar (RE-029)
+
+**🧩 Other**
+- STYLE.md: rules for rare resources in one column and the Hidden-bar gap
+
 ## v0.5.102 · Nov 6, 2026
 
 **🪐 Planet safety (the fix for data mixing between planets)**

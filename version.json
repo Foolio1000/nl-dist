@@ -1,52 +1,44 @@
 {
-  "version": "0.5.102",
-  "built": "2026-11-07T00:57:12.041Z",
+  "version": "0.5.103",
+  "built": "2026-11-07T02:21:21.825Z",
   "items": [
-    "SH-028",
-    "MO-031",
-    "MO-032",
-    "FL-189",
-    "GL-186",
-    "BU-032",
-    "BU-033",
-    "BU-034",
-    "GL-190",
-    "GL-191",
-    "GL-192",
-    "GL-193",
-    "GL-194",
-    "GL-195",
-    "GL-196",
-    "GL-197",
-    "GL-198",
-    "GL-199",
-    "GL-200",
-    "FL-187",
-    "FL-188",
-    "FL-190",
-    "FL-191",
-    "FL-192",
-    "FL-193",
-    "FL-194",
-    "FL-195",
-    "FL-196",
-    "FL-197",
-    "FL-198",
-    "FL-199",
-    "FL-200",
-    "FL-201",
-    "FL-202",
-    "FL-203",
-    "FL-204",
-    "FL-205",
-    "FL-206",
-    "FL-207",
-    "FL-208",
-    "FL-209",
-    "RE-028"
+    "FL-210",
+    "FL-211",
+    "FL-212",
+    "FL-213",
+    "FL-214",
+    "FL-215",
+    "FL-216",
+    "FL-217",
+    "FL-218",
+    "FL-219",
+    "FL-220",
+    "GL-201",
+    "GL-202",
+    "RE-029"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.103",
+      "items": [
+        "FL-210",
+        "FL-211",
+        "FL-212",
+        "FL-213",
+        "FL-214",
+        "FL-215",
+        "FL-216",
+        "FL-217",
+        "FL-218",
+        "FL-219",
+        "FL-220",
+        "GL-201",
+        "GL-202",
+        "RE-029"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.102",
       "items": [
@@ -740,27 +732,6 @@
         "RE-006": "Research: ROI on cards",
         "RE-007": "Research: hide researches",
         "RE-008": "Research badge: artifacts and trader summon"
-      }
-    },
-    {
-      "version": "0.5.83",
-      "items": [
-        "FL-066",
-        "FL-067",
-        "FL-068",
-        "FL-069",
-        "FL-070",
-        "GL-073",
-        "GL-074"
-      ],
-      "notes": {
-        "FL-066": "Fleet Active: own planet names in Route",
-        "FL-067": "Transfer tab no longer jumps to Active",
-        "FL-068": "Transfer: moon rows see ships on the moon",
-        "FL-069": "Spy reports table: Alliance and Player columns",
-        "FL-070": "Spy reports table: Intel level bullets",
-        "GL-073": "Top bar pills: even spacing",
-        "GL-074": "Deliver bar: no empty columns"
       }
     }
   ]
