@@ -1,5 +1,102 @@
 # Release notes
 
+## v0.5.102 · Nov 6, 2026
+
+**🪐 Planet safety (the fix for data mixing between planets)**
+- Every module now takes the planet from the game's planet switcher, never from the last planet it read
+  <details><summary>Details</summary>
+
+  - One shared "where am I" helper used by Shipyard, Fleet, Research, Buildings and Gather Fleets (GL-196)
+  - Fire Sale, Scout First Strike "Copy to…" and Fleet Evacuate use the planet on screen (GL-195)
+  - Sends and writes re-check the planet at the moment of the click and stop on a mismatch (GL-198)
+  - Research "Lab busy" counts only research on this planet (RE-028)
+  - The energy cost hover uses only the planet on screen (GL-196)
+  - A build check fails on any "last planet read" pattern, and per-planet tests use two planets with different data (GL-197, GL-199)
+  - Written rules for planet and server handling (GL-200)
+  </details>
+
+**🛰 Fleet tabs finished**
+- PVE page retired: its tables and settings now live in Fleet
+  <details><summary>Details</summary>
+
+  - No PVE link or page; PVE settings move to Custom > Fleet > PVE with the same values (GL-186)
+  </details>
+- Debris tab rebuilt
+  <details><summary>Details</summary>
+
+  - New control row with Table View, One click mode and Refresh (FL-197)
+  - A column per resource, Total, Expires, Nearest Planet, colour-coded Distance, Hide and Collect (FL-198)
+  - Public pirate-camp piles marked * and listed first (FL-199)
+  - Battle freight from survey reports shows here with Collect / Clear Pirates (FL-200)
+  - Piles being collected move to the bottom with "Send more" (FL-201)
+  </details>
+- Mining and Surveys tables cleaned up
+  <details><summary>Details</summary>
+
+  - Mining: One click mode with a 1x / 2x / 4x / 8x multiplier (FL-192)
+  - Mining: a Total Trip column (FL-193)
+  - Mining: no inner scroll, fixed widths, sortable headers and an even control row (FL-194)
+  - Surveys: nearest 20 plus Show more, an inline Range field, and Investigate above the Survey table (FL-195)
+  - Table controls on one row, top right, on every Fleet tab (FL-196, GL-190)
+  </details>
+- Pirates tab tidied
+  <details><summary>Details</summary>
+
+  - Battle Reports as a Table View (FL-205)
+  - Merchant Contracts condensed into one line (FL-206)
+  - The game's Active Missions section hidden (Fleet > Active lists them) (FL-207)
+  </details>
+- Wormholes sorted by trip time
+  <details><summary>Details</summary>
+
+  - Active Runs: a Trip time column, shortest first, with runs waiting for your decision in their own table on top (FL-202)
+  - Detected Wormholes: Hide + Attack only, already-sent wormholes left out, "n hidden · Show all" at the top right (FL-203)
+  </details>
+- Fleet Active shows outpost relocations, and the Active tab counts only fleets using a slot
+  <details><summary>Details</summary>
+
+  - Relocation rows show RELOCATION with the outpost name and no Recall (FL-189)
+  - "Active (N)" matches "Uses fleet slots (N)" (FL-204)
+  </details>
+
+**🔕 Quieter badges**
+- Silenced reports stay silent on the Fleet tabs and the unread chip too, and new targets badge only their own tab
+  <details><summary>Details</summary>
+
+  - Silenced reports are silent on tab badges and the "N unread" chip, Reports tab included (FL-187)
+  - New Pirate Camps and unexplored Wormholes badge their own tab, cleared on attack or run (FL-188)
+  - Open investigations badge the Surveys tab, cleared on Investigate / Collect (FL-190)
+  - Expedition and Wormhole run reports never badge; runs waiting for Continue / Retreat still do (FL-191)
+  </details>
+- Messages badge hover groups unread messages by type, with click targets (GL-191)
+
+**🌙 Moons**
+- Moon Scans table modernized, ready scans first, with a "Sectors on cooldown" table (MO-032)
+- An upgrading row's cancel reads "× Cancel" (MO-031)
+
+**🏗 Buildings**
+- Hide is protected: a bulk-write guard, a change log and Unhide all (BU-033)
+- Times line up (no clock icon), and "No rare resource on this planet" shows only on the Rare Resource Extractor (BU-032, BU-034)
+
+**🚢 Shipyard**
+- Build on all planets: one dialog with a ship's build row for every planet (SH-028)
+
+**💬 Hovers**
+- Hovers appear at the cursor, only when the text is actually cut short, and no longer repeat button labels
+  <details><summary>Details</summary>
+
+  - A hover that only repeats the field's text is skipped unless the field is cut (GL-192)
+  - The hover appears at the cursor and stays put; left-menu badge hovers stay on the badge (GL-193)
+  - Button hovers that only reword the label are dropped (GL-194)
+  </details>
+
+**🐛 Fixes**
+- Surveys no longer offers systems still on their 2-hour cooldown (FL-208)
+- Transfer: paused routes no longer count as covering a pickup (FL-209)
+
+**🧩 Other**
+- Four flaky tests fixed (time of day, a badge redraw race, and two test inputs)
+
 ## v0.5.101 · Nov 6, 2026
 
 **🧭 PVE moves into Fleet**

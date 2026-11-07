@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.101
+// @version      0.5.102
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.101", features: [] };
+    const NL = window.__nl2 = { version: "0.5.102", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -153,6 +153,8 @@
     NL.tipsOn = true;
     NL.tipAmber = true;
     NL.tipSteady = true;
+    NL.tipTrim = true;
+    NL.tipSmart = true;
     Object.defineProperty(NL, "tipA", { get: () => (NL.tipsOn ? "data-nl2-tip" : "title"), configurable: true });
     NL.tip = function (el, text) {
         if (!el)
@@ -324,19 +326,56 @@
             const r = el.getBoundingClientRect();
             return !!tipRect && Math.abs(r.left - tipRect.left) < 2 && Math.abs(r.top - tipRect.top) < 2 && Math.abs(r.width - tipRect.width) < 2 && Math.abs(r.height - tipRect.height) < 2;
         };
-        const show = (el) => {
-            const text = el.getAttribute("data-nl2-tip");
+        let mouseX = 0, mouseY = 0;
+        document.addEventListener("mousemove", (e) => { mouseX = e.clientX; mouseY = e.clientY; }, { capture: true, passive: true });
+        const squash = (t) => String(t || "").replace(/[\s\u00a0]+/g, "");
+        const isCut = (el) => {
+            const all = [el, ...el.querySelectorAll("*")].slice(0, 60);
+            return all.some((k) => { const cs = getComputedStyle(k); return (k.clientWidth > 0 && k.scrollWidth > k.clientWidth + 1 && cs.overflowX !== "visible") || (k.clientHeight > 0 && k.scrollHeight > k.clientHeight + 1 && cs.overflowY !== "visible"); });
+        };
+        const repeats = (el, text) => squash(text) === squash(el.innerText != null ? el.innerText : el.textContent) && !isCut(el);
+        const TIP_TRIM = ".nl2-frp-ab, .nl2-crtv-cb, [data-nl2-col], .nl2-bt-cb, .nl2-shl-cb, .nl2-mt-cb, .nl2-mb-max, .nl2-emr-x, .nl2-replan-err > button, .nl2-next-x, .nl2-flw-cx, .nl2-ou-pan h3 > button";
+        const show = (el, keep) => {
+            let text = el.getAttribute("data-nl2-tip");
             if (!text || !el.isConnected)
                 return;
+            const trim = NL.tipTrim && el.matches && el.matches(TIP_TRIM);
+            if (trim) {
+                text = String(el.innerText || "").replace(/\s+/g, " ").trim();
+                if (!text || !isCut(el)) {
+                    tipRect = el.getBoundingClientRect();
+                    if (tipEl)
+                        tipEl.style.display = "none";
+                    return;
+                }
+            }
             if (!tipEl) {
                 NL.css("tip", `.nl2-tip{position:fixed;z-index:100000;max-width:320px;padding:6px 10px;border-radius:6px;background:rgba(8,16,32,.97);border:1px solid rgba(56,189,248,.3);box-shadow:0 6px 24px rgba(0,0,0,.5);color:${NL.tipAmber ? "#fcd34d" : "#f1f6ff"};font:500 15px/1.35 Rajdhani,"Exo 2",system-ui,sans-serif;white-space:pre-line;pointer-events:none}`);
                 tipEl = NL.h("div", { class: "nl2-tip", role: "tooltip" });
                 document.body.appendChild(tipEl);
             }
+            if (NL.tipSmart && repeats(el, text)) {
+                tipRect = el.getBoundingClientRect();
+                tipEl.style.display = "none";
+                return;
+            }
+            const up = tipEl.style.display === "block";
             tipEl.textContent = text;
             tipEl.style.display = "block";
             const r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
             tipRect = r;
+            if (NL.tipSmart && !(el.closest && el.closest(".sidebar-nav"))) {
+                if (keep && up)
+                    return;
+                let x = mouseX + 14, y = mouseY + 18;
+                if (x + w > innerWidth - 4)
+                    x = mouseX - w - 10;
+                if (y + h > innerHeight - 4)
+                    y = mouseY - h - 10;
+                tipEl.style.left = Math.round(Math.min(Math.max(4, x), innerWidth - w - 4)) + "px";
+                tipEl.style.top = Math.round(Math.max(4, y)) + "px";
+                return;
+            }
             let x = r.right + 8, y = r.top + r.height / 2 - h / 2;
             if (x + w > innerWidth - 4)
                 x = Math.max(4, r.left - w - 8);
@@ -353,7 +392,7 @@
                 const up = tipEl && tipEl.style.display === "block";
                 tipFor = el;
                 if (up)
-                    show(el);
+                    show(el, true);
                 return;
             }
             hide();
@@ -5225,6 +5264,7 @@
                 return true;
             },
         };
+        NL.badges.types = BG_TYPES;
         async function bgOpenTransfer() {
             if (location.pathname !== "/fleet") {
                 const a = document.querySelector(".sidebar-nav a.sidebar-link[href=\"/fleet\"]:not(.nl2-mirror)");
@@ -5499,6 +5539,242 @@
             document.addEventListener("mousedown", (e) => { if ((isOpen() || pending) && !(menu && menu.contains(e.target)))
                 close(); }, true);
         }
+    }
+    {
+        NL.msgBadge = true;
+        const MB_PATH = "/messages";
+        const mbRx = { uc: /^\/api\/messages\/unread-count(\?|$)/, sys: /^\/api\/messages\/system\?(.*&)?page=1(&|$)|^\/api\/messages\/system$/, conv: /^\/api\/messages\/conversations(\?|$)/ };
+        const mbLinks = new Map();
+        const mbNames = (a) => (a.length > 3 ? a.slice(0, 3).join(", ") + " +" + (a.length - 3) : a.join(", "));
+        const mbStrip = (s) => String(s || "").replace(/\[\[[^\]]*\]\]/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\s+/g, " ").trim();
+        function mbClassify(m) {
+            const s = String(m.subject || ""), raw = String(m.body || ""), b = mbStrip(raw);
+            const rep = (raw.match(/\]\((\/fleet[^)\s]*battleReport[^)\s]*)\)/i) || [])[1] || "";
+            let x;
+            if (/^reconnaissance detected/i.test(s)) {
+                const who = (raw.match(/belonging to \[([^\]]+)\]/i) || b.match(/belonging to (.+?) was/i) || [])[1] || "enemy", at = (b.match(/intercepted at (.+?)\./i) || [])[1] || "";
+                return { kind: "spyCaught", text: who + (at ? " at " + at : ""), href: rep };
+            }
+            if (/^reconnaissance intercepted/i.test(s))
+                return { kind: "spyLost", text: (b.match(/intercepted at (.+?)\./i) || [])[1] || "scout", href: rep };
+            if (/station/i.test(s) && /captur|attack|siege|defen/i.test(s + " " + b))
+                return { kind: "station", text: s };
+            if (/asteroid field depleted/i.test(s))
+                return { kind: "field", text: (raw.match(/outpost\s+"([^"]+)"/i) || [])[1] || "outpost" };
+            if (/^artifact expired/i.test(s))
+                return { kind: "artExpired", text: (raw.match(/artifact\s+"([^"]+)"/i) || [])[1] || "artifact" };
+            if (/^artifact identified/i.test(s)) {
+                x = b.match(/identified an? (\w+) artifact: (.+?)!/i);
+                return { kind: "artIdent", text: x ? x[2] + " " + x[1].toLowerCase() : "artifact" };
+            }
+            if (/^artifact recovered/i.test(s))
+                return { kind: "artFound" };
+            if (/xeno survey/i.test(s))
+                return { kind: "xeno" };
+            if (/command vessel reward|crew member recruited/i.test(s + " " + b)) {
+                x = b.match(/recruited: (.+?), "([^"]+)" \((\w+)\)/i);
+                return { kind: "crew", text: x ? x[1] + " " + x[3].toLowerCase() : "crew" };
+            }
+            if (/livery code has been recovered/i.test(b))
+                return { kind: "livery", text: (b.match(/recovered: (.+?)\.(\s|$)/i) || [])[1] || "livery" };
+            if (/pact accepted/i.test(s))
+                return { kind: "pact", text: (b.match(/^(.+?) accepted/i) || [])[1] || "player" };
+            return { kind: "other", text: s || "message" };
+        }
+        const MB_KIND = {
+            spyCaught: [0, "Spy caught", true],
+            player: [1, "Player message", true],
+            station: [2, "Station notice", true],
+            field: [3, "Field depleted", true],
+            artExpired: [4, "Artifact expired"],
+            spyLost: [5, "Spy lost", true],
+            artIdent: [6, "Artifact identified"],
+            artFound: [6, "Artifact found"],
+            xeno: [6, "Xeno survey"],
+            crew: [6, "Crew recruited"],
+            livery: [7, "Livery"],
+            pact: [7, "Pact accepted"],
+            other: [8, "System message"],
+        };
+        function mbBuild(st) {
+            const uc = st.uc, items = [];
+            const gone = (m) => st.readIds.has(m.id) || st.allSysRead(m);
+            let sys = (st.sys || []).filter((m) => m && !m.isRead && !gone(m)).sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
+            const convs = (st.conv || []).filter((c) => c && +c.unreadCount > 0 && !st.readConv.has(c.id));
+            const stale = uc && st.writeAt > st.ucAt;
+            const offS = stale ? (st.sys || []).filter((m) => m && !m.isRead && gone(m)).length : 0;
+            const offP = stale ? (st.conv || []).filter((c) => c && +c.unreadCount > 0 && st.readConv.has(c.id)).reduce((t, c) => t + +c.unreadCount, 0) : 0;
+            let pl = 0;
+            for (const c of convs)
+                pl += +c.unreadCount;
+            const sysN = uc ? Math.max(0, (+uc.systemCount || 0) - offS) : sys.length, plN = uc ? Math.max(0, (+uc.playerCount || 0) - offP) : pl;
+            sys = sys.slice(0, sysN);
+            for (const m of sys)
+                items.push(mbClassify(m));
+            for (const c of convs)
+                items.push({ kind: "player", text: (c.otherUsername || "player") + " " + c.unreadCount });
+            const lines = [];
+            mbLinks.clear();
+            const by = {};
+            for (const it of items)
+                (by[it.kind] = by[it.kind] || []).push(it);
+            for (const k of Object.keys(MB_KIND).sort((a, b) => MB_KIND[a][0] - MB_KIND[b][0])) {
+                const g = by[k];
+                if (!g)
+                    continue;
+                const [, label, each] = MB_KIND[k];
+                if (each)
+                    for (const it of g) {
+                        const l = label + ": " + it.text;
+                        if (!lines.includes(l)) {
+                            lines.push(l);
+                            if (it.href)
+                                mbLinks.set(l, it.href);
+                        }
+                    }
+                else if (g[0].text == null)
+                    lines.push(label + ": " + g.length);
+                else
+                    lines.push(label + ": " + mbNames(g.map((it) => it.text)));
+            }
+            const moreS = sysN - sys.length, moreP = plN - Math.min(pl, plN);
+            if (moreS > 0)
+                lines.push("System message: " + moreS + " more");
+            if (moreP > 0)
+                lines.push("Player message: " + moreP + " more");
+            const n = uc ? sysN + plN : sys.length + pl;
+            return { n, tip: n > 0 ? lines.join("\n") : "", moreS, moreP };
+        }
+        NL.msgBadgeBuild = mbBuild;
+        function mbTypes() {
+            const T = NL.badges && NL.badges.types;
+            if (!T || T.__mb)
+                return;
+            T.__mb = true;
+            const SYS = () => ({ page: MB_PATH, tab: /^system/i }), ART = () => ({ research: "artifacts", tab: /^\s*artifacts/i });
+            const add = (re, rank, go) => T.push({ re, rank, go });
+            add(/^Spy caught:/, 0, (l) => (mbLinks.get(l) ? { page: mbLinks.get(l) } : SYS()));
+            add(/^Player message:/, 1, () => ({ page: MB_PATH, tab: /^players/i }));
+            add(/^Station notice:/, 2, () => ({ page: "/alliance/station-operations" }));
+            add(/^Field depleted:/, 3, () => ({ outpost: true }));
+            add(/^Artifact expired:/, 4, ART);
+            add(/^Spy lost:/, 5, (l) => (mbLinks.get(l) ? { page: mbLinks.get(l) } : SYS()));
+            add(/^(Artifact identified|Artifact found|Xeno survey):/, 6, ART);
+            add(/^Crew recruited:/, 6, () => ({ page: "/leadership" }));
+            add(/^(Livery|Pact accepted):/, 7, SYS);
+            add(/^System message:/, 8, SYS);
+        }
+        NL.feature({
+            id: "gl-msg-badge",
+            set: "Global",
+            name: "Messages badge",
+            desc: "GL-191: the Messages menu badge shows the game's unread number; its hover lists the unread messages by type (scouts caught, player messages, station notices, depleted fields, artifacts, crew, other), each line opening what it is about.",
+            init(ctx) {
+                if (!NL.msgBadge)
+                    return;
+                if (NL.badgeReg)
+                    NL.badgeReg[MB_PATH] = true;
+                mbTypes();
+                NL.css("gl-msg-badge", `.sidebar-nav .nl2-mirror[data-nl2-path="${MB_PATH}"].nl2-mb-on > .sidebar-badge:not(.nl2-idlebadge){display:none!important}`);
+                let sysIds = new Set(), sysAllAt = 0;
+                const st = { uc: null, ucAt: 0, writeAt: 0, sys: null, conv: null, readIds: new Set(), readConv: new Set(), allSysRead: (m) => sysAllAt > 0 && (Date.parse(m.createdAt) || 0) <= sysAllAt };
+                const own = { sys: 0, conv: 0 };
+                let t = 0;
+                const paint = () => {
+                    const r = mbBuild(st);
+                    NL.navBadges[MB_PATH] = NL.navBadges[MB_PATH] || {};
+                    NL.navBadges[MB_PATH].messages = { n: r.n, tip: r.tip };
+                    for (const a of document.querySelectorAll(`.sidebar-nav .nl2-mirror[data-nl2-path="${MB_PATH}"]`))
+                        a.classList.toggle("nl2-mb-on", r.n > 0);
+                    if (NL.navBadgeChanged)
+                        NL.navBadgeChanged(MB_PATH);
+                    clearTimeout(t);
+                    if ((r.moreS > 0 || r.moreP > 0) && !(st.writeAt > st.ucAt))
+                        t = setTimeout(() => {
+                            const now = Date.now(), again = mbBuild(st);
+                            if (st.writeAt > st.ucAt)
+                                return;
+                            if (again.moreS > 0 && now - own.sys > 30000) {
+                                own.sys = now;
+                                NL.getJson("/api/messages/system?page=1", ctx);
+                            }
+                            if (again.moreP > 0 && now - own.conv > 30000) {
+                                own.conv = now;
+                                NL.getJson("/api/messages/conversations", ctx);
+                            }
+                        }, 1500);
+                };
+                NL.onData(mbRx.uc, (p, d, at) => { if (d && typeof d === "object") {
+                    st.uc = d;
+                    st.ucAt = at || Date.now();
+                    paint();
+                } });
+                NL.onData(mbRx.sys, (p, d) => {
+                    const list = (d && (d.notifications || d.messages)) || [];
+                    if (!Array.isArray(list))
+                        return;
+                    st.sys = list;
+                    sysIds = new Set(list.map((m) => m && m.id));
+                    st.readIds.clear();
+                    sysAllAt = 0;
+                    paint();
+                });
+                NL.onData(mbRx.conv, (p, d) => { const c = d && d.conversations; if (Array.isArray(c)) {
+                    st.conv = c;
+                    st.readConv.clear();
+                    paint();
+                } });
+                let ucT = 0;
+                NL.onWrite(/^\/api\/messages\//, (path) => {
+                    const ids = (path.match(/\d+/g) || []).map(Number);
+                    if (/conversation/i.test(path))
+                        ids.forEach((i) => st.readConv.add(i));
+                    else if (/system|notification/i.test(path) && /all/i.test(path) && !ids.length)
+                        sysAllAt = Date.now();
+                    else
+                        ids.forEach((i) => { if (sysIds.has(i))
+                            st.readIds.add(i); });
+                    st.writeAt = Date.now();
+                    paint();
+                    const at = Date.now();
+                    clearTimeout(ucT);
+                    ucT = setTimeout(() => { const c = NL.cache.latest(mbRx.uc); if (!c || c.at < at)
+                        NL.getJson("/api/messages/unread-count", ctx); }, 2000);
+                });
+                const openConv = (line) => {
+                    const name = String(line || "").replace(/^Player message:\s*/, "").replace(/\s+\d+$/, "");
+                    if (!name || / more$/.test(line))
+                        return;
+                    let tries = 0;
+                    const step = () => {
+                        const it = location.pathname === MB_PATH && [...document.querySelectorAll(".messages-page .conv-item")].find((x) => ((x.querySelector(".conv-name") || {}).textContent || "").trim() === name);
+                        if (it) {
+                            if (!it.classList.contains("active"))
+                                (NL.quietClick || ((e) => e.click()))(it);
+                            return;
+                        }
+                        if (++tries < 50)
+                            setTimeout(step, 100);
+                    };
+                    setTimeout(step, 150);
+                };
+                window.addEventListener("click", (e) => {
+                    const it = e.target.closest && e.target.closest(".nl2-bmenu-i");
+                    let line = it && !it.classList.contains("nl2-bmenu-off") ? it.getAttribute("data-line") : "";
+                    if (!it) {
+                        const bd = e.target.closest && e.target.closest(`.sidebar-nav .nl2-mirror[data-nl2-path="${MB_PATH}"] > .nl2-idlebadge`);
+                        line = bd ? (bd.getAttribute("data-nl2-tip") || "").split("\n")[0] : "";
+                    }
+                    if (/^Player message:/.test(line || ""))
+                        openConv(line);
+                }, true);
+                NL.watch(`.sidebar-nav .nl2-mirror[data-nl2-path="${MB_PATH}"]`, () => {
+                    const r = NL.navBadges[MB_PATH] && NL.navBadges[MB_PATH].messages;
+                    for (const a of document.querySelectorAll(`.sidebar-nav .nl2-mirror[data-nl2-path="${MB_PATH}"]`))
+                        a.classList.toggle("nl2-mb-on", !!(r && r.n > 0));
+                });
+            },
+        });
     }
     {
         NL.feature({
@@ -7120,6 +7396,57 @@
         });
     }
     {
+        NL.gl195 = true;
+        NL.gl196 = true;
+        {
+            const clean = (s) => String(s || "").replace(/\s*\[[^\]]*\]\s*$/, "").trim();
+            const switcherName = () => { const el = document.querySelector(".planet-switcher-btn .ps-name"); return el ? clean(el.textContent) : ""; };
+            NL.herePlanetId = () => {
+                const name = switcherName();
+                if (!NL.gl196) {
+                    if (!name)
+                        return null;
+                    const h0 = NL.cache.all(/^\/api\/planets\/\d+$/).filter((v) => { const p = v.data && (v.data.planet || v.data); return p && clean(p.name) === name; });
+                    if (h0.length)
+                        return Number(h0.sort((a, b) => b.at - a.at)[0].path.split("/").pop());
+                    const sum0 = NL.cache.latest(/^\/api\/planets\/activity-summary(\?|$)/), sp0 = sum0 && sum0.data && Array.isArray(sum0.data.planets) ? sum0.data.planets : [];
+                    const s0 = sp0.find((p) => p && clean(p.planetName || p.name) === name);
+                    if (s0)
+                        return Number(s0.planetId != null ? s0.planetId : s0.id);
+                    const l0 = NL.cache.latest(/^\/api\/planets$/), lp0 = l0 && l0.data ? (Array.isArray(l0.data) ? l0.data : l0.data.planets || []) : [];
+                    const q0 = lp0.find((x) => x && clean(x.name) === name);
+                    return q0 ? Number(q0.id) : null;
+                }
+                if (!name || /^\/moons\//.test(location.pathname))
+                    return null;
+                const hits = NL.cache.all(/^\/api\/planets\/\d+$/).filter((v) => { const p = v.data && (v.data.planet || v.data); return p && clean(p.name) === name; });
+                if (hits.length)
+                    return Number(hits[0].path.split("/").pop());
+                const sum = NL.cache.latest(/^\/api\/planets\/activity-summary(\?|$)/), sp = sum && sum.data && Array.isArray(sum.data.planets) ? sum.data.planets : [];
+                const s = sp.filter((p) => p && clean(p.planetName || p.name) === name);
+                if (s.length === 1)
+                    return Number(s[0].planetId != null ? s[0].planetId : s[0].id);
+                const l = NL.cache.latest(/^\/api\/planets$/), lp = l && l.data ? (Array.isArray(l.data) ? l.data : l.data.planets || []) : [];
+                const p = lp.filter((x) => x && clean(x.name) === name);
+                return p.length === 1 ? Number(p[0].id) : null;
+            };
+            NL.here = () => {
+                const mm = location.pathname.match(/^\/moons\/(\d+)/);
+                if (mm)
+                    return { kind: "moon", id: Number(mm[1]), name: switcherName() };
+                const id = NL.herePlanetId();
+                return id == null ? null : { kind: "planet", id, name: switcherName() };
+            };
+            NL.hereGuard = (id, kind) => {
+                const h = NL.here();
+                if (h && h.kind === (kind || "planet") && h.id === Number(id))
+                    return "";
+                return "Stopped: the " + (kind || "planet") + " on screen changed" + (h && h.name ? " (now " + h.name + ")" : "") + ". Nothing was sent.";
+            };
+            NL.forPlanet = (list, id, key) => (Array.isArray(list) && id != null ? list.filter((x) => x && x[key || "planetId"] != null && Number(x[key || "planetId"]) === Number(id)) : []);
+        }
+    }
+    {
         NL.planetPick = true;
         (() => {
             let rank = null;
@@ -7219,6 +7546,8 @@
                     const off = !NL.evacuate || !(NL.evacuateReady && NL.evacuateReady());
                     if (b.disabled !== off)
                         b.disabled = off;
+                    if (NL.gl195)
+                        NL.tip(b, off && NL.evacuate ? "Waiting for this planet's data" : "Evacuate every ship and the resources from this planet");
                 });
             },
         });
@@ -7268,7 +7597,8 @@
       .nl2-ov-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
       .nl2-ov-cancel{background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.25);color:#7ed4ff;border-radius:4px;padding:5px 14px;font:inherit;cursor:pointer;text-align:center}`);
                 const fresh = (re) => { const c = NL.cache.latest(re); return c && Date.now() - c.at < OV_FRESH ? c : null; };
-                const planetId = () => { const l = NL.cache.latest(/^\/api\/planets\/\d+$/); return l ? Number(l.path.split("/").pop()) : null; };
+                const planetId = () => { if (NL.gl195 && NL.herePlanetId)
+                    return NL.herePlanetId(); const l = NL.cache.latest(/^\/api\/planets\/\d+$/); return l ? Number(l.path.split("/").pop()) : null; };
                 let lastReq = 0;
                 async function gap() {
                     const wait = lastReq + 1000 - Date.now();
@@ -7520,6 +7850,13 @@
                     if (!dlg || dlg.busy || amt < OV_MIN || !dlg.data.hub)
                         return;
                     const me = dlg, pid = me.pid, ask = ovAsk(res, amt);
+                    if (NL.gl196) {
+                        const g = NL.hereGuard(pid);
+                        if (g) {
+                            say(g, true);
+                            return;
+                        }
+                    }
                     me.busy = "p" + res;
                     delete me.why["p" + res];
                     say("");
@@ -7610,7 +7947,7 @@
                     const gx = gxNow();
                     if (gx == null)
                         gxEnsure();
-                    NL.tip(b, gx ? tip : gx == null ? "Checking research\u2026" : "Needs Galactic Exchange research (Remote Trading)");
+                    NL.tip(b, NL.gl195 && !pid ? "Waiting for this planet's data" : gx ? tip : gx == null ? "Checking research\u2026" : "Needs Galactic Exchange research (Remote Trading)");
                     const off = !pid || !gx;
                     if (b.disabled !== off)
                         b.disabled = off;
@@ -7637,7 +7974,8 @@
       .nl2-dc-list label{display:flex;align-items:center;gap:8px;cursor:pointer}
       .nl2-dc-list label.nl2-dc-all{border-bottom:1px solid rgba(116,176,232,.2);padding-bottom:4px;margin-bottom:2px}
       .nl2-dc-st{margin-left:auto;font-size:13px}.nl2-dc-ok{color:#4ade80}.nl2-dc-bad{color:#f87171}`);
-                const planetId = () => { const l = NL.cache.latest(/^\/api\/planets\/\d+$/); return l ? Number(l.path.split("/").pop()) : null; };
+                const planetId = () => { if (NL.gl195 && NL.herePlanetId)
+                    return NL.herePlanetId(); const l = NL.cache.latest(/^\/api\/planets\/\d+$/); return l ? Number(l.path.split("/").pop()) : null; };
                 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                 let lastCall = 0, busy = false;
                 async function call(method, path, body) {
@@ -7694,6 +8032,13 @@
                     const picked = rows.filter((r) => r.cb.checked);
                     if (!picked.length || busy)
                         return;
+                    if (NL.gl196) {
+                        const g = NL.hereGuard(src);
+                        if (g) {
+                            note.textContent = g;
+                            return;
+                        }
+                    }
                     busy = true;
                     ok.disabled = true;
                     rows.forEach((r) => { r.cb.disabled = true; r.st.textContent = ""; r.st.className = "nl2-dc-st"; });
@@ -7763,6 +8108,8 @@
                     const off = !planetId();
                     if (b.disabled !== off && !busy)
                         b.disabled = off;
+                    if (NL.gl195)
+                        NL.tip(b, off ? "Waiting for this planet's data" : "Copy this planet's Scout First Strike order to other planets");
                 });
             },
         });
@@ -7959,7 +8306,7 @@
         const BU_RATE_MAX_AGE = 3600 * 1000;
         const BU_GROWTH = 1.07;
         try {
-            NL.css("bu-cards-shared", ".nl2-cardtools{position:absolute;top:30px;right:10px;display:flex;align-items:center;gap:6px;z-index:2}.nl2-hide{display:flex;align-items:center;gap:4px;font-size:11px;color:#8a96a6;cursor:pointer;z-index:2}.nl2-hide input{margin:0;cursor:pointer}.building-card-header{position:relative}.nl2-hidbar{order:9998;grid-column:1/-1;flex-basis:100%;padding:8px 12px;margin-top:6px;border:1px solid #2a3a52;border-radius:6px;color:#c9d4e3;font-weight:600;cursor:pointer;user-select:none}.nl2-hidbar:hover{background:#13213a}");
+            NL.css("bu-cards-shared", ".nl2-cardtools{position:absolute;top:30px;right:10px;display:flex;align-items:center;gap:6px;z-index:2}.nl2-hide{display:flex;align-items:center;gap:4px;font-size:11px;color:#8a96a6;cursor:pointer;z-index:2}.nl2-hide input{margin:0;cursor:pointer}.building-card-header{position:relative}.nl2-hidbar{order:9998;grid-column:1/-1;flex-basis:100%;padding:8px 12px;margin-top:6px;border:1px solid #2a3a52;border-radius:6px;color:#c9d4e3;font-weight:600;cursor:pointer;user-select:none}.nl2-hidbar:hover{background:#13213a}.nl2-hidbar:has(>.nl2-unhide){display:flex;align-items:center;justify-content:space-between;gap:8px}.nl2-hidbar>.nl2-unhide{padding:2px 10px;font-size:12px;min-height:0;cursor:pointer;text-align:center}");
         }
         catch (e) {
             console.warn("[NL] bu-cards-shared css failed", e);
@@ -8128,6 +8475,7 @@
             }, 60000);
             return { alerts, onChange: (fn) => subs.push(fn), age: () => (snap ? Date.now() - snap.at : null) };
         })();
+        NL.buHideGuard = true;
         NL.feature({
             id: "bu-roi",
             set: "Buildings",
@@ -8138,13 +8486,19 @@
                 const { ensureRates, roiClass, roiSeconds, ageTxt, hasRates } = NL.buRoi;
                 NL.buRoi.onChange(() => decorateAll());
                 const onScreen = () => {
-                    const all = NL.cache.all(/^\/api\/planets\/\d+$/).filter((v) => v.data && v.data.buildings);
-                    const el = document.querySelector(".planet-switcher-btn .ps-name");
-                    if (!el)
-                        return all.sort((a, b) => b.at - a.at)[0] || null;
-                    const name = el.textContent.replace(/\s*\[[^\]]*\]\s*$/, "").trim();
-                    const nm = (v) => { const p = v.data.planet || v.data; return String((p && p.name) || "").trim(); };
-                    return all.filter((v) => name && nm(v) === name).sort((a, b) => b.at - a.at)[0] || null;
+                    if (!NL.gl196) {
+                        const all = NL.cache.all(/^\/api\/planets\/\d+$/).filter((v) => v.data && v.data.buildings);
+                        const el = document.querySelector(".planet-switcher-btn .ps-name");
+                        if (!el)
+                            return all.sort((a, b) => b.at - a.at)[0] || null;
+                        const name = el.textContent.replace(/\s*\[[^\]]*\]\s*$/, "").trim();
+                        const nm = (v) => { const p = v.data.planet || v.data; return String((p && p.name) || "").trim(); };
+                        return all.filter((v) => name && nm(v) === name).sort((a, b) => b.at - a.at)[0] || null;
+                    }
+                    const hid = NL.herePlanetId ? NL.herePlanetId() : null;
+                    if (hid == null)
+                        return null;
+                    return NL.cache.all(new RegExp("^/api/planets/" + hid + "$")).filter((v) => v.data && v.data.buildings).sort((a, b) => b.at - a.at)[0] || null;
                 };
                 const planet = () => { const l = onScreen(); return l ? l.data : null; };
                 const factor = (pl, key) => {
@@ -8333,9 +8687,37 @@
                     t = NL.h("div", { class: "nl2-cardtools" });
                     hd.appendChild(t);
                 } return t; };
-                const planetId = () => { const l = onScreen(); return l ? l.path.split("/").pop() : null; };
+                const planetId = () => {
+                    if (!NL.gl196) {
+                        const l = onScreen();
+                        return l ? l.path.split("/").pop() : null;
+                    }
+                    const id = NL.herePlanetId ? NL.herePlanetId() : null;
+                    return id == null ? null : String(id);
+                };
                 const hiddenSet = () => new Set((ctx.store.get("hidden", {})[planetId()] || []));
-                function setHidden(key, on) {
+                const psName = () => ((document.querySelector(".planet-switcher-btn .ps-name") || {}).textContent || "").trim();
+                function hideLog(e) {
+                    if (!NL.buHideGuard)
+                        return;
+                    const a = ctx.store.get("hideLog", []);
+                    a.push(Object.assign({ at: new Date().toISOString(), pid: planetId(), planet: psName(), path: location.pathname }, e));
+                    ctx.store.set("hideLog", (Array.isArray(a) ? a : []).slice(-100));
+                }
+                NL.buHideLog = () => ctx.store.get("hideLog", []);
+                const seen = {};
+                function noteSeen(pid, list) {
+                    if (!NL.buHideGuard || !pid)
+                        return;
+                    const was = seen[pid];
+                    seen[pid] = list.slice();
+                    if (!was)
+                        return;
+                    const add = list.filter((k) => !was.includes(k)), del = was.filter((k) => !list.includes(k));
+                    if (add.length || del.length)
+                        hideLog({ how: "outside (another tab or other code)", added: add, removed: del });
+                }
+                function setHidden(key, on, how) {
                     const all = ctx.store.get("hidden", {}), pid = planetId();
                     if (!pid)
                         return;
@@ -8345,6 +8727,20 @@
                     else
                         set.delete(key);
                     all[pid] = [...set];
+                    ctx.store.set("hidden", all);
+                    if (NL.buHideGuard) {
+                        seen[pid] = all[pid].slice();
+                        hideLog({ how: how || "click", key, on: !!on, count: all[pid].length });
+                    }
+                    applyHidden();
+                }
+                function unhideAll() {
+                    const all = ctx.store.get("hidden", {}), pid = planetId();
+                    if (!pid || !(all[pid] || []).length)
+                        return;
+                    hideLog({ how: "unhide all", removed: all[pid].slice() });
+                    delete all[pid];
+                    seen[pid] = [];
                     ctx.store.set("hidden", all);
                     applyHidden();
                 }
@@ -8357,6 +8753,7 @@
                     if (!planetId())
                         return;
                     const set = hiddenSet(), open = !!ctx.store.get("hiddenOpen", false);
+                    noteSeen(planetId(), [...set]);
                     const grids = new Set();
                     document.querySelectorAll(".building-card").forEach((card) => {
                         const key = cardKey(card);
@@ -8382,7 +8779,38 @@
                             bar.addEventListener("click", () => { ctx.store.set("hiddenOpen", !ctx.store.get("hiddenOpen", false)); applyHidden(); });
                             g.appendChild(bar);
                         }
-                        bar.textContent = (open ? "\u25BE " : "\u25B8 ") + "Hidden (" + n + ")";
+                        const t = (open ? "\u25BE " : "\u25B8 ") + "Hidden (" + n + ")";
+                        if (NL.buHideGuard) {
+                            let lbl = bar.querySelector(":scope > .nl2-hidbar-t");
+                            if (!lbl) {
+                                bar.textContent = "";
+                                lbl = NL.h("span", { class: "nl2-hidbar-t" });
+                                const ub = NL.h("button", { type: "button", class: "nl2-unhide nl2-c-blue", title: "Show every hidden building on this planet again" }, "Unhide all");
+                                let armed = 0;
+                                ub.addEventListener("click", (e) => {
+                                    e.stopPropagation();
+                                    if (!e.isTrusted)
+                                        return;
+                                    if (Date.now() < armed) {
+                                        armed = 0;
+                                        ub.textContent = "Unhide all";
+                                        unhideAll();
+                                        return;
+                                    }
+                                    armed = Date.now() + 5000;
+                                    ub.textContent = "Confirm unhide (" + hiddenSet().size + ")";
+                                    setTimeout(() => { if (armed && Date.now() >= armed) {
+                                        armed = 0;
+                                        ub.textContent = "Unhide all";
+                                    } }, 5100);
+                                });
+                                bar.append(lbl, ub);
+                            }
+                            if (lbl.textContent !== t)
+                                lbl.textContent = t;
+                        }
+                        else
+                            bar.textContent = t;
                         bar.style.display = n ? "" : "none";
                     });
                 }
@@ -8393,8 +8821,30 @@
                     const cb = NL.h("input", { type: "checkbox" });
                     const lab = NL.h("label", { class: "nl2-hide", title: "Hide this card on this planet" }, cb, "Hide");
                     lab.addEventListener("click", (e) => e.stopPropagation());
-                    cb.addEventListener("change", () => { const key = cardKey(card); if (key)
-                        setHidden(key, cb.checked); });
+                    let realAt = 0;
+                    const mark = (e) => { if (e.isTrusted)
+                        realAt = Date.now(); };
+                    lab.addEventListener("pointerdown", mark, true);
+                    lab.addEventListener("keydown", mark, true);
+                    cb.addEventListener("change", (e) => {
+                        const key = cardKey(card);
+                        if (!key)
+                            return;
+                        if (NL.buHideGuard) {
+                            const real = e.isTrusted && Date.now() - realAt < 1500;
+                            realAt = 0;
+                            if (!real) {
+                                hideLog({ how: "refused (not a real click)", key, on: cb.checked, stack: String((new Error()).stack || "").slice(0, 500) });
+                                applyHidden();
+                                return;
+                            }
+                            if (cb.checked === hiddenSet().has(key)) {
+                                applyHidden();
+                                return;
+                            }
+                        }
+                        setHidden(key, cb.checked, "click");
+                    });
                     cardTools(hd).appendChild(lab);
                     applyHidden();
                 });
@@ -8639,6 +9089,8 @@
     {
         NL.btPills = true;
         NL.btSections = true;
+        NL.btRareOnly = true;
+        NL.btTimeIcon = true;
         NL.feature({
             id: "bu-table",
             set: "Buildings",
@@ -8679,6 +9131,7 @@
                     P + ".building-costs>*{display:inline-flex!important;align-items:center;gap:3px;white-space:nowrap;overflow:hidden;justify-self:start;max-width:100%;font-size:14px;padding:0!important;background:none!important;border:0!important}",
                     [1, 2, 3, 4, 5].map((c) => P + ".building-costs>[data-nl2-bt-c=\"" + c + "\"]{" + col(COLS.cost1 + c - 1) + "}").join(""),
                     P + ".building-costs>.build-time{" + col(COLS.time) + "}",
+                    NL.btTimeIcon ? P + ".building-costs>.build-time>svg{display:none!important}" : "",
                     P + ".building-costs>[data-nl2-bt-v]," + P + ".building-costs>[data-nl2-bt-v] *:not(img):not(svg){font-size:0!important}",
                     P + ".building-costs>[data-nl2-bt-v]::after{content:attr(data-nl2-bt-v);font-size:14px;margin-left:3px}",
                     P + ".building-action-area>.upgrade-btn," + P + ".building-action-area>.construction-supply-trigger," + P + ".building-upgrading>.cancel-btn{" + col(COLS.btn) + ";" + BTN + "}",
@@ -8706,9 +9159,18 @@
                     NL.btPills ? [
                         P + ".building-upgrading-line>span:not(.building-upgrading-separator):not(.qol-completion)," + P + ".building-action-area>.building-maxed," + P + ".building-action-area>.building-sentinel-disabled{" + col(COLS.cost1, COLS.time) + ";" + PILL + "}",
                         P + ".building-sentinel-disabled>svg{display:none!important}",
-                        P + ".building-action-area>.building-sentinel-disabled{font-size:0!important}",
-                        P + ".building-sentinel-disabled>span{display:none!important}",
-                        P + ".building-action-area>.building-sentinel-disabled::after{content:\"No rare resource on this planet\";font-size:12px;white-space:nowrap}",
+                        NL.btRareOnly ? [
+                            P + ".building-action-area>.building-sentinel-disabled[data-nl2-bt-why]{font-size:0!important}",
+                            P + ".building-sentinel-disabled[data-nl2-bt-why]>span{display:none!important}",
+                            P + ".building-action-area>.building-sentinel-disabled[data-nl2-bt-why=\"rare\"]::after{content:\"No rare resource on this planet\";font-size:12px;white-space:nowrap}",
+                            P + ".building-action-area>.building-sentinel-disabled[data-nl2-bt-why=\"sentinel\"]::after{content:\"Disabled in Sentinel Space\";font-size:12px;white-space:nowrap}",
+                            P + ".building-action-area>.building-sentinel-disabled:not([data-nl2-bt-why]){font-size:12px!important}",
+                            P + ".building-sentinel-disabled:not([data-nl2-bt-why])>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}",
+                        ].join("") : [
+                            P + ".building-action-area>.building-sentinel-disabled{font-size:0!important}",
+                            P + ".building-sentinel-disabled>span{display:none!important}",
+                            P + ".building-action-area>.building-sentinel-disabled::after{content:\"No rare resource on this planet\";font-size:12px;white-space:nowrap}",
+                        ].join(""),
                         P + ".building-requirements>svg{display:none!important}",
                         P + ".building-requirements>span:not(.req-item){font-size:0!important}",
                         P + ".building-requirements>span:not(.req-item)::after{content:\"Requires\";font-size:13px}",
@@ -8806,7 +9268,13 @@
                     });
                 });
                 NL.watch(".buildings-page[data-nl2-bt] .building-action-area > .building-sentinel-disabled", (el) => {
-                    NL.tip(el, NL.btPills ? (el.textContent || "").trim() : "");
+                    const txt = (el.textContent || "").trim();
+                    NL.tip(el, NL.btPills ? txt : "");
+                    if (NL.btRareOnly) {
+                        const name = ((el.closest(".building-card") || document).querySelector("h4.building-name") || {}).textContent || "";
+                        const why = /sentinel space/i.test(txt) ? "sentinel" : (/rare resource extractor/i.test(name) || /rare.resource deposit/i.test(txt)) ? "rare" : null;
+                        setAttr(el, "data-nl2-bt-why", why);
+                    }
                 });
                 NL.watch(".buildings-page .building-level", (el) => {
                     const cur = /(\d+)/.exec((el.firstChild && el.firstChild.nodeType === 3 ? el.firstChild.textContent : el.textContent) || "");
@@ -8856,11 +9324,18 @@
                 const planet = () => {
                     if (!NL.cache || !NL.cache.all)
                         return null;
-                    const all = NL.cache.all(/^\/api\/planets\/\d+$/).filter((v) => v.data && v.data.buildings);
-                    const el = document.querySelector(".planet-switcher-btn .ps-name");
-                    const nm = (v) => { const p = v.data.planet || v.data; return String((p && p.name) || "").trim(); };
-                    const name = el ? el.textContent.replace(/\s*\[[^\]]*\]\s*$/, "").trim() : "";
-                    const l = (el ? all.filter((v) => name && nm(v) === name) : all).sort((a, b) => b.at - a.at)[0];
+                    if (!NL.gl196) {
+                        const all = NL.cache.all(/^\/api\/planets\/\d+$/).filter((v) => v.data && v.data.buildings);
+                        const el = document.querySelector(".planet-switcher-btn .ps-name");
+                        const nm = (v) => { const p = v.data.planet || v.data; return String((p && p.name) || "").trim(); };
+                        const name = el ? el.textContent.replace(/\s*\[[^\]]*\]\s*$/, "").trim() : "";
+                        const l0 = (el ? all.filter((v) => name && nm(v) === name) : all).sort((a, b) => b.at - a.at)[0];
+                        return l0 ? l0.data : null;
+                    }
+                    const hid = NL.herePlanetId();
+                    if (hid == null)
+                        return null;
+                    const l = NL.cache.all(new RegExp("^/api/planets/" + hid + "$")).filter((v) => v.data && v.data.buildings).sort((a, b) => b.at - a.at)[0];
                     return l ? l.data : null;
                 };
                 const rss = (list) => { let t = 0; for (const [r, v] of list) {
@@ -8935,6 +9410,7 @@
         const RE_FLAGS = ["data-nl2-relab", "data-nl2-reuw", "data-nl2-rehid"];
         const reActive = {};
         const reShare = {};
+        NL.labBusyHere = true;
         function reSetFlag(card, attr, on) {
             if (on === card.hasAttribute(attr))
                 return;
@@ -10099,6 +10575,42 @@
                 const haveOf = (planet, k) => { if (!planet)
                     return null; const v = planet[camel(k)] !== undefined ? planet[camel(k)] : planet[k]; return v === undefined || v === null ? null : +v; };
                 const underwayOf = (it) => /progress|running|active/i.test(String(it.status || "")) || !!it.pauseReason || (reShare.uw && reShare.uw.has(it.key)) || (it.endsAt && Date.parse(it.endsAt) > Date.now() && !/complete/i.test(String(it.status || "")));
+                const RUN28 = /progress|active|running/i, DONE28 = /complete|done|finish|cancel|paus/i;
+                function hereId(ps) {
+                    if (NL.gl196)
+                        return NL.herePlanetId ? NL.herePlanetId() : null;
+                    const l = NL.cache.latest(/^\/api\/research(\?|$)/), m = l && /[?&]planetId=(\d+)/.exec(l.path);
+                    if (m)
+                        return +m[1];
+                    const id = ps && ps.planet && ps.planet.id;
+                    if (id != null)
+                        return +id;
+                    const el = document.querySelector(".planet-switcher-btn .ps-name"), name = el ? el.textContent.replace(/\s*\[[^\]]*\]\s*$/, "").trim() : "";
+                    const all = NL.cache.all(/^\/api\/planets\/\d+$/).filter((v) => v.data && (!name || String(((v.data.planet || v.data) || {}).name || "").trim() === name)).sort((a, b) => b.at - a.at);
+                    return all[0] ? +all[0].path.split("/").pop() : null;
+                }
+                const running28 = (x) => x && !x.pauseReason && !DONE28.test(String(x.status || "")) && (RUN28.test(String(x.status || "")) || (x.endsAt && Date.parse(x.endsAt) > Date.now())) && !(x.endsAt && Date.parse(x.endsAt) <= Date.now());
+                function labRunHere(ps, list) {
+                    const pid = hereId(ps), out = (x, k) => { const it = list.find((y) => y.key === k) || x; return { name: it.name || cap(k || ""), end: x.endsAt ? Date.parse(x.endsAt) || 0 : 0 }; };
+                    if (pid == null)
+                        return null;
+                    const tagged = list.some((x) => x && x.planetId != null);
+                    if (tagged) {
+                        const it = NL.forPlanet(list, pid).find(running28);
+                        return it ? out(it, it.key) : null;
+                    }
+                    const l = NL.cache.latest(/^\/api\/research(\?|$)/), ar = l && l.data && l.data.activeResearch;
+                    const ak = ar && (ar.key || ar.researchKey || (ar.research && ar.research.key));
+                    if (ar && ar.planetId != null && +ar.planetId === pid)
+                        return running28(ar) || !ar.status ? out(ar, ak) : null;
+                    const sum = NL.cache.latest(/^\/api\/planets\/activity-summary(\?|$)/);
+                    const pl = sum && sum.data && Array.isArray(sum.data.planets) ? sum.data.planets.find((x) => x && +(x.planetId != null ? x.planetId : x.id) === pid) : null;
+                    if (pl) {
+                        const r = pl.research, k = r && (r.key || r.researchKey);
+                        return k && running28(r) ? out(r, k) : null;
+                    }
+                    return null;
+                }
                 const fails = {};
                 const frags = {};
                 const cardSeen = {};
@@ -10321,8 +10833,7 @@
                     const ps = pageState(), list = items(ps), byKey = {};
                     list.forEach((x) => { byKey[x.key] = x; });
                     const lab = labLevel(ps), have = fragHave();
-                    const runIt = list.find((x) => underwayOf(x) && !x.pauseReason);
-                    labRun = runIt ? { name: runIt.name || cap(runIt.key), end: runIt.endsAt ? Date.parse(runIt.endsAt) || 0 : 0 } : null;
+                    labRun = NL.labBusyHere !== false ? labRunHere(ps, list) : (() => { const runIt = list.find((x) => underwayOf(x) && !x.pauseReason); return runIt ? { name: runIt.name || cap(runIt.key), end: runIt.endsAt ? Date.parse(runIt.endsAt) || 0 : 0 } : null; })();
                     planSync();
                     const hideDone = toggleOn(/hide\s*completed/i), onlyLv = toggleOn(/only\s*levelable/i), q = searchText();
                     const range = reShare.labRange ? reShare.labRange() : {}, uwOn = reShare.uw ? reShare.uw.on() : false;
@@ -10826,7 +11337,8 @@
                 NL.moonDock = (id) => { const k = dock.get(+id); return k ? k.lvl : null; };
                 NL.onData(/^\/api\/moons\/\d+$/, (p, d, at) => noteMoon(d, at));
                 NL.onData(/^\/api\/planets\/(activity-summary|\d+\/shipyard)/, () => NL._kick());
-                const planetId = () => { const l = NL.cache.latest(/^\/api\/planets\/\d+\/shipyard/); const m = l && /\/planets\/(\d+)\//.exec(l.path); return m ? +m[1] : null; };
+                const planetId = () => { if (NL.gl196)
+                    return NL.herePlanetId(); const l = NL.cache.latest(/^\/api\/planets\/\d+\/shipyard/); const m = l && /\/planets\/(\d+)\//.exec(l.path); return m ? +m[1] : null; };
                 const moonsHere = () => {
                     const pid = planetId(), l = NL.cache.latest(/^\/api\/planets\/activity-summary/);
                     const pl = l && l.data && Array.isArray(l.data.planets) ? l.data.planets.find((x) => +x.planetId === pid) : null;
@@ -10960,7 +11472,7 @@
                 };
                 const curName = () => ((document.querySelector(".planet-switcher-btn .ps-name") || {}).textContent || "").replace(/\s*\[[^\]]*\]\s*$/, "").trim();
                 const snapStock = () => {
-                    const c = NL.cache && NL.cache.latest(/^\/api\/planets\/\d+$/), d = c && c.data, rs = d && d.resourceSnapshot;
+                    const hid = NL.gl196 ? NL.herePlanetId() : null, c = NL.gl196 ? (hid != null ? NL.cache.latest(new RegExp("^/api/planets/" + hid + "$")) : null) : NL.cache && NL.cache.latest(/^\/api\/planets\/\d+$/), d = c && c.data, rs = d && d.resourceSnapshot;
                     if (!rs || !rs.resources)
                         return {};
                     const nm = curName(), pn = d.planet && String(d.planet.name || "").replace(/\s*\[[^\]]*\]\s*$/, "").trim();
@@ -11215,6 +11727,10 @@
                     const hit = n && list.find((p) => p.name === n);
                     if (hit)
                         return { id: hit.id, name: hit.name };
+                    if (NL.gl196) {
+                        const hid = NL.herePlanetId();
+                        return hid != null ? { id: hid, name: n || "this planet" } : null;
+                    }
                     const sy = NL.cache.latest(/^\/api\/planets\/\d+\/shipyard/), m = sy && /\/planets\/(\d+)\//.exec(sy.path);
                     return m ? { id: +m[1], name: n || "this planet" } : null;
                 }
@@ -11638,6 +12154,347 @@
         });
     }
     {
+        NL.shMulti = true;
+        const MB_SIZES = ["small", "medium", "large"];
+        const mbN = (v) => (Number.isFinite(+v) ? +v : 0);
+        const mbSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const mbClean = (t) => String(t == null ? "" : t).replace(/\s*\[[^\]]*\]\s*$/, "").trim();
+        const mbKey = (k) => String(k).toLowerCase().replace(/[^a-z]/g, "");
+        NL.feature({
+            id: "sh-multibuild",
+            set: "Shipyard",
+            name: "Build on all planets",
+            desc: "SH-028: an \"All\" button beside each ship's Build opens one dialog with that ship's build row for every planet. Each Build click starts one build on that planet.",
+            init(ctx) {
+                if (!NL.shMulti)
+                    return;
+                NL.css("sh-multibuild", `
+      .ship-card .nl2-mb-btn{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:34px;padding:0 12px;border-radius:999px;
+        border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font:600 15px Rajdhani,"Exo 2",sans-serif;letter-spacing:.3px;line-height:1;white-space:nowrap;cursor:pointer}
+      .ship-card .nl2-mb-btn:hover{background:rgba(56,189,248,.22);color:#fff}
+      .ship-card .nl2-mb-btn[data-nl2-busy]{opacity:.6;cursor:progress}
+      .nl2-mb-ov{position:fixed;inset:0;background:rgba(2,6,14,.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px}
+      .nl2-mb{width:min(1000px,calc(100vw - 24px));max-height:92vh;overflow:auto;box-sizing:border-box;background:var(--bg-card,rgba(8,16,32,.98));border:1px solid rgba(56,189,248,.3);
+        border-radius:10px;box-shadow:0 12px 48px rgba(0,0,0,.6);color:var(--text-primary,#f1f6ff);font:500 14px Rajdhani,"Exo 2",sans-serif;padding:12px 14px}
+      .nl2-mb .nl2-mb-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+      .nl2-mb .nl2-mb-head h3{margin:0;font-size:17px;font-weight:700}
+      .nl2-mb .nl2-mb-x{margin-left:auto;background:none;border:0;color:var(--text-muted,#c0cce0);cursor:pointer;padding:4px;font-size:18px;line-height:1}
+      .nl2-mb .nl2-mb-x:hover{color:var(--text-primary,#f1f6ff)}
+      .nl2-mb .nl2-mb-top{display:flex;align-items:center;gap:10px;margin:6px 0 10px;flex-wrap:wrap}
+      .nl2-mb .nl2-mb-top label{display:inline-flex;align-items:center;gap:6px;color:var(--text-muted,#9fb3d1)}
+      .nl2-mb select,.nl2-mb input.nl2-mb-n{background:rgba(12,24,44,.96);color:inherit;border:1px solid rgba(120,200,255,.18);border-radius:4px;font:500 14px Rajdhani,"Exo 2",sans-serif;padding:2px 4px;height:26px;box-sizing:border-box}
+      .nl2-mb input.nl2-mb-n{width:72px;text-align:left}
+      .nl2-mb .nl2-mb-pill{height:26px;padding:0 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer;text-align:center}
+      .nl2-mb .nl2-mb-pill:hover{background:rgba(56,189,248,.22)}
+      .nl2-mb table{color:inherit;font:inherit;font-variant-numeric:tabular-nums}
+      .nl2-mb th{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted,#9fb3d1);text-align:left;padding:0 6px;line-height:18px}
+      .nl2-mb td{padding:0 6px;border-bottom:1px solid rgba(120,200,255,.08);text-align:left;line-height:18px}
+      .nl2-mb .nl2-mb-qty{display:inline-flex;align-items:center;gap:3px}
+      .nl2-mb .nl2-mb-pm{width:24px;height:24px;padding:0;border-radius:4px;border:1px solid rgba(120,200,255,.25);background:rgba(12,24,44,.96);color:inherit;cursor:pointer;font:600 14px Rajdhani,sans-serif;text-align:center}
+      .nl2-mb .nl2-mb-max{--nl2-btnw:52px;height:26px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer;padding:0}
+      .nl2-mb .nl2-mb-go{--nl2-btnw:110px;height:26px;border-radius:4px;font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer;padding:0 6px}
+      .nl2-mb tr.nl2-mb-off td:not(.nl2-mb-why){opacity:.45}
+      .nl2-mb td.nl2-mb-why{color:#f87171;font-size:13px}
+      .nl2-mb td.nl2-mb-why.nl2-mb-ok{color:#4ade80}
+      .nl2-mb tr.nl2-mb-total td{color:#fbbf24;font-weight:600}
+      .nl2-mb .nl2-mb-none{margin:12px 0;color:var(--text-muted,#9fb3d1)}`);
+                const fresh = (path) => { const c = NL.cache.latest(new RegExp("^" + path.replace(/[/]/g, "\\/") + "$")); return c && Date.now() - c.at < 60000 ? c : null; };
+                let lastRead = 0;
+                async function read(path) {
+                    const wait = lastRead + 1000 - Date.now();
+                    if (wait > 0)
+                        await mbSleep(wait);
+                    lastRead = Date.now();
+                    const d = await NL.getJson(path, ctx);
+                    return d ? { data: d, at: Date.now() } : null;
+                }
+                const get = async (path) => fresh(path) || (await read(path));
+                const list = (d, k) => (Array.isArray(d) ? d : d && Array.isArray(d[k]) ? d[k] : []);
+                async function planets() {
+                    let out = [];
+                    const pl = NL.cache.latest(/^\/api\/planets$/);
+                    if (pl)
+                        out = list(pl.data, "planets").map((p) => ({ id: Number(p.id), name: mbClean(p.name) }));
+                    if (!out.length) {
+                        const s = NL.cache.latest(/^\/api\/planets\/activity-summary$/);
+                        if (s)
+                            out = list(s.data, "planets").map((p) => ({ id: Number(p.planetId != null ? p.planetId : p.id), name: mbClean(p.planetName || p.name) }));
+                    }
+                    if (!out.length) {
+                        const r = await read("/api/planets");
+                        if (r)
+                            out = list(r.data, "planets").map((p) => ({ id: Number(p.id), name: mbClean(p.name) }));
+                    }
+                    out = out.filter((p) => Number.isFinite(p.id));
+                    return NL.pickList ? NL.pickList(out) : out;
+                }
+                function stockOf(pc) {
+                    const d = pc && pc.data, rs = d && d.resourceSnapshot, out = {};
+                    const flat = (d && d.planet) || {};
+                    for (const [k, v] of Object.entries(flat))
+                        if (typeof v === "number")
+                            out[mbKey(k)] = Math.floor(v);
+                    if (rs && rs.resources) {
+                        const t = (v) => { const x = Date.parse(v); return isFinite(x) ? x : NaN; };
+                        const lag = (t(rs.serverNow) - t(rs.resourcesUpdatedAt)) || 0;
+                        const hrs = Math.max(0, (Date.now() - pc.at + Math.max(0, lag)) / 3600000);
+                        const rates = rs.productionRates || {}, cap = rs.storage || {};
+                        for (const [k, v] of Object.entries(rs.resources)) {
+                            const have = +v;
+                            if (!isFinite(have))
+                                continue;
+                            const lim = +cap[k] || (/^(ore|silicates|hydrogen|alloys|population)$/.test(k) ? Infinity : +cap.rare || Infinity);
+                            const r = +rates[k] || 0;
+                            out[mbKey(k)] = Math.floor(r > 0 ? Math.max(have, Math.min(lim, have + r * hrs)) : have);
+                        }
+                    }
+                    return out;
+                }
+                const freeCrew = (pc, stock) => {
+                    const b = pc && pc.data && Array.isArray(pc.data.buildings) ? pc.data.buildings : null;
+                    if (!b || stock.population == null)
+                        return null;
+                    return Math.max(0, Math.floor(stock.population) - b.reduce((a, x) => a + mbN(x && x.assignedWorkers), 0));
+                };
+                const costsOf = (s) => {
+                    const c = [["ore", s.costOre], ["silicates", s.costSilicates], ["hydrogen", s.costHydrogen], ["alloys", s.costAlloys]];
+                    for (const [k, v] of Object.entries(s.rareCosts || {}))
+                        c.push([mbKey(k), v]);
+                    return c.map(([k, v]) => [k, mbN(v)]).filter(([, v]) => v > 0);
+                };
+                function stateOf(r, defId) {
+                    const sy = r.sy && r.sy.data, ships = list(sy, "ships"), s = ships.find((x) => String(x.id) === String(defId));
+                    if (!sy)
+                        return { off: true, why: "Could not read this shipyard", max: 0 };
+                    if (!s)
+                        return { off: true, why: "Not built here", max: 0 };
+                    if (s.available === false)
+                        return { off: true, why: s.researchMet === false ? "Research needed" : s.shipyardMet === false ? "Shipyard too low (needs Lv " + (s.requiredShipyardLevel || "?") + ")" : "Locked", max: 0, ship: s };
+                    const orb = s.shipSize === "large", q = orb ? sy.orbitalQueueAll : sy.planetaryQueueAll;
+                    const used = Array.isArray(q) ? q.length : mbN(orb ? sy.orbitalQueueCount : sy.planetaryQueueCount), cap = mbN(sy.maxQueueSize);
+                    if (cap > 0 && used >= cap)
+                        return { off: true, why: "Queue full (" + used + "/" + cap + ")", max: 0, ship: s };
+                    const stock = stockOf(r.pl), crew = freeCrew(r.pl, stock);
+                    let max = 100000;
+                    for (const [k, v] of costsOf(s))
+                        max = Math.min(max, stock[k] != null ? Math.floor(stock[k] / v) : 0);
+                    const afford = max;
+                    const pc = mbN(s.populationCost);
+                    if (pc > 0 && crew != null)
+                        max = Math.min(max, Math.floor(crew / pc));
+                    max = Math.max(0, max);
+                    if (afford < 1)
+                        return { off: true, why: "Can't afford 1", max: 0, crew, ship: s };
+                    if (max < 1)
+                        return { off: true, why: "Not enough free crew (reassign on that planet's Shipyard)", max: 0, crew, ship: s };
+                    return { off: false, why: "", max, crew, ship: s };
+                }
+                const keyOfCard = (card) => {
+                    const a = card.querySelector("a.ship-name-link"), m = a && /\/shipyard\/([^/?#]+)/.exec(a.getAttribute("href") || "");
+                    if (m)
+                        return m[1];
+                    const img = card.querySelector(".ship-card-header img[alt]");
+                    return img ? img.getAttribute("alt") : null;
+                };
+                NL.watch(".shipyard-page .ship-card .ship-build-row", (row) => {
+                    let btn = row.querySelector(":scope > .nl2-mb-btn");
+                    const gb = row.querySelector(":scope > .build-btn");
+                    const show = location.pathname.replace(/\/+$/, "") === "/shipyard" && gb && !/Moon Dockyard/i.test(gb.getAttribute("title") || gb.textContent || "");
+                    if (!show) {
+                        if (btn)
+                            btn.remove();
+                        return;
+                    }
+                    if (!btn)
+                        btn = NL.h("button", { type: "button", class: "nl2-mb-btn", title: "Build this ship on all your planets" }, "All");
+                    if (gb.nextElementSibling !== btn)
+                        gb.after(btn);
+                });
+                document.addEventListener("click", (e) => {
+                    const b = e.target.closest && e.target.closest(".nl2-mb-btn");
+                    if (!b)
+                        return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (b.hasAttribute("data-nl2-busy"))
+                        return;
+                    const card = b.closest(".ship-card");
+                    open(b, card ? keyOfCard(card) : null).catch((x) => { b.removeAttribute("data-nl2-busy"); b.textContent = "All"; ctx.err(x); });
+                }, true);
+                let summaryTm = 0;
+                async function open(btn, key) {
+                    btn.setAttribute("data-nl2-busy", "1");
+                    const ps = await planets(), rows = ps.map((p) => ({ id: p.id, name: p.name }));
+                    const n = rows.length * 2;
+                    let i = 0;
+                    for (const r of rows) {
+                        btn.textContent = "Loading " + (++i) + "/" + n;
+                        r.sy = await get("/api/planets/" + r.id + "/shipyard");
+                        btn.textContent = "Loading " + (++i) + "/" + n;
+                        r.pl = await get("/api/planets/" + r.id);
+                    }
+                    btn.textContent = "All";
+                    btn.removeAttribute("data-nl2-busy");
+                    const seen = new Map();
+                    for (const r of rows)
+                        for (const s of list(r.sy && r.sy.data, "ships"))
+                            if (s && s.id != null && MB_SIZES.includes(s.shipSize) && !seen.has(String(s.id)))
+                                seen.set(String(s.id), s);
+                    const ships = [...seen.values()].sort((a, b) => mbN(a.sortOrder) - mbN(b.sortOrder));
+                    const pick = ships.find((s) => s.key === key) || ships[0];
+                    draw(rows, ships, pick);
+                }
+                function draw(rows, ships, pick) {
+                    let defId = pick ? String(pick.id) : null;
+                    const ov = NL.h("div", { class: "nl2-mb-ov" });
+                    const close = () => { ov.remove(); document.removeEventListener("keydown", onKey, true); clearInterval(tick); };
+                    const onKey = (e) => { if (e.key === "Escape") {
+                        e.stopPropagation();
+                        close();
+                    } };
+                    ov.addEventListener("mousedown", (e) => { if (e.target === ov)
+                        close(); });
+                    const panel = NL.h("div", { class: "nl2-mb", role: "dialog", "aria-modal": "true", "aria-label": "Build on all planets" });
+                    panel.append(NL.h("div", { class: "nl2-mb-head" }, NL.h("h3", null, "Build on all planets"), NL.h("button", { type: "button", class: "nl2-mb-x", "aria-label": "Close", onclick: close }, "\u00D7")));
+                    ov.append(panel);
+                    document.body.appendChild(ov);
+                    document.addEventListener("keydown", onKey, true);
+                    if (!rows.length || !ships.length) {
+                        panel.append(NL.h("div", { class: "nl2-mb-none" }, rows.length ? "No ships to build." : "No planets found."));
+                        return;
+                    }
+                    const sel = NL.h("select", { class: "nl2-mb-ship", "aria-label": "Ship" }, ships.map((s) => NL.h("option", { value: String(s.id), selected: String(s.id) === defId }, s.name || s.key)));
+                    const all = NL.h("input", { class: "nl2-mb-n nl2-mb-all", type: "number", min: 1, max: 100000, step: 1, value: "1", "aria-label": "Quantity for all planets" });
+                    const maxAll = NL.h("button", { type: "button", class: "nl2-mb-pill nl2-mb-maxall", title: "Set every planet to the most it can build" }, "Max all");
+                    panel.append(NL.h("div", { class: "nl2-mb-top" }, NL.h("label", null, "Ship", sel), NL.h("label", null, "Qty for all", all), maxAll));
+                    const tbl = NL.h("table", { class: "nl2-tbl nl2-mb-tbl" });
+                    NL.tableCols(tbl, ["150px", "96px", "96px", "130px", "64px", "122px", null]);
+                    const thead = NL.h("thead", null, NL.h("tr", null, NL.h("th", null, "Planet"), NL.h("th", null, "Can build"), NL.h("th", null, "Free crew"), NL.h("th", null, "Qty"), NL.h("th"), NL.h("th"), NL.h("th", null, "")));
+                    const tbody = NL.h("tbody");
+                    tbl.append(thead, tbody);
+                    panel.append(tbl);
+                    const clampQ = (v) => Math.max(1, Math.min(100000, Math.floor(mbN(v)) || 1));
+                    for (const r of rows) {
+                        r.qty = 1;
+                        r.busy = false;
+                        r.msg = "";
+                        r.ok = false;
+                        r.tr = NL.h("tr", { "data-planet": String(r.id) });
+                        r.inp = NL.h("input", { class: "nl2-mb-n", type: "number", min: 1, max: 100000, step: 1, value: "1", "aria-label": r.name + " quantity" });
+                        r.inp.addEventListener("input", () => { r.qty = clampQ(r.inp.value); r.msg = ""; paint(r); });
+                        r.inp.addEventListener("change", () => { r.inp.value = String(r.qty); });
+                        const minus = NL.h("button", { type: "button", class: "nl2-mb-pm", "aria-label": "Less" }, "\u2212");
+                        const plus = NL.h("button", { type: "button", class: "nl2-mb-pm", "aria-label": "More" }, "+");
+                        minus.addEventListener("click", () => setQ(r, r.qty - 1));
+                        plus.addEventListener("click", () => setQ(r, r.qty + 1));
+                        r.max = NL.h("button", { type: "button", class: "nl2-mb-max nl2-btnw", title: "The most this planet can build" }, "Max");
+                        r.max.addEventListener("click", () => { const st = stateOf(r, defId); if (st.max >= 1)
+                            setQ(r, st.max); });
+                        r.go = NL.h("button", { type: "button", class: "nl2-mb-go nl2-btnw nl2-c-green" }, "Build 1");
+                        r.go.addEventListener("click", () => build(r));
+                        r.canTd = NL.h("td", { class: "nl2-tbl-num" });
+                        r.crewTd = NL.h("td", { class: "nl2-tbl-num" });
+                        r.whyTd = NL.h("td", { class: "nl2-mb-why" });
+                        r.tr.append(NL.h("td", { title: r.name }, r.name), r.canTd, r.crewTd, NL.h("td", null, NL.h("span", { class: "nl2-mb-qty" }, minus, r.inp, plus)), NL.h("td", null, r.max), NL.h("td", null, r.go), r.whyTd);
+                        tbody.append(r.tr);
+                    }
+                    const tot = NL.h("tr", { class: "nl2-mb-total" }), totCan = NL.h("td", { class: "nl2-tbl-num" }), totQty = NL.h("td", { class: "nl2-tbl-num" });
+                    tot.append(NL.h("td", null, "Total"), totCan, NL.h("td"), totQty, NL.h("td"), NL.h("td"), NL.h("td"));
+                    if (rows.length > 1)
+                        tbody.append(tot);
+                    function setQ(r, v) { r.qty = clampQ(v); r.inp.value = String(r.qty); r.msg = ""; paint(r); }
+                    function paint(r) {
+                        const st = stateOf(r, defId);
+                        r.canTd.textContent = st.off ? "\u2014" : NL.fmt(st.max);
+                        r.crewTd.textContent = st.crew == null ? "\u2014" : NL.fmt(st.crew);
+                        const over = !st.off && r.qty > st.max;
+                        r.tr.classList.toggle("nl2-mb-off", st.off);
+                        r.go.disabled = st.off || over || r.busy;
+                        r.max.disabled = st.off || r.busy;
+                        r.inp.disabled = st.off;
+                        const label = r.busy ? "Starting\u2026" : "Build " + NL.fmt(r.qty);
+                        if (r.go.textContent !== label)
+                            r.go.textContent = label;
+                        const why = r.msg || st.why || (over ? "Can build " + NL.fmt(st.max) : "");
+                        if (r.whyTd.textContent !== why) {
+                            r.whyTd.textContent = why;
+                            if (why)
+                                r.whyTd.setAttribute("data-nl2-tip", why);
+                            else
+                                r.whyTd.removeAttribute("data-nl2-tip");
+                        }
+                        r.whyTd.classList.toggle("nl2-mb-ok", !!r.msg && r.ok);
+                    }
+                    function paintAll() {
+                        let can = 0, q = 0;
+                        for (const r of rows) {
+                            paint(r);
+                            const st = stateOf(r, defId);
+                            if (!st.off) {
+                                can += st.max;
+                                q += r.qty;
+                            }
+                        }
+                        totCan.textContent = can ? NL.fmt(can) : "\u2014";
+                        totQty.textContent = q ? NL.fmt(q) : "\u2014";
+                    }
+                    sel.addEventListener("change", () => { defId = sel.value; for (const r of rows)
+                        r.msg = ""; paintAll(); });
+                    all.addEventListener("input", () => { const v = clampQ(all.value); for (const r of rows) {
+                        r.qty = v;
+                        r.inp.value = String(v);
+                        r.msg = "";
+                    } paintAll(); });
+                    all.addEventListener("change", () => { all.value = String(clampQ(all.value)); });
+                    maxAll.addEventListener("click", () => { for (const r of rows) {
+                        const st = stateOf(r, defId);
+                        if (st.max >= 1) {
+                            r.qty = clampQ(st.max);
+                            r.inp.value = String(r.qty);
+                            r.msg = "";
+                        }
+                    } paintAll(); });
+                    async function build(r) {
+                        if (r.go.disabled || r.busy)
+                            return;
+                        const st = stateOf(r, defId);
+                        if (st.off || r.qty > st.max)
+                            return;
+                        const qty = r.qty, name = (st.ship && st.ship.name) || "ships";
+                        r.busy = true;
+                        r.msg = "";
+                        paint(r);
+                        const res = await NL.postJson("/api/planets/" + r.id + "/shipyard/build", { shipDefId: Number(defId), quantity: qty }, ctx);
+                        const d = res && res.data;
+                        const ok = !!(res && res.ok);
+                        const msg = ok ? "Started " + NL.fmt(qty) + " " + name
+                            : res && res.paused ? "The game is slowing us down; try again in a minute"
+                                : (d && (d.error || d.message)) || "The game refused the build (HTTP " + (res ? res.status : 0) + ")";
+                        if (ok) {
+                            const a = await read("/api/planets/" + r.id + "/shipyard");
+                            if (a)
+                                r.sy = a;
+                            const b = await read("/api/planets/" + r.id);
+                            if (b)
+                                r.pl = b;
+                            clearTimeout(summaryTm);
+                            summaryTm = setTimeout(() => { read("/api/planets/activity-summary"); }, 3000);
+                        }
+                        r.ok = ok;
+                        r.msg = msg;
+                        r.busy = false;
+                        paintAll();
+                    }
+                    const tick = setInterval(() => { if (!ov.isConnected) {
+                        clearInterval(tick);
+                        return;
+                    } paintAll(); }, 1000);
+                    paintAll();
+                }
+            },
+        });
+    }
+    {
         const FL_RES = [["antimatter", "antimatter", "Antimatter"], ["dark_matter", "darkMatter", "Dark Matter"], ["quantum_dust", "quantumDust", "Quantum Dust"], ["plasma_core", "plasmaCore", "Plasma Core"], ["bio_extract", "bioExtract", "Bio-Extract"], ["cryo_ice", "cryoIce", "Cryo-Ice"], ["alloys", "alloys", "Alloys"], ["hydrogen", "hydrogen", "Hydrogen"], ["silicates", "silicates", "Silicates"], ["ore", "ore", "Ore"]];
         const FL_FRESH = 60 * 1000;
         const flNum = (v) => (Number.isFinite(+v) ? +v : 0);
@@ -11660,7 +12517,8 @@
       .nl2-fl-warn-foot{display:flex;justify-content:flex-end;margin-top:14px}
       .nl2-fl-warn button{background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.25);color:#7ed4ff;border-radius:4px;padding:5px 14px;font:inherit;cursor:pointer}`);
                 const fresh = (re) => { const c = NL.cache.latest(re); return c && Date.now() - c.at < FL_FRESH ? c.data : null; };
-                const planetId = () => { const l = NL.cache.latest(/^\/api\/planets\/\d+$/); return l ? Number(l.path.split("/").pop()) : null; };
+                const planetId = () => { if (NL.gl195 && NL.herePlanetId)
+                    return NL.herePlanetId(); const l = NL.cache.latest(/^\/api\/planets\/\d+$/); return l ? Number(l.path.split("/").pop()) : null; };
                 let lastRead = 0;
                 async function read(path) {
                     const wait = lastRead + 1000 - Date.now();
@@ -11810,6 +12668,11 @@
                             return { fuel: flNum(e.fuelCost), travelSec: flNum(e.travelTime), hydrogenAvailable: e.hydrogenAvailable != null ? flNum(e.hydrogenAvailable) : undefined };
                         },
                         send: async (state) => {
+                            if (NL.gl196) {
+                                const g = NL.hereGuard(state.sourceId);
+                                if (g)
+                                    return { ok: false, message: g };
+                            }
                             const rt = route(state), cargo = {};
                             for (const [k, v] of Object.entries(state.resources || {})) {
                                 const a = Math.floor(flNum(v && typeof v === "object" ? v.amount : v));
@@ -11851,6 +12714,8 @@
             },
         });
         NL.fl175 = true;
+        NL.fl202 = true;
+        NL.fl203 = true;
         const FLW_RES = { ore: "Ore", silicates: "Sil", hydrogen: "H\u2082", alloys: "Alloy", cryo_ice: "Cryo", plasma_core: "Plasma", bio_extract: "Bio", quantum_dust: "QD", dark_matter: "DM", antimatter: "AM" };
         if (NL.option)
             NL.option({ key: "fl-wh.losspct", group: "Fleet Wormholes", label: "Bad run when losses reach (%)", type: "number", def: 10, min: 1, max: 100 });
@@ -11909,6 +12774,11 @@
       .nl2-flw table.nl2-flw-1l td{vertical-align:middle}
       .nl2-flw table.nl2-flw-1l button.nl2-btnw{padding:2px 4px}
       .nl2-flw table.nl2-flw-1l td.nl2-flw-act{overflow:visible;white-space:nowrap}
+      .nl2-flw .nl2-flw-sub{font:600 13px Rajdhani,"Exo 2",sans-serif;color:#8fb3d9;text-transform:uppercase;letter-spacing:.04em;margin:4px 2px}
+      .nl2-flw table + .nl2-flw-sub{margin-top:14px}
+      .wormholes-tab > h4[data-nl2-x203]{display:flex;align-items:center}
+      .nl2-x203-hn{margin-left:auto;font:500 13px Rajdhani,"Exo 2",sans-serif;color:#9fb3c8;text-transform:none;letter-spacing:0;white-space:nowrap}
+      .nl2-x203-hn button{font:600 13px Rajdhani,"Exo 2",sans-serif;border-radius:4px;padding:2px 9px;cursor:pointer;background:#1e3a5f;color:#bfdbfe;border:1px solid #3b82f6}
       .wormholes-tab h4[data-nl2-flw-cxk]{cursor:pointer;user-select:none}
       .wormholes-tab h4 > .nl2-flw-cx{display:inline-block;width:16px;color:#7ed4ff;flex:none}
       .wormholes-tab > .wormhole-active[data-nl2-flw-cx] > :not(h4),.wormholes-tab > h4 ~ [data-nl2-flw-cx]:not(h4){display:none!important}`);
@@ -12099,6 +12969,28 @@
                     const nextT = ts(r.nextEncounterAt);
                     return nextT ? cdCell("", nextT) : dash();
                 }
+                const flyOf = (m) => { if (!m)
+                    return null; if (num(m.travelTime) > 0)
+                    return num(m.travelTime) * 1000; const a = ts(m.arrivesAt), d = ts(m.departsAt); return a != null && d != null && a > d ? a - d : null; };
+                function tripOf(r) {
+                    const m = missionOf(r);
+                    if (/return|retreat/.test(r.status || ""))
+                        return (m && ts(m.returnArrivesAt)) || null;
+                    const fly = flyOf(m);
+                    if (fly == null)
+                        return null;
+                    const cur = num(r.currentEncounter), tot = num(r.totalEncounters), left = Math.max(0, tot - cur);
+                    const stage = ts(r.nextEncounterAt), began = ts(r.encounterStartedAt);
+                    if (r.status === "traveling" || r.status === "outbound" || (stage == null && began == null && cur === 0)) {
+                        const arr = m && ts(m.arrivesAt);
+                        return arr != null ? arr + tot * WH_AUTO_MS + fly : null;
+                    }
+                    if (stage == null && began == null)
+                        return null;
+                    const end = !left ? (stage != null ? stage : began) + WH_AUTO_MS / 2 : stage != null ? stage + WH_AUTO_MS / 2 + left * WH_AUTO_MS : began + WH_AUTO_MS + left * WH_AUTO_MS;
+                    return end + fly;
+                }
+                const trip = () => NL.fl202 !== false;
                 const runSys = (r) => { const m = missionOf(r), w = whOf(r.wormholeId); return { id: (m && m.targetSystemId != null ? m.targetSystemId : w && w.sysId), name: (m && m.targetSystemName) || (w && w.sys) || "" }; };
                 function encRow(e, before, mid, after) {
                     const lt = loot(e.loot), spy = e.probeDetected ? NL.h("span", { class: "nl2-flw-spy" }, "Spy probe detected hazard \u2013 damage reduced") : null;
@@ -12123,15 +13015,15 @@
                         }
                         const sh = runShares(r), lr = sh.lost;
                         const bad = lr != null && lr >= lossPct();
-                        rows.push(NL.h("tr", { class: "nl2-flw-run" + (z ? " nl2-z" : "") }, clsCell(NL.h("span", { class: "nl2-flw-wc nl2-flw-wc" + (w ? Math.min(+((/^C(\d)/.exec(w.c) || [])[1] || 0), 4) : 0), title: w ? null : "Class not known: the wormhole closed before it was seen" }, w ? w.c : "?"), r.id, log.length > 0), sysCell(sy.id, sy.name), NL.h("td", null, stBadge(r.status)), NL.h("td", null, num(r.currentEncounter) + "/" + num(r.totalEncounters)), NL.h("td", null, nextCell(r)), NL.h("td", null, loot(r.totalLoot) || dash()), NL.h("td", bad ? { class: "nl2-flw-bad", title: "Losses are " + Math.round(lr * 100) + "% of the starting fleet value" } : null, shipsCell(lostAll, dmgAll, sh.lost, sh.dmg)), NL.h("td", one() ? { class: "nl2-flw-act" } : null, acts.length ? acts : "")));
+                        rows.push(NL.h("tr", { class: "nl2-flw-run" + (z ? " nl2-z" : "") }, clsCell(NL.h("span", { class: "nl2-flw-wc nl2-flw-wc" + (w ? Math.min(+((/^C(\d)/.exec(w.c) || [])[1] || 0), 4) : 0), title: w ? null : "Class not known: the wormhole closed before it was seen" }, w ? w.c : "?"), r.id, log.length > 0), sysCell(sy.id, sy.name), NL.h("td", null, stBadge(r.status)), NL.h("td", null, num(r.currentEncounter) + "/" + num(r.totalEncounters)), NL.h("td", null, nextCell(r)), ...(trip() ? [NL.h("td", null, (() => { const t = tripOf(r); return t ? NL.h("span", { class: "nl2-flw-t", "data-nl2-cd": String(t) }, cd(t)) : dash(); })())] : []), NL.h("td", null, loot(r.totalLoot) || dash()), NL.h("td", bad ? { class: "nl2-flw-bad", title: "Losses are " + Math.round(lr * 100) + "% of the starting fleet value" } : null, shipsCell(lostAll, dmgAll, sh.lost, sh.dmg)), NL.h("td", one() ? { class: "nl2-flw-act" } : null, acts.length ? acts : "")));
                         if (open.has(r.id))
                             for (const e of log) {
                                 const x = encRow(e);
-                                rows.push(NL.h("tr", { class: "nl2-flw-enc" }, blank(), x.title, NL.h("td", { colspan: "2" }, x.oc), blank(), x.loot, x.ships, blank()));
+                                rows.push(NL.h("tr", { class: "nl2-flw-enc" }, blank(), x.title, NL.h("td", { colspan: "2" }, x.oc), blank(), ...(trip() ? [blank()] : []), x.loot, x.ships, blank()));
                             }
                     }
-                    const head = ["Class", "System", "Status", "Encounter", "Next encounter", "Loot so far", "Ships lost / damaged", ""];
-                    const widths = ["80px", "150px", "100px", "84px", "190px", "", "", one() ? "200px" : "160px"];
+                    const head = ["Class", "System", "Status", "Encounter", "Next encounter", ...(trip() ? ["Trip time"] : []), "Loot so far", "Ships lost / damaged", ""];
+                    const widths = ["80px", "150px", "100px", "84px", "190px", ...(trip() ? ["110px"] : []), "", "", one() ? "200px" : "160px"];
                     return tipCells(NL.h("table", null, NL.h("thead", null, NL.h("tr", null, head.map((t, i) => NL.h("th", widths[i] ? { style: { width: widths[i] } } : null, t)))), NL.h("tbody", null, rows)));
                 }
                 let tick = 0;
@@ -12186,7 +13078,7 @@
                 const ensureCosts = () => {
                     if (askedCosts || Object.keys(shipCost).length || !NL.getJson)
                         return;
-                    const l = NL.cache.latest(/^\/api\/planets\/\d+$/), pid = l ? l.path.split("/").pop() : null;
+                    const l = NL.gl196 ? null : NL.cache.latest(/^\/api\/planets\/\d+$/), pid = NL.gl196 ? NL.herePlanetId() : l ? l.path.split("/").pop() : null;
                     if (!pid)
                         return;
                     askedCosts = true;
@@ -12281,8 +13173,12 @@
                         return;
                     }
                     const soon = (r) => { const m = missionOf(r) || {}; return ts(r.nextEncounterAt) || ts(/return|retreat/.test(r.status || "") ? m.returnArrivesAt : m.arrivesAt) || Infinity; };
-                    runs.sort((a, b) => (waiting(b) - waiting(a)) || (soon(a) - soon(b)) || (b.id - a.id));
-                    const sig = runs.map((r) => [r.id, !!pendingOf(r), r.status, r.currentEncounter, r.nextEncounterAt, (r.encounterLog || []).length, waiting(r) && [...((cards.get(r.id) || {}).querySelectorAll ? cards.get(r.id).querySelectorAll("button") : [])].map((b) => (b.textContent || "").trim()).join("/"), (whOf(r.wormholeId) || {}).c, r.encounterStartedAt, (missionOf(r) || {}).arrivesAt, (missionOf(r) || {}).returnArrivesAt, runSys(r).name, badRun(r), pctTxt(runShares(r).dmg), pctTxt(runShares(r).lost)].join(":")).join(",") + "|" + [...open].join(",");
+                    const tt = (r) => tripOf(r) || Infinity, srt = (a, b) => (tt(a) - tt(b)) || (b.id - a.id);
+                    if (trip())
+                        runs.sort(srt);
+                    else
+                        runs.sort((a, b) => (waiting(b) - waiting(a)) || (soon(a) - soon(b)) || (b.id - a.id));
+                    const sig = (trip() ? "T" + runs.map((r) => tt(r)).join("/") + ":" : "") + runs.map((r) => [r.id, !!pendingOf(r), r.status, r.currentEncounter, r.nextEncounterAt, (r.encounterLog || []).length, waiting(r) && [...((cards.get(r.id) || {}).querySelectorAll ? cards.get(r.id).querySelectorAll("button") : [])].map((b) => (b.textContent || "").trim()).join("/"), (whOf(r.wormholeId) || {}).c, r.encounterStartedAt, (missionOf(r) || {}).arrivesAt, (missionOf(r) || {}).returnArrivesAt, runSys(r).name, badRun(r), pctTxt(runShares(r).dmg), pctTxt(runShares(r).lost)].join(":")).join(",") + "|" + [...open].join(",");
                     if (box && box.dataset.sig === sig && box.dataset.ver === String(ver))
                         return;
                     if (!box) {
@@ -12291,7 +13187,13 @@
                     }
                     box.dataset.sig = sig;
                     box.dataset.ver = String(ver);
-                    box.replaceChildren(table(runs, cards));
+                    if (!trip())
+                        box.replaceChildren(table(runs, cards));
+                    else {
+                        const pend = runs.filter((r) => waiting(r) && !pendingOf(r)), rest = runs.filter((r) => !pend.includes(r));
+                        const sub = (t) => NL.h("div", { class: "nl2-flw-sub" }, t);
+                        box.replaceChildren(...(pend.length ? [sub("Active \u2013 pending decision"), table(pend, cards), ...(rest.length ? [sub("Active"), table(rest, cards)] : [])] : [table(rest, cards)]));
+                    }
                     ticker(true);
                 });
                 const CX_KEY = (t) => (/^\s*active/i.test(t) ? "active" : /^\s*detected/i.test(t) ? "detected" : /^\s*completed/i.test(t) ? "completed" : null);
@@ -12376,16 +13278,61 @@
                             r.hid = r.wo ? NL.pve.hidden("wh", r.wo.id) : false;
                             r.sent = r.wo ? NL.pve.launched("wh", r.wo.id) : false;
                         }
-                    const nHid = x167 ? rows.filter((r) => r.hid).length : 0, shown = x167 ? rows.filter((r) => !r.hid) : rows;
+                    const x203 = x167 && NL.fl203 !== false;
+                    const nHid = x167 ? rows.filter((r) => r.hid && !(x203 && r.sent)).length : 0, shown = x167 ? rows.filter((r) => !r.hid && !(x203 && r.sent)) : rows;
                     const sig = rows.map((r) => [r.sys, r.sysId, r.cls, r.used, r.exp, r.btn ? r.btn.disabled : "", r.near ? r.near.name + Math.round(r.near.dist) : "", r.hid ? "h" : "", r.sent ? "s" : ""].join(":")).join(",");
                     const ex = (r) => !x167 ? [] : [
                         NL.h("td", null, r.near ? r.near.name : dash()),
                         NL.h("td", null, r.near ? Math.round(r.near.dist) + " ly" : dash()),
-                        NL.h("td", { class: "nl2-flw-nw" }, r.wo ? NL.h("button", { type: "button", class: "nl2-flw-enter nl2-x167-hide", title: "Hide this wormhole until it expires", onclick: () => { NL.pve.hide("wh", r.wo); NL._kick(); } }, "Hide") : "", " ", r.wo ? NL.h("button", { type: "button", class: "nl2-flw-enter nl2-x167-go", disabled: r.sent, onclick: () => { NL.pve.open("wh", r.wo); } }, r.sent ? "Sent" : "Attack") : "")
+                        NL.h("td", { class: "nl2-flw-nw" }, r.wo ? NL.h("button", { type: "button", class: "nl2-flw-enter nl2-x167-hide", title: "Hide this wormhole until it expires", onclick: () => { NL.pve.hide("wh", r.wo); NL._kick(); } }, "Hide") : "", " ", r.wo ? NL.h("button", { type: "button", class: "nl2-flw-enter nl2-x167-go", disabled: r.sent, onclick: () => { NL.pve.open("wh", r.wo); } }, r.sent ? "Sent" : "Attack") : "", x203 && !r.wo && r.btn ? enterBtn(r) : "")
                     ];
+                    const enterBtn = (r) => NL.h("button", { type: "button", class: "nl2-flw-enter", disabled: r.btn.disabled, onclick: () => { r.btn.click(); NL._kick(); } }, (r.btn.textContent || "").trim() || "Enter Wormhole");
                     const head = ["Class", "System", "Mass", "Expires", ...(x167 ? ["Nearest Planet", "Distance", ""] : []), ""];
-                    const widths = ["80px", "150px", "160px", "", ...(x167 ? ["140px", "100px", "170px"] : []), "170px"];
+                    const widths = x203 ? ["80px", "150px", "160px", "150px", "140px", "100px", "170px", ""] : ["80px", "150px", "160px", "", ...(x167 ? ["140px", "100px", "170px"] : []), "170px"];
+                    if (x203)
+                        return { n: rows.length, sig, x203, nHid, nShown: shown.length, build: () => NL.h("table", { style: { tableLayout: "fixed" } }, headRow(head, widths), NL.h("tbody", null, shown.length ? shown.map((r, i) => NL.h("tr", { class: "nl2-flw-run" + (i % 2 ? "" : " nl2-z") }, NL.h("td", null, pill(r.cls)), NL.h("td", { class: "nl2-flw-nw" }, NL.h("span", { class: "nl2-flw-ar" }, ""), sysLink(r.sysId, r.sys)), NL.h("td", null, r.lim ? fmtN(num(String(r.used).replace(/,/g, ""))) + " / " + fmtN(num(String(r.lim).replace(/,/g, ""))) : dash()), NL.h("td", null, r.exp ? cdCell("", r.exp) : dash()), ...ex(r), NL.h("td", null, ""))) : NL.h("tr", null, NL.h("td", { colspan: head.length, class: "nl2-d" }, "No wormholes to enter.")))) };
                     return { n: rows.length, sig, build: () => NL.h("table", null, headRow(head, widths), NL.h("tbody", null, shown.map((r, i) => NL.h("tr", { class: "nl2-flw-run" + (i % 2 ? "" : " nl2-z") + (r.sent ? " nl2-x167-sent" : "") }, NL.h("td", null, pill(r.cls)), NL.h("td", { class: "nl2-flw-nw" }, NL.h("span", { class: "nl2-flw-ar" }, ""), sysLink(r.sysId, r.sys)), NL.h("td", null, r.lim ? fmtN(num(String(r.used).replace(/,/g, ""))) + " / " + fmtN(num(String(r.lim).replace(/,/g, ""))) : dash()), NL.h("td", null, r.exp ? cdCell("", r.exp) : dash()), ...ex(r), NL.h("td", null, r.btn ? NL.h("button", { type: "button", class: "nl2-flw-enter", disabled: r.btn.disabled, onclick: () => { r.btn.click(); NL._kick(); } }, (r.btn.textContent || "").trim() || "Enter Wormhole") : "")))), nHid ? NL.h("tfoot", null, NL.h("tr", null, NL.h("td", { colspan: head.length, class: "nl2-x167-foot" }, nHid + " hidden \u00B7 ", NL.h("button", { type: "button", class: "nl2-flw-enter", onclick: () => { NL.pve.unhideAll("wh"); NL._kick(); } }, "Show all")))) : null) };
+                }
+                function x203Head(dl, d, on) {
+                    const h = dl.previousElementSibling && dl.previousElementSibling.tagName === "H4" ? dl.previousElementSibling : null;
+                    if (!h)
+                        return;
+                    let hn = h.querySelector(":scope > .nl2-x203-hn");
+                    if (!(d.x203 && on && d.n > 0)) {
+                        if (hn)
+                            hn.remove();
+                        if (h.hasAttribute("data-nl2-x203"))
+                            h.removeAttribute("data-nl2-x203");
+                        return;
+                    }
+                    if (!h.hasAttribute("data-nl2-x203"))
+                        h.setAttribute("data-nl2-x203", "");
+                    const tn = [...h.childNodes].filter((n) => n.nodeType === 3);
+                    tn.forEach((n, i) => {
+                        const v = n.nodeValue || "";
+                        if (/\(\d+\)/.test(v)) {
+                            const w = v.replace(/\(\d+\)/, "(" + d.nShown + ")");
+                            if (w !== v)
+                                n.nodeValue = w;
+                        }
+                        else if (/^\s*\d+\s*$/.test(v) && i > 0 && /\(\s*$/.test(tn[i - 1].nodeValue || "")) {
+                            if (v.trim() !== String(d.nShown))
+                                n.nodeValue = String(d.nShown);
+                        }
+                    });
+                    if (!d.nHid) {
+                        if (hn)
+                            hn.remove();
+                        return;
+                    }
+                    if (!hn) {
+                        hn = NL.h("span", { class: "nl2-x203-hn" }, NL.h("span", null, ""), NL.h("button", { type: "button", title: "Show the wormholes you hid", onclick: () => { NL.pve.unhideAll("wh"); NL._kick(); } }, "Show all"));
+                    }
+                    const t = d.nHid + " hidden \u00B7 ";
+                    if (hn.firstChild.textContent !== t)
+                        hn.firstChild.textContent = t;
+                    if (hn.parentNode !== h || h.lastChild !== hn)
+                        h.appendChild(hn);
                 }
                 function completed(list, all) {
                     const cards = [...list.querySelectorAll(".expedition-report-card")].map((c) => [fkey(c), c]).filter(([id]) => id != null);
@@ -12427,6 +13374,7 @@
                     if (dl) {
                         const d = detected(dl);
                         placeBox(dl, on && d.n > 0, d.sig, d.build);
+                        x203Head(dl, d, on);
                     }
                     const cl = tab.querySelector(":scope > .expedition-reports-list");
                     if (cl) {
@@ -12637,7 +13585,37 @@
             init() { NL.css("fl-cc-summary-hide", ".cc-fleet-overview > .cc-fleet-summary-grid{display:none!important}"); },
         });
         const FAT_SLOTS_ST = ["outbound", "returning", "in_combat", "raiding", "mining", "exploring", "surveying", "stationed", "collecting", "inside_wormhole"];
+        NL.flReloc = true;
+        const fatReloc = (m) => !!NL.flReloc && !!m && m.missionType === "relocate_outpost";
         const fatHolds = (m) => !(m.logisticsRouteId != null || m.missionType === "patrol" || m.missionType === "leadership_move") && FAT_SLOTS_ST.includes(m.status);
+        NL.feature({
+            id: "fl-active-count",
+            set: "Fleet",
+            name: "Active tab counts fleet slots",
+            desc: "FL-204: the Fleet > Active tab count shows only fleets that use a fleet slot (patrols, trade routes and leader moves left out).",
+            init() {
+                let n = null;
+                NL.onData(/^\/api\/fleet\/missions$/, (pth, d) => { if (d && Array.isArray(d.missions)) {
+                    n = d.missions.filter(fatHolds).length;
+                    NL._kick();
+                } });
+                NL.watch(".fleet-command-primary .fleet-tab", (b) => {
+                    if (n == null)
+                        return;
+                    const ts = [...b.childNodes].filter((t) => t.nodeType === 3);
+                    ts.forEach((t, i) => {
+                        const r = /^(\s*Active\s*\()(\d+)(\)\s*)$/.exec(t.nodeValue);
+                        if (r) {
+                            if (r[2] !== String(n))
+                                t.nodeValue = r[1] + n + r[3];
+                            return;
+                        }
+                        if (/^\d+$/.test(t.nodeValue) && i > 0 && /Active\s*\(\s*$/.test(ts[i - 1].nodeValue) && t.nodeValue !== String(n))
+                            t.nodeValue = String(n);
+                    });
+                });
+            },
+        });
         NL.feature({
             id: "fl-active-table",
             set: "Fleet",
@@ -12879,6 +13857,7 @@
                         t.nodeValue = t.nodeValue.replace(/^[^A-Za-z0-9]+/, "");
                     return b;
                 };
+                const relocName = (m, src) => String((m.source && m.source.name) || m.sourceOutpostName || src || "").trim();
                 function row(card, m, i, z) {
                     const id = m.id, badge = card.querySelector(".mission-type-badge");
                     const link = card.querySelector("a.mission-route-link");
@@ -12891,7 +13870,8 @@
                     const shipTip = (m.fleetComposition || []).map((x) => fmtN(n(x.quantity)) + " " + (x.shipName || x.shipKey)).join(", ");
                     const ab = acts(card);
                     const pk = picking.get(id);
-                    const actCell = pk === "open" ? cell() : cell(...ab.map((b) => {
+                    const rl = fatReloc(m);
+                    const actCell = pk === "open" ? cell() : cell(...ab.filter((b) => !(rl && isRecall(b))).map((b) => {
                         const t = label(b), rec = isRecall(b), sel = SEL.test(t);
                         const armedNow = NL.fl179 && rec && rcArm.has(id) && Date.now() - rcArm.get(id) < 5000;
                         return NL.h("button", { type: "button", class: "nl2-fat-rc" + (armedNow ? " nl2-fat-arm" : ""), "data-nl2-tip": rec ? recallTip(m) : null, onclick: () => {
@@ -12916,7 +13896,8 @@
                                 paint();
                             } }, (rec ? "\u2715 " : sel ? "\u21B6 " : "") + (armedNow ? "Confirm" : t.replace(/^\W+/, "")));
                     }));
-                    return NL.h("div", { class: "nl2-fat" + (z ? " nl2-z" : ""), "data-nl2-fat-id": String(id), style: { order: String(i) } }, cell(NL.h("span", { class: "nl2-fat-arc", title: "Show the game's card", onclick: () => toggle(id) }, open.has(id) ? "\u25BE" : "\u25B8"), badge ? plainBadge(badge) : (m.missionType || ""), NL.fl181 && m.leadershipVessel ? NL.h("span", { class: "nl2-fat-star", "data-nl2-tip": "\u2605 " + leader(m, card) }, " \u2605") : null), ...(NL.fl178 ? [(() => { const d = detailHtml(m), el = NL.h("div"); el.innerHTML = d || "\u2013"; const tx = (el.textContent || "").trim(); if (tx && tx !== "\u2013" && tx !== "\u2014")
+                    return NL.h("div", { class: "nl2-fat" + (z ? " nl2-z" : ""), "data-nl2-fat-id": String(id), style: { order: String(i) } }, cell(NL.h("span", { class: "nl2-fat-arc", title: "Show the game's card", onclick: () => toggle(id) }, open.has(id) ? "\u25BE" : "\u25B8"), rl ? NL.h("span", { class: badge ? badge.className : "mission-type-badge", "data-nl2-tip": "Outpost Relocation" }, "Relocation")
+                        : badge ? plainBadge(badge) : (m.missionType || ""), NL.fl181 && m.leadershipVessel ? NL.h("span", { class: "nl2-fat-star", "data-nl2-tip": "\u2605 " + leader(m, card) }, " \u2605") : null), ...(NL.fl178 ? [(() => { const d = rl ? NL.esc(relocName(m, src)) : detailHtml(m), el = NL.h("div"); el.innerHTML = d || "\u2013"; const tx = (el.textContent || "").trim(); if (tx && tx !== "\u2013" && tx !== "\u2014")
                             el.setAttribute("data-nl2-tip", tx); return el; })()] : []), cell(NL.h("span", { class: "nl2-fat-st " + stCls(m) }, stTxt(card, m))), cell(planetLink(src), " \u2192 ", ownT ? (m.targetMoonId != null ? moonLink(ownT) : planetLink(ownT)) : link ? NL.h("a", { class: "nl2-fat-sys", href: link.getAttribute("href") || "#", "data-nl2-tip": fpl ? "System " + sys : null, onclick: (e) => { e.preventDefault(); const g = document.querySelector(".mission-card[data-nl2-fat-mid=\"" + id + "\"] a.mission-route-link"); if (g)
                             g.click(); } }, fpl || tgt) : fpl ? NL.h("span", { "data-nl2-tip": sys ? "System " + sys : null }, fpl) : planetLink(tgt)), cell(NL.h("span", { title: shipTip || null }, fmtN(ships) + (ships === 1 ? " ship" : " ships"))), phaseCell(m, card), homeCell(m), cell(...cargo(m.cargo)), actCell);
                 }
@@ -14755,6 +15736,7 @@
             NL.option({ key: "fl-transfer.pltrig", group: "Fleet Transfer", label: "Make route, planet \u2192 planet (Move out rows): Trigger When (amount)", type: "number", def: 100000, min: 1, step: 1000 });
             NL.option({ key: "fl-transfer.plsend", group: "Fleet Transfer", label: "Make route, planet \u2192 planet (Move out rows): Send Amount", type: "number", def: 50000, min: 1, step: 1000 });
         }
+        NL.fl209 = true;
         NL.feature({
             id: "fl-transfer-supto",
             set: "Fleet",
@@ -15198,13 +16180,17 @@
                         }
                     for (const t of out) {
                         t.covered = routes().filter((r) => covers(r, t));
+                        if (NL.fl209 && routes().some((r) => fl209Paused(r) && coversAny(r, t)))
+                            t.fl209p = true;
                         const left = Object.keys(t.res).filter((k) => !t.covered.some((r) => rk(r) === k));
                         t.done = t.covered.length > 0 && !left.length;
                         t.mission = enRoute(t.go);
                     }
                     return out;
                 }
-                function covers(r, t) {
+                function fl209Paused(r) { return r.isPaused === true || r.paused === true || r.isActive === false || r.enabled === false || /pause/i.test(String(r.status || "")); }
+                function covers(r, t) { return NL.fl209 && fl209Paused(r) ? false : coversAny(r, t); }
+                function coversAny(r, t) {
                     const k = rk(r);
                     if (!k || !(k in t.res))
                         return false;
@@ -15867,7 +16853,8 @@
                 const WHY_CAT = new Proxy(WHY_CAT0, { get: (o, k) => (trThr() && k === "moon" ? "Over Collect" : trThr() && k === "supply" ? "Below Maintain" : o[k]) });
                 const whyFull = (t) => (!isFinite(t.due) ? [] : [t.due <= 0 ? "Full now" : "Full in " + trDur(t.due) + ", at " + trClock(Date.now() + t.due * 1000)]);
                 const whyFill = (x) => trName(x.k) + " " + Math.floor(x.f * 100) + "% of storage (" + trFmt(x.now) + " / " + trFmt(x.cap) + ")";
-                function whyTip(t) {
+                function whyTip(t) { const w = whyTip0(t); return t.fl209p ? w + "\nRoute paused: it covers this but won't run until resumed (Routes table)" : w; }
+                function whyTip0(t) {
                     const r = t.rows || [];
                     if (t.kind === "move")
                         return ["Storage high:", ...r.map(whyFill), "Shows at " + Math.round(pct() * 100) + "% (setting: Move out when planet storage reaches)", ...whyFull(t), "Move out takes it down to 50% of storage"].join("\n");
@@ -15900,7 +16887,7 @@
                         const routeBtn = mHub !== undefined ? NL.h("button", { type: "button", class: "nl2-c-blue", disabled: !mHub, "data-nl2-tip": mHub ? "Collect Moon route from " + t.from.name + " to " + mHub.name + " (" + mHub.used + "/" + mHub.max + " routes)" : "No hub planet with a free route slot", onclick: () => routeDialog(t) }, "Make route")
                             : plan ? NL.h("button", { type: "button", class: "nl2-c-blue", "data-nl2-tip": plan.mode + ": " + trName(plan.k) + " from " + plan.from.name + " to " + plan.to.name + ", when \u2265 " + trFmt(plan.trig) + ", send " + trFmt(plan.amt), onclick: (e) => makeRoute(t, e.currentTarget) }, "Make route") : null;
                         const sh = bare ? NL.h("td", null, dash()) : t.noShips ? NL.h("td", { class: "nl2-ftr-d" }, "no ships on moon") : t.ships ? NL.h("td", { class: "nl2-ftr-est" + (t.ships.short ? " nl2-ftr-short" : ""), "data-nl2-tip": t.ships.short ? "Only " + t.ships.have + " there" : null }, t.ships.text) : NL.h("td", { class: "nl2-ftr-d" }, "\u2014");
-                        return NL.h("tr", { class: t.mission ? "nl2-ftr-enr" : null, "data-nl2-ftr-key": t.key }, NL.h("td", null, t.task), NL.h("td", t.from && t.from.empty ? { class: "nl2-ftr-empty", "data-nl2-tip": t.from.name + " holds none of this" } : null, place(t.from)), NL.h("td", null, t.to && !bare ? place(t.to) : dash()), bare ? NL.h("td", null, dash()) : resCell(t.res), sh, NL.h("td", { class: "nl2-ftr-r" }, t.mission && homeAt(t.mission) ? cd(homeAt(t.mission)) : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", { "data-nl2-tip": whyTip(t), onpointerover: (e) => e.currentTarget.setAttribute("data-nl2-tip", whyTip(t)) }, WHY_CAT[t.kind] || t.why), NL.h("td", null, t.mission ? NL.h("span", { class: "nl2-ftr-st nl2-ftr-trav" }, "en route") : ""), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, routeBtn || NL.h("span", { class: "nl2-ftr-gap" }), actBtn), hideBox(t.key));
+                        return NL.h("tr", { class: t.mission ? "nl2-ftr-enr" : null, "data-nl2-ftr-key": t.key }, NL.h("td", null, t.task), NL.h("td", t.from && t.from.empty ? { class: "nl2-ftr-empty", "data-nl2-tip": t.from.name + " holds none of this" } : null, place(t.from)), NL.h("td", null, t.to && !bare ? place(t.to) : dash()), bare ? NL.h("td", null, dash()) : resCell(t.res), sh, NL.h("td", { class: "nl2-ftr-r" }, t.mission && homeAt(t.mission) ? cd(homeAt(t.mission)) : NL.h("span", { class: "nl2-ftr-d" }, "\u2014")), NL.h("td", { "data-nl2-tip": whyTip(t), onpointerover: (e) => e.currentTarget.setAttribute("data-nl2-tip", whyTip(t)) }, (WHY_CAT[t.kind] || t.why) + (t.fl209p ? " \u00B7 Route paused" : "")), NL.h("td", null, t.mission ? NL.h("span", { class: "nl2-ftr-st nl2-ftr-trav" }, "en route") : ""), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, routeBtn || NL.h("span", { class: "nl2-ftr-gap" }), actBtn), hideBox(t.key));
                     });
                     return NL.h("table", null, NL.h("colgroup", null, ...COLS.map(([, w]) => NL.h("col", { style: w ? "width:" + w : null }))), NL.h("thead", null, head), NL.h("tbody", null, ...body));
                 }
@@ -16203,7 +17190,7 @@
                     }
                     if (!on)
                         return;
-                    const s = JSON.stringify([list.map((t) => [t.key, t.res, t.why, !!t.mission, t.mission && homeAt(t.mission), t.done, hidden(t), t.to && t.to.id, t.from && t.from.id, t.ships && t.ships.text, !!routePlan(t), isFinite(t.due) ? Math.round(t.due / 60) : -1, t.noShips, t.covered.length]), routes().length, (saved("routes") || {}).at, st.get("hide", {}), st.get("collapsed", {}), st.get("sort", null), Math.floor(Date.now() / 60000)]);
+                    const s = JSON.stringify([list.map((t) => [t.key, t.res, t.why, !!t.fl209p, !!t.mission, t.mission && homeAt(t.mission), t.done, hidden(t), t.to && t.to.id, t.from && t.from.id, t.ships && t.ships.text, !!routePlan(t), isFinite(t.due) ? Math.round(t.due / 60) : -1, t.noShips, t.covered.length]), routes().length, (saved("routes") || {}).at, st.get("hide", {}), st.get("collapsed", {}), st.get("sort", null), Math.floor(Date.now() / 60000)]);
                     if (s === sig && box.firstChild)
                         return;
                     sig = s;
@@ -16435,9 +17422,28 @@
             { more: true, key: "mining", cls: "battle", tab: /^reports?\b/i, path: "/api/fleet/mining-reports", items: (d) => d.reports, opt: "fl-quiet.mining", label: "Reports: no badge for Mining Complete", match: (r) => r.reportType === "delivery", alert: () => false },
             { more: true, key: "mining", cls: "battle", tab: /^reports?\b/i, path: "/api/fleet/mining-reports", items: (d) => d.reports, opt: "fl-quiet.raid", label: "Reports: badge Mining Raids only on a loss (ships or cargo lost, raid not repelled)", match: (r) => r.reportType === "pirate_raid", alert: (r) => r.combatOutcome !== "defender_won" || fqLost(r.shipsLost) || fqAny(r.cargoStolen) || fqLost(r.combatLog && r.combatLog.defenderLosses) },
             { more: true, key: "battle", cls: "battle", tab: /^reports?\b/i, path: "/api/fleet/reports", items: (d) => d.reports, opt: "fl-quiet.whbattle", label: "Reports: no badge for Wormhole Battles", match: (r) => !r.defenderId && !r.planetId && !r.moonId, alert: () => false },
+            { fl191: true, key: "expedition", cls: "expedition", tab: /^expeditions?\b/i, path: "/api/fleet/expedition-reports", items: (d) => d.reports, opt: "fl-quiet.expedition", label: "Expeditions: no badge for unread reports", alert: () => false },
+            { fl191: true, key: "wormhole", cls: "wormhole", tab: /^wormholes?\b/i, path: "/api/fleet/wormhole-runs", items: (d) => d.runs, opt: "fl-quiet.whrun", label: "Wormholes: no badge for unread run reports (runs waiting for Continue / Retreat keep theirs)", alert: () => false },
         ];
         NL.flQuietMore = true;
-        const fqCats = () => FQ_CATS.filter((c) => !c.more || NL.flQuietMore);
+        NL.fl191 = true;
+        NL.fl187 = true;
+        NL.fleetTabLabel = function (b) {
+            const l = b.querySelector(".fleet-activity-label > span");
+            if (l)
+                return (l.textContent || "").trim();
+            if (!NL.fl187)
+                return (b.textContent || "").trim();
+            const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+            let s = "", n;
+            while ((n = w.nextNode())) {
+                const c = n.parentElement && n.parentElement.closest(".unread-badge, [class*=\"nl2-\"]");
+                if (!c || c === b || !b.contains(c))
+                    s += n.textContent;
+            }
+            return s.replace(/\s+/g, " ").trim();
+        };
+        const fqCats = () => FQ_CATS.filter((c) => (!c.more || NL.flQuietMore) && (!c.fl191 || NL.fl191));
         fqCats().forEach((c) => { if (NL.option)
             NL.option({ key: c.opt, group: "Fleet badges", label: c.label, type: "checkbox", def: true }); });
         const fqRe = (p) => new RegExp("^" + p.replace(/[/.-]/g, "\\$&") + "(\\?|$)");
@@ -16445,7 +17451,7 @@
             id: "fl-badge-quiet",
             set: "Fleet",
             name: "Quiet Fleet reports",
-            desc: "FL-161 to FL-163, FL-182 to FL-184: unread Survey, Pirate and Mining Raid reports raise no Fleet badge unless they need attention (ships or cargo lost, battle lost); Mining Complete and Wormhole Battle reports never do. They stay unread.",
+            desc: "FL-161 to FL-163, FL-182 to FL-184, FL-187, FL-191: unread Survey, Pirate and Mining Raid reports raise no Fleet badge unless they need attention (ships or cargo lost, battle lost); Mining Complete, Wormhole Battle, Expedition and Wormhole run reports never do. Silent on the Fleet menu, the tab and the unread chip. They stay unread.",
             init(ctx) {
                 const CATS = fqCats(), on = (c) => NL.opt(c.opt) !== false;
                 const LISTS = [...new Set(CATS.map((c) => c.path))].map((path) => ({ path, cats: CATS.filter((c) => c.path === path), keys: [...new Set(CATS.filter((c) => c.path === path).map((c) => c.key))] }));
@@ -16552,23 +17558,32 @@
                     s.unread.clear(); s.gen++; clearTimeout(s.wait); s.held = {}; }); changed(); });
                 CATS.forEach((c) => NL.onOpt && NL.onOpt(c.opt, () => { sig = ""; changed(); }));
                 const TABS = [...new Set(CATS.map((c) => c.cls))].map((cls) => { const cs = CATS.filter((c) => c.cls === cls); return { cls, tab: cs[0].tab, keys: [...new Set(cs.map((c) => c.key))] }; });
-                NL.css("nl2-fl-quiet", TABS.map((t) => `html[data-nl2-flq-${t.cls}] .fleet-page .fleet-tab .unread-badge.${t.cls}:not(.nl2-flq-badge){display:none!important}`).join("\n"));
+                NL.css("nl2-fl-quiet", TABS.map((t) => `html[data-nl2-flq-${t.cls}] .fleet-page .fleet-tab .unread-badge.${t.cls}:not(.nl2-flq-badge){display:none!important}`).join("\n")
+                    + "\n.fleet-page .fleet-tab .unread-badge[data-nl2-flq-hide],.fleet-page .fleet-stat-chip[data-nl2-flq-hide]{display:none!important}");
+                const gameBadge = (tab, cls) => (NL.fl187 ? [...tab.querySelectorAll(".unread-badge")].find((x) => !/\bnl2-/.test(x.className)) : tab.querySelector(".unread-badge." + cls + ":not(.nl2-flq-badge)"));
                 function tabs() {
                     const root = document.documentElement, pg = document.querySelector(".fleet-page");
+                    const navTabs = pg ? [...pg.querySelectorAll(".fleet-command-navigation .fleet-tab")] : [];
                     for (const T of TABS) {
                         const m = T.keys.reduce((t, k) => t + NL.flQuiet.minus(k), 0), attr = "data-nl2-flq-" + T.cls;
-                        const tab = pg && [...pg.querySelectorAll(".fleet-command-navigation .fleet-tab")].find((b) => T.tab.test(((b.querySelector(".fleet-activity-label > span") || b).textContent || "").trim()));
-                        const gb = tab && tab.querySelector(".unread-badge." + T.cls + ":not(.nl2-flq-badge)");
+                        const tab = navTabs.find((b) => T.tab.test(NL.fleetTabLabel(b)));
+                        const gb = tab && gameBadge(tab, T.cls);
                         let x = tab && tab.querySelector(".nl2-flq-badge");
+                        const unhide = () => { if (root.hasAttribute(attr))
+                            root.removeAttribute(attr); if (tab)
+                            tab.querySelectorAll("[data-nl2-flq-hide]").forEach((e) => e.removeAttribute("data-nl2-flq-hide")); };
                         if (!m || !gb) {
-                            if (root.hasAttribute(attr))
-                                root.removeAttribute(attr);
+                            unhide();
                             if (x)
                                 x.remove();
                             continue;
                         }
                         const n = Math.max(0, (parseInt((gb.textContent || "").trim(), 10) || 0) - m);
-                        if (!root.hasAttribute(attr))
+                        if (NL.fl187) {
+                            if (!gb.hasAttribute("data-nl2-flq-hide"))
+                                gb.setAttribute("data-nl2-flq-hide", "");
+                        }
+                        else if (!root.hasAttribute(attr))
                             root.setAttribute(attr, "");
                         if (!n) {
                             if (x)
@@ -16576,13 +17591,58 @@
                             continue;
                         }
                         if (!x)
-                            x = NL.h("span", { class: "unread-badge " + T.cls + " nl2-flq-badge" });
+                            x = NL.h("span", { class: "nl2-flq-badge" });
+                        const cn = gb.className.replace(/\s*\bnl2-flq-badge\b/g, "") + " nl2-flq-badge";
+                        if (x.className !== cn)
+                            x.className = cn;
                         if (x.previousElementSibling !== gb)
                             gb.insertAdjacentElement("afterend", x);
                         if (x.textContent !== String(n))
                             x.textContent = String(n);
                     }
+                    chip();
                 }
+                function chip() {
+                    const box = NL.fl187 && document.querySelector(".fleet-page .fleet-stat-chips");
+                    const gc = box && [...box.querySelectorAll(".fleet-stat-chip")].find((e) => !e.classList.contains("nl2-flq-chip") && /\d[\d,]*\s*unread\b/i.test(e.textContent || ""));
+                    let x = box && box.querySelector(".nl2-flq-chip");
+                    const m = NL.flQuiet.keys().reduce((t, k) => t + NL.flQuiet.minus(k), 0);
+                    if (!gc || !m) {
+                        if (gc && gc.hasAttribute("data-nl2-flq-hide"))
+                            gc.removeAttribute("data-nl2-flq-hide");
+                        if (x)
+                            x.remove();
+                        return;
+                    }
+                    const g = parseInt(((gc.textContent || "").match(/(\d[\d,]*)\s*unread/i) || [0, "0"])[1].replace(/,/g, ""), 10) || 0, n = Math.max(0, g - m);
+                    if (!gc.hasAttribute("data-nl2-flq-hide"))
+                        gc.setAttribute("data-nl2-flq-hide", "");
+                    if (!n) {
+                        if (x)
+                            x.remove();
+                        return;
+                    }
+                    const sig = gc.innerHTML + "|" + n;
+                    if (!x || x.__nlSig !== sig) {
+                        const c = gc.cloneNode(true);
+                        c.removeAttribute("data-nl2-flq-hide");
+                        c.classList.add("nl2-flq-chip");
+                        c.__nlSig = sig;
+                        const w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT);
+                        let t;
+                        while ((t = w.nextNode()))
+                            if (/\d/.test(t.textContent)) {
+                                t.textContent = t.textContent.replace(/\d[\d,]*/, String(n));
+                                break;
+                            }
+                        if (x)
+                            x.replaceWith(c);
+                        x = c;
+                    }
+                    if (x.previousElementSibling !== gc)
+                        gc.insertAdjacentElement("afterend", x);
+                }
+                NL.watch(".fleet-page .fleet-stat-chips", () => chip());
                 NL.watch(".fleet-page .fleet-command-navigation", () => tabs());
             },
         });
@@ -16849,6 +17909,71 @@
         });
     }
     {
+        NL.flTabAvail = true;
+        const FA_TABS = [
+            { tab: /^pirates?\b/i, lines: (c) => [c.camp && "Pirate camps: " + c.camp + " to attack"] },
+            { tab: /^wormholes?\b/i, lines: (c) => [c.wh && "Wormholes: " + c.wh + " to explore"] },
+            { tab: /^surveys?\b/i, lines: (c) => [c.inv && "Investigate: " + c.inv + " open", c.salv && "Freight: " + c.salv + " to collect"] },
+        ];
+        NL.feature({
+            id: "fl-tab-avail",
+            set: "Fleet",
+            name: "Available-to-run tab badges",
+            desc: "FL-188 / FL-190: amber badges on the Pirates, Wormholes and Surveys tabs for camps to attack, wormholes to explore, anomalies to investigate and freight to collect. Never on the Fleet menu.",
+            init() {
+                if (!NL.flTabAvail)
+                    return;
+                NL.css("fl-tab-avail", ".fleet-page .fleet-tab .nl2-fav-badge{background:#f59e0b!important;color:#111!important}");
+                let subbed = false, cache = null, at = 0;
+                const counts = () => {
+                    if (cache && Date.now() - at < 3000)
+                        return cache;
+                    try {
+                        cache = NL.pve && NL.pve.availCounts ? NL.pve.availCounts() : null;
+                    }
+                    catch (e) {
+                        cache = null;
+                    }
+                    at = Date.now();
+                    return cache;
+                };
+                function paint() {
+                    const pg = document.querySelector(".fleet-page");
+                    if (!pg)
+                        return;
+                    if (!subbed && NL.pve && NL.pve.sub) {
+                        subbed = true;
+                        NL.pve.sub(() => { at = 0; paint(); });
+                    }
+                    const c = counts() || {}, tabs = [...pg.querySelectorAll(".fleet-command-navigation .fleet-tab")];
+                    const label = NL.fleetTabLabel || ((b) => (b.textContent || "").trim());
+                    for (const T of FA_TABS) {
+                        const tab = tabs.find((b) => T.tab.test(label(b)));
+                        if (!tab)
+                            continue;
+                        const ls = T.lines(c).filter(Boolean), n = ls.reduce((t, l) => t + (parseInt(l.split(": ")[1], 10) || 0), 0);
+                        let x = tab.querySelector(".nl2-fav-badge");
+                        if (!n) {
+                            if (x)
+                                x.remove();
+                            continue;
+                        }
+                        if (!x)
+                            x = NL.h("span", { class: "unread-badge nl2-fav-badge" });
+                        if (x.parentElement !== tab)
+                            tab.appendChild(x);
+                        if (x.textContent !== String(n))
+                            x.textContent = String(n);
+                        const tip = ls.join("\n");
+                        if (x.getAttribute("data-nl2-tip") !== tip)
+                            x.setAttribute("data-nl2-tip", tip);
+                    }
+                }
+                NL.watch(".fleet-page .fleet-command-navigation", () => paint());
+            },
+        });
+    }
+    {
         NL.pveMove = true;
         NL.pveMoveOn = () => !!NL.pveMove && NL.enabled("fl-pve-tabs");
         NL.fl142 = true;
@@ -17011,6 +18136,428 @@
         });
     }
     {
+        NL.flDebris = true;
+        NL.feature({
+            id: "fl-debris",
+            set: "Fleet",
+            name: "Debris table",
+            desc: "FL-197 to FL-201: Fleet > Debris as one table of piles and battle freight to collect, with resource columns, public piles first, Send more on piles being collected, and One click mode.",
+            init({ store }) {
+                if (!NL.flDebris)
+                    return;
+                NL.css("fl-debris", `
+      .debris-tab[data-nl2-fdb] > :not(.nl2-fdb){display:none!important}
+      .nl2-fdb{margin:0 0 12px}
+      .nl2-fdb-bar{display:flex;justify-content:flex-end;gap:16px;align-items:center;margin:0 0 6px;font:500 13.6px Rajdhani,"Exo 2",sans-serif;color:#c0cce0}
+      .nl2-fdb-bar label{display:inline-flex;gap:6px;align-items:center;cursor:pointer;white-space:nowrap}
+      .nl2-fdb-bar input{margin:0;cursor:pointer}
+      .nl2-fdb-wrap{background:rgb(11,21,37);border:.8px solid rgba(120,200,255,.12);border-radius:8px;padding:6px 8px}
+      .nl2-fdb table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:15px;color:#d9e6f7}
+      .nl2-fdb th,.nl2-fdb td{padding:5px 9px;border-bottom:1px solid rgba(120,200,255,.1);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:24px;font-variant-numeric:tabular-nums}
+      .nl2-fdb th{color:#8fb3d9;font-weight:600;font-size:13.6px}
+      .nl2-fdb th + th,.nl2-fdb td + td{border-left:1px solid rgba(120,200,255,.1)}
+      .nl2-fdb th .game-resource-icon{width:18px;height:18px;vertical-align:-4px}
+      .nl2-fdb td.nl2-fdb-act,.nl2-fdb th.nl2-fdb-act{text-align:right;overflow:visible}
+      .nl2-fdb td.nl2-fdb-hide,.nl2-fdb th.nl2-fdb-hide{text-align:center}
+      .nl2-fdb tfoot td{color:#fcd34d;font-weight:600;border-bottom:0}
+      .nl2-fdb a.nl2-fdb-sys{color:#7fd4ff;cursor:pointer;text-decoration:none}.nl2-fdb a.nl2-fdb-sys:hover{text-decoration:underline}
+      .nl2-fdb .nl2-fdb-pub{color:#fcd34d;font-weight:700;margin-left:2px}
+      .nl2-fdb .nl2-fdb-grd{color:#f87171;margin-left:4px}
+      .nl2-fdb .nl2-fdb-g{color:#4ade80}.nl2-fdb .nl2-fdb-y{color:#fcd34d}.nl2-fdb .nl2-fdb-r{color:#f87171}
+      .nl2-fdb .nl2-fdb-dim{color:#5f7a94}
+      .nl2-fdb button.nl2-fdb-b{font:600 13px Rajdhani,"Exo 2",sans-serif;border-radius:5px;height:24px;width:110px;padding:1px 6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;
+        background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.5)}
+      .nl2-fdb button.nl2-fdb-b.nl2-fdb-red{background:rgba(239,68,68,.12);color:#fca5a5;border-color:rgba(239,68,68,.5)}
+      .nl2-fdb button.nl2-fdb-ic{background:none;border:0;color:#8fb3d9;cursor:pointer;padding:0 4px;vertical-align:middle;font-size:14px}
+      .nl2-fdb button.nl2-fdb-ic svg{width:16px;height:16px}
+      .nl2-fdb button.nl2-fdb-rf{font:600 13px Rajdhani,"Exo 2",sans-serif;background:rgba(56,189,248,.1);color:#7dd3fc;border:1px solid rgba(56,189,248,.4);border-radius:5px;height:24px;width:84px;cursor:pointer}
+      .nl2-fdb-empty{color:#5f7a94;font:500 14px Rajdhani,sans-serif;padding:6px 8px}
+    `);
+                const RES = [["ore", "Ore"], ["silicates", "Silicates"], ["hydrogen", "Hydrogen"], ["alloys", "Alloys"], ["cryo_ice", "Cryo-Ice"], ["quantum_dust", "Quantum Dust"], ["plasma_core", "Plasma Core"], ["bio_extract", "Bio-Extract"], ["dark_matter", "Dark Matter"]];
+                const ACTIVE = ["outbound", "collecting", "in_combat"];
+                const CAP = { bulk_carrier: 4200, transport_shuttle: 479 };
+                const TIP = NL.tipA || "data-nl2-tip";
+                const fiber = (el) => { const k = el && Object.keys(el).find((x) => x.startsWith("__reactFiber")); return k ? el[k] : null; };
+                const fkey = (el) => { const f = fiber(el); return f && f.key != null ? String(f.key) : null; };
+                const propsUp = (el, want) => { let f = fiber(el); for (let i = 0; i < 8 && f; i++, f = f.return) {
+                    const p = f.memoizedProps;
+                    if (p && typeof p === "object" && Array.isArray(p[want]))
+                        return p;
+                } return null; };
+                const num = (v) => Number(v) || 0;
+                const ts = (v) => { const t = v ? new Date(v).getTime() : NaN; return Number.isFinite(t) ? t : null; };
+                const fmtN = (n) => Math.round(num(n)).toLocaleString("en-US");
+                const opt = (k, def) => { const v = store.get(k, def); return v == null ? def : v; };
+                const dash = () => NL.h("span", { class: "nl2-fdb-dim" }, "\u2014");
+                const cd = (t) => (t == null ? "\u2014" : NL.countdown ? NL.countdown(t - Date.now()) : String(Math.round((t - Date.now()) / 60000)) + "m");
+                const bands = () => { const b = NL.pve && NL.pve.bands ? NL.pve.bands() : null; return Array.isArray(b) ? b : [50, 100]; };
+                const distCls = (d) => { const [g, y] = bands(); return d <= g ? "nl2-fdb-g" : d < y ? "nl2-fdb-y" : "nl2-fdb-r"; };
+                const total = (o) => RES.reduce((a, [k]) => a + num(o && o[k]), 0);
+                const trash = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 6h18\"/><path d=\"M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6\"/><path d=\"M10 11v6M14 11v6\"/><path d=\"M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2\"/></svg>";
+                let ticking = null, prepped = false;
+                const prep = () => { if (prepped || !NL.pve || !NL.pve.prep)
+                    return; prepped = true; NL.pve.prep().then(() => NL._kick && NL._kick()); };
+                const tick = () => {
+                    if (ticking)
+                        return;
+                    let n = 0;
+                    ticking = setInterval(() => {
+                        const cells = document.querySelectorAll(".nl2-fdb [data-cd]");
+                        if (!document.querySelector(".nl2-fdb")) {
+                            clearInterval(ticking);
+                            ticking = null;
+                            return;
+                        }
+                        for (const c of cells) {
+                            const t = cd(+c.dataset.cd);
+                            if (c.textContent !== t)
+                                c.textContent = t;
+                        }
+                        if (++n % 30 === 0)
+                            NL._kick();
+                    }, 1000);
+                };
+                const roomLeft = (ms) => ms.reduce((a, m) => {
+                    const rp = m.raidParams || {}, b = num(rp.collectionCargoBonus), sb = num(rp.collectionShuttleCargoBonus);
+                    const cap = (m.fleetComposition || []).reduce((s, x) => s + num(x.quantity) * (CAP[x.shipKey] || 0) * (1 + b + (x.shipKey === "transport_shuttle" ? sb : 0)), 0);
+                    return a + Math.max(0, cap - total(m.cargo));
+                }, 0);
+                const remainder = (o, ms) => {
+                    const t = total(o), left = t - roomLeft(ms);
+                    if (!(t > 0) || left <= 0 || left >= t)
+                        return o;
+                    const f = left / t, out = { ...o };
+                    for (const [k] of RES)
+                        if (num(o[k]) > 0)
+                            out[k] = Math.ceil(num(o[k]) * f);
+                    return out;
+                };
+                NL.watch(".debris-tab", (tab) => {
+                    if (!NL.pve || !NL.pve.open)
+                        return;
+                    prep();
+                    let box = tab.querySelector(":scope > .nl2-fdb");
+                    if (!box)
+                        box = NL.h("div", { class: "nl2-fdb" });
+                    if (tab.firstElementChild !== box)
+                        tab.insertBefore(box, tab.firstElementChild);
+                    const tbl = opt("table", true) !== false, one = !!opt("one", false);
+                    tab.toggleAttribute("data-nl2-fdb", tbl);
+                    const p = propsUp(tab, "debris") || {}, piles = p.debris || [], missions = (p.missions || []).filter((m) => m && m.missionType === "collect_debris");
+                    const cards = {};
+                    for (const c of tab.querySelectorAll(".command-debris-field")) {
+                        const k = fkey(c);
+                        if (k != null)
+                            cards[k] = c;
+                    }
+                    const now = Date.now();
+                    const rows = [];
+                    piles.forEach((o, i) => {
+                        const exp = ts(o.expiresAt);
+                        if (exp != null && exp <= now)
+                            return;
+                        const on = missions.filter((m) => ACTIVE.includes(m.status) && m.raidParams && String(m.raidParams.debrisId) === String(o.id));
+                        const busy = on.length > 0 || !!(NL.pve.launched && NL.pve.launched("deb", o.id));
+                        const arr = on.map((m) => ts(m.arrivesAt) || 0).sort((a, b) => a - b)[0] || now;
+                        const card = cards[String(o.id)];
+                        rows.push({ kind: "deb", o, res: o, i, exp, busy, on, arr, pub: o.locationType === "pirate_camp", guard: !!o.guardedByPirates, near: NL.pve.near ? NL.pve.near("deb", o) : null, link: card && card.querySelector(".debris-system-link"), hide: card && card.querySelector(".debris-field-hide") });
+                    });
+                    const fr = NL.pve.freight ? NL.pve.freight() || [] : [];
+                    for (const r of fr) {
+                        const exp = ts(r.salvageExpiresAt);
+                        if (exp != null && exp <= now)
+                            continue;
+                        if (NL.pve.hidden && NL.pve.hidden("deb", "s" + r.id))
+                            continue;
+                        const gs = NL.pve.guards ? NL.pve.guards(r) : [];
+                        rows.push({ kind: "sal", o: r, res: r.uncollectedLoot || {}, i: 1000000, exp, busy: false, gs, guard: gs.length > 0, near: NL.pve.near ? NL.pve.near("salv", { ...r, requiresDeadPlanetOrigin: r.securityZone === "dead" }) : null });
+                    }
+                    const grp = (r) => (r.busy ? 2 : r.pub ? 0 : 1);
+                    rows.sort((a, b) => grp(a) - grp(b) || (a.busy ? a.arr - b.arr : 0) || a.i - b.i || (a.exp || 0) - (b.exp || 0));
+                    const shown = RES.filter(([k]) => rows.some((r) => num(r.res[k]) > 0));
+                    const sig = [tbl, one, shown.map((x) => x[0]).join(":"), rows.map((r) => [r.kind, r.o.id, total(r.res), r.busy, r.on ? r.on.length : 0, r.guard, r.near ? r.near.name + Math.round(r.near.dist) : ""].join(":")).join(",")].join("|");
+                    if (box.dataset.sig === sig) {
+                        if (tbl)
+                            tick();
+                        return;
+                    }
+                    box.dataset.sig = sig;
+                    const chk = (key, def, label) => { const i = NL.h("input", { type: "checkbox" }); i.checked = !!opt(key, def); i.addEventListener("change", () => { store.set(key, i.checked); NL._kick(); }); return NL.h("label", null, i, label); };
+                    const refresh = () => { const g = tab.querySelector(".debris-refresh-btn"); if (g)
+                        g.click(); NL._kick(); };
+                    const bar = NL.h("div", { class: "nl2-fdb-bar" }, ...(tbl ? [chk("one", false, "One click mode")] : []), chk("table", true, "Table View"), ...(tbl ? [NL.h("button", { type: "button", class: "nl2-fdb-rf", onclick: (e) => { e.stopPropagation(); refresh(); } }, "Refresh")] : []));
+                    if (!tbl) {
+                        box.replaceChildren(bar);
+                        return;
+                    }
+                    const sysCell = (r) => {
+                        const name = r.o.systemName || "";
+                        const a = r.link ? NL.h("a", { class: "nl2-fdb-sys", onclick: (e) => { e.preventDefault(); e.stopPropagation(); r.link.click(); } }, name) : NL.h("span", null, name || "\u2014");
+                        return NL.h("td", null, a, r.pub ? NL.h("span", { class: "nl2-fdb-pub", [TIP]: "Public pile: other players can see and collect it" }, "*") : "", r.guard ? NL.h("span", { class: "nl2-fdb-grd", [TIP]: r.gs && r.gs.length ? "Guarded: " + r.gs.map((x) => num(x.quantity) + "x " + (x.name || x.key)).join(", ") : "Guarded by pirates" }, "\u2694") : "", r.kind === "sal" ? NL.h("span", { class: "nl2-fdb-dim", [TIP]: "Freight left after an anomaly battle" }, " \u00B7 Battle") : "");
+                    };
+                    const hideBtn = (r) => {
+                        const b = NL.h("button", { type: "button", class: "nl2-fdb-ic", [TIP]: r.kind === "sal" ? "Hide until it expires" : "Hide debris", onclick: (e) => {
+                                e.stopPropagation();
+                                if (r.kind === "sal") {
+                                    if (NL.pve.hide)
+                                        NL.pve.hide("deb", { id: "s" + r.o.id, salvageExpiresAt: r.o.salvageExpiresAt });
+                                    box.dataset.sig = "";
+                                }
+                                else if (r.hide)
+                                    r.hide.click();
+                                NL._kick();
+                            } });
+                        b.innerHTML = trash;
+                        return b;
+                    };
+                    const actBtn = (r) => {
+                        const go = (label, fn, red) => NL.h("button", { type: "button", class: "nl2-fdb-b nl2-fdb-go" + (red ? " nl2-fdb-red" : ""), onclick: (e) => { e.stopPropagation(); fn(); } }, label);
+                        if (r.kind === "sal")
+                            return r.guard ? go("Clear Pirates", () => NL.pve.open("guards", r.o), true) : go("Collect", () => NL.pve.open("salv", r.o));
+                        if (r.busy)
+                            return go("Send more", () => NL.pve.open("deb", remainder(r.o, r.on), { oneClick: one }));
+                        return go("Collect", () => NL.pve.open("deb", r.o, { oneClick: one }));
+                    };
+                    const head = ["System", ...shown.map(([k, n]) => NL.h("span", { [TIP]: n }, NL.h("img", { class: "game-resource-icon", src: "/images/resources/" + k + ".webp", alt: n }))), "Total", "Expires", "Nearest Planet", "Distance", "", ""];
+                    const widths = ["130px", ...shown.map(() => "100px"), "100px", "100px", "", "100px", "50px", "130px"];
+                    const cls = (i) => (i === head.length - 1 ? "nl2-fdb-act" : i === head.length - 2 ? "nl2-fdb-hide" : null);
+                    const body = rows.map((r) => NL.h("tr", { "data-row": r.kind + ":" + r.o.id, class: r.busy ? "nl2-fdb-busy" : null }, sysCell(r), ...shown.map(([k]) => NL.h("td", null, num(r.res[k]) > 0 ? fmtN(r.res[k]) : dash())), NL.h("td", null, fmtN(total(r.res))), NL.h("td", r.exp != null ? { "data-cd": String(r.exp), [TIP]: "Expires " + (NL.clock ? NL.clock(r.exp) : new Date(r.exp).toLocaleTimeString()) } : null, cd(r.exp)), NL.h("td", null, r.near ? r.near.name : dash()), NL.h("td", null, r.near ? NL.h("span", { class: distCls(r.near.dist) }, Math.round(r.near.dist) + " ly") : dash()), NL.h("td", { class: "nl2-fdb-hide" }, r.kind === "sal" || r.hide ? hideBtn(r) : ""), NL.h("td", { class: "nl2-fdb-act" }, actBtn(r))));
+                    const foot = rows.length > 1 ? NL.h("tfoot", null, NL.h("tr", null, NL.h("td", null, "Total"), ...shown.map(([k]) => NL.h("td", null, fmtN(rows.reduce((a, r) => a + num(r.res[k]), 0)))), NL.h("td", null, fmtN(rows.reduce((a, r) => a + total(r.res), 0))), NL.h("td"), NL.h("td"), NL.h("td"), NL.h("td"), NL.h("td"))) : null;
+                    const content = rows.length
+                        ? NL.h("div", { class: "nl2-fdb-wrap" }, NL.h("table", null, NL.h("colgroup", null, widths.map((w) => NL.h("col", w ? { style: "width:" + w } : {}))), NL.h("thead", null, NL.h("tr", null, head.map((t, i) => NL.h("th", { class: cls(i) }, t)))), NL.h("tbody", null, body), foot))
+                        : NL.h("div", { class: "nl2-fdb-empty" }, "No debris to collect.");
+                    box.replaceChildren(bar, content);
+                    tick();
+                });
+            },
+        });
+    }
+    {
+        NL.flPirates = true;
+        NL.fl205 = NL.fl206 = NL.fl207 = NL.flPirates;
+        NL.feature({
+            id: "fl-pirates3",
+            set: "Fleet",
+            name: "Pirates tab clean-up",
+            desc: "FL-205 to FL-207: Battle Reports as a Table View, Merchant Contracts on one line, Active Missions hidden on Fleet > Pirates.",
+            init({ store }) {
+                if (!NL.flPirates)
+                    return;
+                const TIP = NL.tipA || "data-nl2-tip";
+                const HEAD = "font:600 13.6px Rajdhani,\"Exo 2\",sans-serif;color:#8fb3d9;text-transform:none;letter-spacing:0";
+                NL.css("fl-pirates3", `
+      
+      .pirates-tab > [data-nl2-p207]{display:none!important}
+      
+      .pirates-tab > [data-nl2-p206]{display:none!important}
+      .nl2-pcon{display:flex;align-items:center;height:40px;box-sizing:border-box;margin:0 0 14px;padding:0 14px;border:1px solid rgba(245,158,11,.25);border-left:4px solid #f59e0b;
+        background:linear-gradient(90deg,rgba(245,158,11,.10),rgba(8,16,32,.6));font:500 15px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7;white-space:nowrap;overflow:hidden}
+      .nl2-pcon .nl2-pcon-lab{font-weight:700;font-size:12px;letter-spacing:.08em;color:#f59e0b;margin-right:18px;text-transform:uppercase}
+      .nl2-pcon .nl2-pcon-c{display:inline-flex;align-items:center;gap:8px;min-width:0}
+      .nl2-pcon .nl2-pcon-k{font-weight:700;font-size:12px;letter-spacing:.06em}
+      .nl2-pcon .nl2-pcon-d{color:#60a5fa}.nl2-pcon .nl2-pcon-w{color:#f59e0b}
+      .nl2-pcon .nl2-pcon-t{font-weight:600;color:#f1f6ff;overflow:hidden;text-overflow:ellipsis}
+      .nl2-pcon .nl2-pcon-p{color:#8fb3d9}
+      .nl2-pcon .nl2-pcon-ok{color:#22c55e}
+      .nl2-pcon .nl2-pcon-sep{color:#3b4a66;margin:0 16px}
+      .nl2-pcon button{font:600 13px Rajdhani,"Exo 2",sans-serif;height:24px;min-width:72px;padding:0 10px;border-radius:4px;cursor:pointer;text-align:center}
+      .nl2-pcon button:disabled{opacity:.5;cursor:default}
+      .nl2-pcon .nl2-pcon-ref{margin-left:auto;padding-left:18px;color:#8fb3d9}
+      .nl2-pcon .nl2-pcon-ref b{color:#38bdf8;font-weight:700;font-variant-numeric:tabular-nums}
+      .nl2-pcon .nl2-pcon-ref + .nl2-pcon-ref{margin-left:16px;padding-left:0}
+      
+      .pirates-tab > [data-nl2-p205]{display:none!important}
+      .nl2-pbr{margin:14px 0 12px}
+      .nl2-pbr .nl2-fpl-bar{display:flex;align-items:center;gap:10px;min-height:30px;margin:0 0 6px;font:600 14px Rajdhani,"Exo 2",sans-serif;color:#8fb3d9;white-space:nowrap}
+      .nl2-pbr .nl2-fpl-t{font:700 18px Rajdhani,"Exo 2",sans-serif;color:#f1f6ff;letter-spacing:.4px}
+      .nl2-pbr .nl2-fpl-n{color:#5f7a94;font-weight:500}
+      .nl2-pbr .nl2-fpl-ctl{display:inline-flex;gap:14px;align-items:center;margin-left:auto}
+      .nl2-pbr .nl2-fpl-ctl label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+      .nl2-pbr table{border-collapse:collapse;width:100%;table-layout:fixed}
+      .nl2-pbr th{${HEAD};text-align:left;padding:6px 8px;border-bottom:1px solid rgba(120,200,255,.12);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;user-select:none}
+      .nl2-pbr th:last-child{cursor:default}
+      .nl2-pbr th .game-resource-icon{width:18px;height:18px;vertical-align:-4px}
+      .nl2-pbr td{font:500 15px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7;padding:0 8px;height:34px;box-sizing:border-box;border-bottom:1px solid rgba(120,200,255,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;font-variant-numeric:tabular-nums}
+      .nl2-pbr td + td,.nl2-pbr th + th{border-left:1px solid rgba(120,200,255,.1)}
+      .nl2-pbr tbody tr:nth-child(even){background:rgb(15,27,46)}
+      .nl2-pbr tr.nl2-pbr-new td{background:rgba(56,189,248,.07)}
+      .nl2-pbr tr.nl2-pbr-new td:nth-child(2){font-weight:700;color:#fff}
+      .nl2-pbr td.nl2-pbr-act{text-align:right;overflow:visible}
+      .nl2-pbr .nl2-pbr-b,.nl2-pbr .nl2-pbr-gap{display:inline-block;width:84px;height:24px;box-sizing:border-box;margin-left:4px;vertical-align:middle}
+      .nl2-pbr .nl2-pbr-b{font:600 13px Rajdhani,"Exo 2",sans-serif;background:rgba(56,189,248,.1);color:#7dd3fc;border:1px solid rgba(56,189,248,.4);border-radius:5px;padding:0 6px;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .nl2-pbr .nl2-pbr-b.nl2-pbr-saved{color:#fcd34d;border-color:rgba(252,211,77,.45);background:rgba(252,211,77,.08)}
+      .nl2-pbr .nl2-pbr-b.nl2-pbr-del{color:#f87171;border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.08)}
+      .nl2-pbr .nl2-pbr-pill{display:inline-block;width:70px;text-align:center;font-size:12px;font-weight:700;letter-spacing:.06em;line-height:20px;border-radius:3px;text-transform:uppercase}
+      .nl2-pbr .nl2-pbr-won{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.45)}
+      .nl2-pbr .nl2-pbr-lost{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.45)}
+      .nl2-pbr .nl2-pbr-draw{background:rgba(148,163,184,.12);color:#cbd5e1;border:1px solid rgba(148,163,184,.4)}
+      .nl2-pbr .nl2-pbr-dim{color:#5f7a94}
+      .nl2-pbr .nl2-pbr-r{color:#f87171}
+      .nl2-pbr tr.nl2-pbr-tot td{color:#fcd34d;font-weight:700;border-top:1px solid rgba(252,211,77,.3);background:none}
+    `);
+                const fiber = (el) => { const k = el && Object.keys(el).find((x) => x.startsWith("__reactFiber")); return k ? el[k] : null; };
+                const propUp = (el, want, n) => { let f = fiber(el); for (let i = 0; i < (n || 6) && f; i++, f = f.return) {
+                    const p = f.memoizedProps;
+                    if (p && typeof p === "object" && p[want] != null)
+                        return p[want];
+                } return null; };
+                const txt = (el) => ((el && el.textContent) || "").replace(/\s+/g, " ").trim();
+                const num = (v) => Number(v) || 0;
+                const fmtN = (n) => Math.round(num(n)).toLocaleString("en-US");
+                const cap1 = (s) => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : "");
+                const dash = () => NL.h("span", { class: "nl2-pbr-dim" }, "\u2014");
+                const opt = (k, def) => { const v = store.get(k, def); return v == null ? def : v; };
+                const isActiveMissions = (el) => {
+                    if (!el.classList.contains("pirate-active") || el.classList.length !== 1)
+                        return false;
+                    const h = el.querySelector(":scope > h4");
+                    return !!h && !h.querySelector("svg") && !!el.querySelector(":scope > .missions-list");
+                };
+                let cdTimer = null;
+                const cdText = () => {
+                    for (const b of document.querySelectorAll(".nl2-pcon [data-nl2-end]")) {
+                        const t = Number(b.getAttribute("data-nl2-end")), s = NL.countdown ? NL.countdown(t - Date.now()) : "";
+                        if (b.textContent !== s)
+                            b.textContent = s;
+                    }
+                };
+                const startCd = () => { if (cdTimer)
+                    return; cdTimer = setInterval(() => { if (!document.querySelector(".nl2-pcon")) {
+                    clearInterval(cdTimer);
+                    cdTimer = null;
+                    return;
+                } cdText(); }, 1000); };
+                function contracts(tab, board) {
+                    const cards = [...board.querySelectorAll(":scope > .missions-list > .expedition-mission-card")].map((c) => {
+                        const hs = [...c.querySelectorAll(":scope > .expedition-mission-header > span")], info = c.querySelector(":scope > .expedition-mission-info");
+                        const isp = info ? [...info.querySelectorAll(":scope > span")] : [];
+                        const type = txt(hs[0]), reward = isp.map(txt).find((s) => /^reward/i.test(s)) || "";
+                        const claimed = isp.some((s) => /^claimed$/i.test(txt(s)));
+                        const claim = info && info.querySelector(":scope > button.btn-success");
+                        const reroll = c.querySelector(":scope > .expedition-mission-header > button");
+                        return { type, title: txt(hs[1]), prog: txt(isp[0]), reward, claimed, claim, reroll };
+                    });
+                    const resets = [...board.querySelectorAll(".pirate-bounty-reset")].map((r) => {
+                        const t = r.querySelector("time[datetime]"), end = t ? Date.parse(t.getAttribute("datetime")) : NaN;
+                        return { weekly: /weekly/i.test(txt(r.querySelector(":scope > span"))), end };
+                    }).filter((r) => Number.isFinite(r.end));
+                    let box = tab.querySelector(":scope > .nl2-pcon");
+                    if (!box)
+                        box = NL.h("div", { class: "nl2-pcon" });
+                    if (box.nextElementSibling !== board)
+                        tab.insertBefore(box, board);
+                    board.setAttribute("data-nl2-p206", "");
+                    const sig = JSON.stringify([cards.map((c) => [c.type, c.title, c.prog, c.reward, c.claimed, !!c.claim, c.claim && c.claim.disabled, c.claim && txt(c.claim), !!c.reroll, c.reroll && c.reroll.disabled, c.reroll && txt(c.reroll)]), resets]);
+                    if (box.dataset.sig === sig)
+                        return;
+                    box.dataset.sig = sig;
+                    const kids = [NL.h("span", { class: "nl2-pcon-lab" }, "Merchant Contracts")];
+                    cards.forEach((c, i) => {
+                        if (i)
+                            kids.push(NL.h("span", { class: "nl2-pcon-sep" }, "|"));
+                        const weekly = /weekly/i.test(c.type);
+                        const tip = c.reward ? c.reward.replace(/^reward:?\s*/i, "Reward: ") : null;
+                        kids.push(NL.h("span", { class: "nl2-pcon-c", [TIP]: tip }, NL.h("span", { class: "nl2-pcon-k " + (weekly ? "nl2-pcon-w" : "nl2-pcon-d") }, (c.type || "").toUpperCase()), NL.h("span", { class: "nl2-pcon-t" }, c.title || "\u2014"), c.prog ? NL.h("span", { class: "nl2-pcon-p" }, c.prog) : null, c.claimed ? NL.h("span", { class: "nl2-pcon-ok" }, "\u2713 Claimed") : null, c.claim ? NL.h("button", { type: "button", class: "nl2-c-green", disabled: !!c.claim.disabled, onclick: (e) => { e.stopPropagation(); c.claim.click(); NL._kick(); } }, txt(c.claim) || "Claim") : null, c.reroll ? NL.h("button", { type: "button", class: "nl2-c-blue", disabled: !!c.reroll.disabled, [TIP]: c.reroll.getAttribute("title") || null, onclick: (e) => { e.stopPropagation(); c.reroll.click(); NL._kick(); } }, txt(c.reroll) || "Reroll") : null));
+                    });
+                    if (!cards.length)
+                        kids.push(NL.h("span", { class: "nl2-pcon-p" }, "No contracts today"));
+                    for (const r of resets)
+                        kids.push(NL.h("span", { class: "nl2-pcon-ref", [TIP]: NL.clock ? NL.clock(r.end) : null }, (r.weekly ? "Weekly" : "Daily") + " refresh ", NL.h("b", { "data-nl2-end": String(r.end) }, "")));
+                    box.replaceChildren(...kids);
+                    cdText();
+                    if (resets.length)
+                        startCd();
+                }
+                const RES = [["ore", "Ore"], ["silicates", "Silicates"], ["hydrogen", "Hydrogen"], ["alloys", "Alloys"], ["cryo_ice", "Cryo-Ice"], ["plasma_core", "Plasma Core"], ["bio_extract", "Bio-Extract"], ["quantum_dust", "Quantum Dust"], ["dark_matter", "Dark Matter"], ["antimatter", "Antimatter"]];
+                const OUT = { attacker_won: ["Victory", "nl2-pbr-won"], defender_won: ["Defeat", "nl2-pbr-lost"] };
+                const lossOf = (r) => (Array.isArray(r.attackerLosses) ? r.attackerLosses : []).map((x) => ({ n: num(x.lost != null ? x.lost : x.quantity), name: x.name || String(x.key || "").replace(/_/g, " ") })).filter((x) => x.n > 0);
+                const campOf = (r, camps) => {
+                    const id = r.campId != null ? Number(r.campId) : null;
+                    const live = id != null ? (camps || []).find((c) => Number(c.id) === id) : null;
+                    const saved = id != null && NL.pve && NL.pve.rowOf ? NL.pve.rowOf("camp", live || { id }) : null;
+                    return { ...(saved || {}), ...(live || {}) };
+                };
+                const timeTxt = (t) => (Number.isFinite(t) ? (NL.clock ? NL.clock(t) : new Date(t).toLocaleTimeString()) : "");
+                function reports(tab, list) {
+                    const cards = [...list.querySelectorAll(":scope > .expedition-report-card")];
+                    const head = (() => { let h = list.previousElementSibling; while (h && h.tagName !== "H4" && h.classList.contains("nl2-pbr"))
+                        h = h.previousElementSibling; return h && h.tagName === "H4" ? h : null; })();
+                    const camps = propUp(tab.firstElementChild || tab, "camps", 3) || propUp(list, "camps", 8) || [];
+                    const rows = cards.map((c, i) => {
+                        const r = propUp(c, "report", 5) || {};
+                        const quest = txt(c.querySelector(".quest-anomaly-badge"));
+                        const camp = campOf(r, camps), loss = lossOf(r), t = Date.parse(r.createdAt);
+                        const saveB = c.querySelector(".report-save-btn"), delB = c.querySelector(".report-delete-btn");
+                        const out = OUT[r.outcome] || [txt(c.querySelector(".expedition-event")) || "Draw", "nl2-pbr-draw"];
+                        const saved = !!saveB && ((saveB.className.replace("report-save-btn", "").trim() !== "") || saveB.getAttribute("aria-pressed") === "true" || (!!r.isSaved && !saveB.dataset.nl2Toggled));
+                        return { c, i, id: r.id, unread: c.classList.contains("unread"), out, quest, camp: quest || camp.name || (r.campId != null ? "Camp #" + r.campId : "Pirate camp"), tier: cap1(camp.tier), sys: camp.systemName || "", loot: r.loot || {}, lost: loss.reduce((a, x) => a + x.n, 0), lossTip: loss.map((x) => x.n + "x " + x.name).join(", "), t, saveB, delB, saved };
+                    });
+                    let box = tab.querySelector(":scope > .nl2-pbr");
+                    const anchor = head || list;
+                    if (!box)
+                        box = NL.h("div", { class: "nl2-pbr" });
+                    if (box.nextElementSibling !== anchor)
+                        tab.insertBefore(box, anchor);
+                    const tbl = opt("br.table", true) !== false;
+                    list.toggleAttribute("data-nl2-p205", tbl);
+                    if (head)
+                        head.toggleAttribute("data-nl2-p205", tbl);
+                    const sort = opt("br.sort", { k: "t", d: -1 }) || { k: "t", d: -1 };
+                    const shown = RES.filter(([k]) => rows.some((r) => num(r.loot[k]) > 0));
+                    const sig = JSON.stringify([tbl, sort, shown.map((x) => x[0]), rows.map((r) => [r.id, r.unread, r.saved, r.camp, r.tier, r.sys, r.lost, r.t, shown.map(([k]) => num(r.loot[k]))])]);
+                    if (box.dataset.sig === sig)
+                        return;
+                    box.dataset.sig = sig;
+                    const unread = rows.filter((r) => r.unread).length;
+                    const chk = NL.h("input", { type: "checkbox" });
+                    chk.checked = tbl;
+                    chk.addEventListener("change", () => { store.set("br.table", chk.checked); NL._kick(); });
+                    const bar = NL.h("div", { class: "nl2-fpl-bar nl2-ctl3" }, NL.h("strong", { class: "nl2-fpl-t" }, "Battle Reports"), NL.h("span", { class: "nl2-fpl-n" }, rows.length + " report" + (rows.length === 1 ? "" : "s") + (unread ? " \u00B7 " + unread + " unread" : "")), NL.h("span", { class: "nl2-fpl-ctl" }, NL.h("label", null, chk, "Table View")));
+                    if (!tbl) {
+                        box.replaceChildren(bar);
+                        return;
+                    }
+                    const keyOf = { res: (r) => r.out[0], camp: (r) => r.camp.toLowerCase(), tier: (r) => r.tier, sys: (r) => r.sys, lost: (r) => r.lost, t: (r) => r.t || 0 };
+                    for (const [k] of shown)
+                        keyOf["l." + k] = (r) => num(r.loot[k]);
+                    const kf = keyOf[sort.k] || keyOf.t;
+                    const sorted = rows.slice().sort((a, b) => { const x = kf(a), y = kf(b); return (x < y ? -1 : x > y ? 1 : 0) * (sort.d || 1) || a.i - b.i; });
+                    const setSort = (k) => { const cur = opt("br.sort", { k: "t", d: -1 }) || {}; store.set("br.sort", { k, d: cur.k === k ? -(cur.d || 1) : (k === "t" || k === "lost" || k.startsWith("l.") ? -1 : 1) }); NL._kick(); };
+                    const arrow = (k) => (sort.k === k ? (sort.d < 0 ? " \u25BE" : " \u25B4") : "");
+                    const th = (k, label, w) => NL.h("th", { style: w ? { width: w } : null, onclick: k ? () => setSort(k) : null }, label, k ? arrow(k) : "");
+                    const heads = [th("res", "Result", "96px"), th("camp", "Camp", ""), th("tier", "Tier", "110px"), th("sys", "System", "110px"), ...shown.map(([k, n]) => th("l." + k, [NL.h("img", { class: "game-resource-icon", src: "/images/resources/" + k + ".webp", alt: n, [TIP]: n }), " ", n], "130px")), th("lost", "Ships lost", "120px"), th("t", "Time", "110px"), th(null, "", "292px")];
+                    const btn = (label, cls, on, tip) => NL.h("button", { type: "button", class: "nl2-pbr-b" + (cls ? " " + cls : ""), [TIP]: tip || null, onclick: (e) => { e.stopPropagation(); on(); NL._kick(); } }, label);
+                    const body = sorted.map((r) => NL.h("tr", { class: r.unread ? "nl2-pbr-new" : null, "data-nl2-rid": r.id != null ? String(r.id) : null }, NL.h("td", null, NL.h("span", { class: "nl2-pbr-pill " + r.out[1] }, r.out[0])), NL.h("td", null, r.camp), NL.h("td", null, r.tier || dash()), NL.h("td", null, r.sys || dash()), ...shown.map(([k]) => NL.h("td", null, num(r.loot[k]) > 0 ? fmtN(r.loot[k]) : dash())), NL.h("td", { class: r.lost ? "nl2-pbr-r" : null, [TIP]: r.lossTip || null }, r.lost ? r.lost + " ship" + (r.lost === 1 ? "" : "s") : dash()), NL.h("td", { [TIP]: Number.isFinite(r.t) ? new Date(r.t).toLocaleString() : null }, timeTxt(r.t) || dash()), NL.h("td", { class: "nl2-pbr-act" }, r.unread ? btn("Mark read", "nl2-pbr-mr", () => { r.c.click(); }) : NL.h("span", { class: "nl2-pbr-gap" }), r.saveB ? btn(r.saved ? "Saved" : "Save", r.saved ? "nl2-pbr-saved" : "", () => { r.saveB.dataset.nl2Toggled = "1"; r.saveB.click(); }, r.saveB.getAttribute("title")) : NL.h("span", { class: "nl2-pbr-gap" }), r.delB ? btn("Delete", "nl2-pbr-del", () => { r.delB.click(); }, r.delB.getAttribute("title")) : NL.h("span", { class: "nl2-pbr-gap" }))));
+                    if (rows.length > 1) {
+                        const lost = rows.reduce((a, r) => a + r.lost, 0);
+                        body.push(NL.h("tr", { class: "nl2-pbr-tot" }, NL.h("td", null, "Total"), NL.h("td", null, ""), NL.h("td", null, ""), NL.h("td", null, ""), ...shown.map(([k]) => NL.h("td", null, fmtN(rows.reduce((a, r) => a + num(r.loot[k]), 0)))), NL.h("td", null, lost ? lost + " ship" + (lost === 1 ? "" : "s") : "\u2014"), NL.h("td", null, ""), NL.h("td", null, "")));
+                    }
+                    box.replaceChildren(bar, NL.h("table", { class: "nl2-tbl nl2-pbr-table" }, NL.h("thead", null, NL.h("tr", null, heads)), NL.h("tbody", null, body)));
+                }
+                NL.watch(".pirates-tab", (tab) => {
+                    if (NL.fl207)
+                        for (const el of tab.querySelectorAll(":scope > .pirate-active"))
+                            if (isActiveMissions(el))
+                                el.setAttribute("data-nl2-p207", "");
+                    if (NL.fl206) {
+                        const board = tab.querySelector(":scope > .pirate-bounty-board");
+                        if (board)
+                            contracts(tab, board);
+                        else
+                            tab.querySelectorAll(":scope > .nl2-pcon").forEach((b) => b.remove());
+                    }
+                    if (NL.fl205) {
+                        const list = tab.querySelector(":scope > .expedition-reports-list");
+                        if (list)
+                            reports(tab, list);
+                        else
+                            tab.querySelectorAll(":scope > .nl2-pbr").forEach((b) => b.remove());
+                    }
+                });
+            },
+        });
+    }
+    {
         NL.fl164 = true;
         NL.fl165 = true;
         NL.pveActive = true;
@@ -17019,6 +18566,8 @@
         NL.fl180 = NL.pveActive;
         NL.fl181 = NL.pveActive;
         NL.fl166 = NL.fl167 = NL.fl168 = NL.fl169 = NL.fl185 = NL.pveActive;
+        NL.fl169 = NL.pveActive && !NL.flDebris;
+        NL.pveRetired = true;
         NL.css("fl-166-169", `
   .nl2-x167-sent td{opacity:.5}
   .nl2-x167-foot{color:#5f7a94;font-size:13px;padding:6px 8px}
@@ -17142,7 +18691,17 @@
                     }
                     if (NL.fl168 && NL.pve.mountSurvey) {
                         const a = gameActive(pg), l = a ? tabName(a) : "", on = !st.open && !pg.hasAttribute("data-nl2-fstn") && /^surveys/.test(l);
-                        if (on) {
+                        if (on && NL.fl195) {
+                            const a = pg.querySelector(".surveys-tab > .reports-list");
+                            if (a ? a.nextElementSibling !== surv : !surv.isConnected) {
+                                if (a)
+                                    a.after(surv);
+                                else
+                                    content.appendChild(surv);
+                                NL.pve.mountSurvey(surv);
+                            }
+                        }
+                        else if (on) {
                             if (content.firstChild !== surv) {
                                 content.insertBefore(surv, content.firstChild);
                                 NL.pve.mountSurvey(surv);
@@ -17254,12 +18813,15 @@
                         host.insertBefore(box, list);
                     const tbl = opt(k + ".table", true) !== false;
                     list.toggleAttribute("data-nl2-fpl-tbl", tbl);
-                    const sig = [tbl, opt(k + ".one", false), opt(k + ".open", true), view.sig].join("|");
+                    const sig = [tbl, opt(k + ".one", false), opt(k + ".open", true), view.sig, NL.fl196 ? (view.title || "") + (view.note || "") : ""].join("|");
                     if (box.dataset.sig === sig)
                         return;
                     box.dataset.sig = sig;
                     const chk = (key, def, label, tip) => { const i = NL.h("input", { type: "checkbox" }); i.checked = !!opt(key, def); i.addEventListener("change", () => { store.set(key, i.checked); NL._kick(); }); return NL.h("label", tip ? { title: tip } : null, i, label); };
-                    const bar = NL.h("div", { class: "nl2-fpl-bar" }, chk(k + ".table", true, "Table View"), ...(tbl && view.one ? [chk(k + ".one", false, "One click mode", "Launch the default fleet without the dialog; the dialog still opens when something needs a look")] : []), ...(tbl && view.open ? [chk(k + ".open", true, "Open only", "Only reports with something to do: an open anomaly or freight to collect")] : []), tbl && view.info ? NL.h("span", { class: "nl2-fpl-n" }, view.info) : null);
+                    const ctl = [chk(k + ".table", true, "Table View"), ...(tbl && view.one ? [chk(k + ".one", false, "One click mode", "Launch the default fleet without the dialog; the dialog still opens when something needs a look")] : []), ...(tbl && view.open ? [chk(k + ".open", true, "Open only", "Only reports with something to do: an open anomaly or freight to collect")] : [])];
+                    const info = tbl && view.info ? NL.h("span", { class: "nl2-fpl-n" }, view.info) : null;
+                    const bar = NL.fl196 ? NL.h("div", { class: "nl2-fpl-bar nl2-ctl3" }, view.title ? NL.h("strong", { class: "nl2-fpl-t" }, view.title) : null, info, view.note ? NL.h("span", { class: "nl2-fpl-n" }, view.note) : null, NL.h("span", { class: "nl2-fpl-ctl" }, ...ctl))
+                        : NL.h("div", { class: "nl2-fpl-bar" }, ...ctl, info);
                     box.replaceChildren(bar, ...(tbl ? [view.build()] : []));
                     if (tbl)
                         tick();
@@ -17326,8 +18888,70 @@
                         const rows = openOnly ? all.filter((r) => r.anom || r.fr) : all;
                         const act = (r) => r.anom ? btn(r.sent ? "Sent" : "Investigate", () => NL.pve.open("inv", r.o, { oneClick: one && NL.fl185 }), "nl2-fpl-go", r.sent)
                             : r.fr ? (r.gs.length ? btn("Clear Guards", () => NL.pve.open("guards", r.o), "nl2-fpl-cg") : btn(r.sent ? "Sent" : "Send Freighters", () => NL.pve.open("salv", r.o), "nl2-fpl-sf", r.sent)) : "";
-                        place(tab, list, "inv", { one: true, open: true, info: rows.length + (openOnly ? " open" : "") + " of " + all.length, sig: rows.map((r) => [r.o.id, r.anom, r.fr, r.gs.length, left(r.exp), r.age, r.sent, nearSig("inv", r.o)].join(":")).join(","), build: () => table(["Location", "Result", "Zone", "Expires", "Age", "Nearest Planet", "Distance", ""], ["110px", "", "90px", "90px", "90px", "140px", "90px", "200px"], rows.map((r) => NL.h("tr", { class: r.sent ? "nl2-fpl-sent" : null }, NL.h("td", null, r.o.systemName || dash()), NL.h("td", { title: r.title, class: r.anom ? "nl2-fpl-y" : null }, r.title || dash(), r.gs.length ? NL.h("span", { class: "nl2-fpl-r" }, " \u00B7 guarded") : ""), NL.h("td", null, r.o.securityZone || dash()), NL.h("td", null, r.exp ? left(r.exp) : dash()), NL.h("td", null, r.age || dash()), ...nearCells("inv", r.o), NL.h("td", { class: "nl2-fpl-act" }, gameBtn(r.del), act(r)))), openOnly ? "No open anomalies or freight." : "No survey reports.") });
+                        const rested = tab.querySelector(".survey-reports-heading .anomaly-rested-status");
+                        place(tab, list, "inv", { one: true, open: true, info: rows.length + (openOnly ? " open" : "") + " of " + all.length, title: NL.fl195 ? "Investigate" : "", note: NL.fl195 && rested ? (rested.textContent || "").replace(/\s+/g, " ").trim() : "", sig: rows.map((r) => [r.o.id, r.anom, r.fr, r.gs.length, left(r.exp), r.age, r.sent, nearSig("inv", r.o)].join(":")).join(","), build: () => table(["Location", "Result", "Zone", "Expires", "Age", "Nearest Planet", "Distance", ""], ["110px", "", "90px", "90px", "90px", "140px", "90px", "200px"], rows.map((r) => NL.h("tr", { class: r.sent ? "nl2-fpl-sent" : null }, NL.h("td", null, r.o.systemName || dash()), NL.h("td", { title: r.title, class: r.anom ? "nl2-fpl-y" : null }, r.title || dash(), r.gs.length ? NL.h("span", { class: "nl2-fpl-r" }, " \u00B7 guarded") : ""), NL.h("td", null, r.o.securityZone || dash()), NL.h("td", null, r.exp ? left(r.exp) : dash()), NL.h("td", null, r.age || dash()), ...nearCells("inv", r.o), NL.h("td", { class: "nl2-fpl-act" }, gameBtn(r.del), act(r)))), openOnly ? "No open anomalies or freight." : "No survey reports.") });
                     });
+            },
+        });
+    }
+    {
+        NL.flTables3 = true;
+        NL.fl192 = NL.fl193 = NL.fl194 = NL.fl195 = NL.fl196 = NL.flTables3;
+        NL.feature({
+            id: "fl-tables3",
+            set: "Fleet",
+            name: "Mining one-click and table clean-up",
+            desc: "FL-192 to FL-196: Mining One click mode with 1x/2x/4x/8x and a Total Trip column; Surveys shows Investigate first; one control row, top right, on the Fleet tables.",
+            init() {
+                if (!NL.flTables3)
+                    return;
+                const HEAD = "font:600 13.6px Rajdhani,\"Exo 2\",sans-serif;color:#8fb3d9;text-transform:none;letter-spacing:0";
+                NL.css("fl-tables3", `
+      
+      :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-head{flex-wrap:nowrap;gap:10px;min-height:30px}
+      :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-head .nxs-info{flex:1 1 auto;min-width:0;font-size:14px;color:#7890a5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-hbtns{display:inline-flex;align-items:center;gap:8px;margin-left:auto;flex:0 0 auto}
+      :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-hbtns .nxs-rf{margin-left:0}
+      :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-hbtns :is(.nxs-btn,.nxs-sel,.nxs-in){height:28px;box-sizing:border-box;font-size:14px}
+      :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-hbtns .nxs-btn{min-width:72px;padding:0 10px;text-align:center}
+      :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-hbtns .nxs-chk{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:14px}
+      :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-hbtns .nxs-dim{font-size:14px}
+      .nl2-fpl-bar.nl2-ctl3{flex-wrap:nowrap;gap:10px;min-height:30px}
+      .nl2-fpl-bar.nl2-ctl3 .nl2-fpl-t{font:700 18px Rajdhani,"Exo 2",sans-serif;color:#f1f6ff;letter-spacing:.4px}
+      .nl2-fpl-bar.nl2-ctl3 .nl2-fpl-n{font-size:14px;white-space:nowrap}
+      .nl2-fpl-bar.nl2-ctl3 .nl2-fpl-ctl{display:inline-flex;gap:14px;align-items:center;margin-left:auto}
+      .wormholes-tab h4 > .nl2-flw-cb{margin-left:auto}
+      .wormholes-tab h4:has(> .nl2-flw-cb){display:flex;align-items:center}
+
+      
+      .nl2-mt3 .nl2-mt-chips{margin-left:0;flex-wrap:nowrap}
+      .nl2-mt3 .nl2-mt-mult{display:inline-flex;gap:4px}
+      .nl2-mt3 .nl2-mt-mult[hidden]{display:none}
+      .nl2-mt3 .nl2-mt-chip{height:28px}
+      .nl2-mt-rbox{position:relative;display:inline-flex;align-items:center}
+      .nl2-mt-rbox .nl2-mt-range{width:64px;padding-right:22px}
+      .nl2-mt-rbox .nl2-mt-ly{position:absolute;right:7px;color:#7890a5;font-size:13px;pointer-events:none}
+      :is(.nl2-fpx,.nl2-fpx-surv) .nxs-table:is(.nl2-mt3-table,.nl2-sv3-table) th{${HEAD};cursor:pointer;user-select:none}
+      
+      .nxs-table:is(.nl2-mt3-table,.nl2-sv3-table) :is(th,td):last-child{width:112px}
+      :is(.nl2-mt3-table,.nl2-sv3-table) th:last-child{cursor:default}
+      :is(.nl2-mt3-table,.nl2-sv3-table) .nl2-mt-ar{color:#7fd4ff}
+      :is(.nl2-mt3-table,.nl2-sv3-table) tbody tr:nth-child(even){background:rgb(15,27,46)}
+      :is(.nl2-mt3-table,.nl2-sv3-table) td + td,:is(.nl2-mt3-table,.nl2-sv3-table) th + th{border-left:1px solid rgba(120,200,255,.1)}
+      .nl2-mt3-c1{width:170px}.nl2-mt3-c2{width:110px}.nl2-mt3-c3{width:100px}.nl2-mt3-c4{width:120px}.nl2-mt3-c5{width:120px}.nl2-mt3-c6{width:auto}.nl2-mt3-c7{width:112px}
+      .nl2-mt3-table .nxs-pill{display:inline-block;width:46px;text-align:center;box-sizing:border-box;line-height:20px}
+      .nl2-mt3-table .nxs-est{font-style:italic}
+
+      
+      .nl2-sv3 .nxs-scroll{max-height:none;overflow:visible}
+      .nl2-sv3-c1{width:160px}.nl2-sv3-c2{width:160px}.nl2-sv3-c3{width:100px}.nl2-sv3-c4{width:auto}.nl2-sv3-c5{width:112px}
+      .nl2-sv3-more td{text-align:center}
+      .nl2-fpx-surv{margin:14px 0 10px}
+      .surveys-tab:has(> .nl2-fpl[data-k="inv"]) > .survey-reports-heading{display:none!important}
+      .surveys-tab .nl2-fpl[data-k="inv"] table th{${HEAD}}
+      
+      .surveys-tab > .survey-active{display:none!important}
+    `);
             },
         });
     }
@@ -19221,6 +20845,7 @@
             desc: "MO-019: clicking Moons in the left menu also opens a Moons page; it holds the Moon Scans table (moved from Tasks).",
             init() { },
         });
+        NL.moScans = true;
     }
     {
         NL.feature({
@@ -19286,6 +20911,7 @@
         });
     }
     {
+        NL.moCancelLabel = true;
         NL.feature({
             id: "mo-table",
             set: "Moons",
@@ -19341,6 +20967,9 @@
                     P + ".moon-bcard-upgrading>.countdown{margin-left:auto!important;flex:0 0 80px!important;width:80px;overflow:hidden}",
                     P + ".moon-bcard-upgrading>button{margin-left:0!important;" + BTN + "}",
                     P + ".moon-bcard-upgrading:not(:has(>.countdown))>button{margin-left:auto!important}",
+                    P + ".moon-bcard-upgrading>button[data-nl2-mt-cx]{font-size:0!important}",
+                    P + ".moon-bcard-upgrading>button[data-nl2-mt-cx]>*{display:none!important}",
+                    P + ".moon-bcard-upgrading>button[data-nl2-mt-cx]::after{content:\"\u00D7 Cancel\";font-size:13px}",
                     P + ".moon-bcard-footer>.entity-max-level{" + col(COLS.cost1, COLS.btn) + ";justify-self:start;" + FLAT + ";color:#4ade80;font-size:13px!important;letter-spacing:.5px;white-space:nowrap}",
                     P + ".moon-bcard-footer>div:not(.moon-bcard-upgrade):not(.moon-bcard-upgrading):not(.nl2-moroi):not(.entity-max-level){" + col(COLS.roi) + ";overflow:hidden}",
                     P + ".moon-bcard-footer .entity-btn-demolish{width:100%!important;padding:2px 4px!important;min-height:0!important;height:24px!important;font-size:12px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
@@ -19375,6 +21004,7 @@
                     const up = b.parentElement.querySelector(":scope > .entity-btn"), why = up ? (up.textContent || "").trim() : "";
                     NL.tip(b, "Bring missing resources" + (why ? "\nUpgrade: " + why : ""));
                 });
+                NL.watch(".moon-view .moon-bcard-upgrading > button", (b) => { setAttr(b, "data-nl2-mt-cx", NL.moCancelLabel !== false ? "" : null); });
                 NL.watch(".moon-view .entity-bcard-stat", (st2) => {
                     const sp = st2.querySelector(":scope > span"), m = sp && !st2.querySelector("img.game-resource-icon") && /^([+\-−]?\s*[\d.,]+)\s*energy$/i.exec((sp.textContent || "").trim());
                     setAttr(st2, "data-nl2-mt-en", m ? m[1].replace(/\s+/g, "") : null);
@@ -20718,13 +22348,14 @@
     {
         NL.tplInline = true;
         NL.css("gl160", ".nxs-tplmsg{margin-left:8px;font-size:13px;white-space:nowrap}.nxs-btn.nxs-tplsure{border-color:#e06c75!important;color:#e06c75!important}");
-        NL.feature({
-            id: "pve",
-            set: "Global",
-            name: "PVE dashboard",
-            desc: "GL-025: Dashboards > PVE: Fleet Slots, Pirate Camps, Wormholes, Investigate, Debris, Survey, Stations, Expeditions and Salvage Patrols (was the separate PVE script, v0.35.3).",
-            init() { nxsMain(); },
-        });
+        if (!NL.pveRetired)
+            NL.feature({
+                id: "pve",
+                set: "Global",
+                name: "PVE dashboard",
+                desc: "GL-025: Dashboards > PVE: Fleet Slots, Pirate Camps, Wormholes, Investigate, Debris, Survey, Stations, Expeditions and Salvage Patrols (was the separate PVE script, v0.35.3).",
+                init() { nxsMain(); },
+            });
         NL.feature({
             id: "gl-pve-data",
             set: "Global",
@@ -20732,8 +22363,8 @@
             desc: "GL-185: the PVE reads that feed Fleet > Active trip times, the wormhole and station badges, Leader idle, distances and the PVE parts on the Fleet page, with or without the PVE page.",
             init() { nxsMain(); },
         });
-        const PVE_UI = () => NL.enabled("pve");
-        if (NL.enabled("pve") || NL.enabled("gl-pve-data"))
+        const PVE_UI = () => !NL.pveRetired && NL.enabled("pve");
+        if ((!NL.pveRetired && NL.enabled("pve")) || NL.enabled("gl-pve-data"))
             (function nxsEarlyTee() {
                 if (window.__nxsTee)
                     return;
@@ -20789,13 +22420,13 @@
                 const ROWS = 10;
                 const pveNum = (k, d) => { const v = NL.opt ? +NL.opt("pve." + k) : NaN; return isFinite(v) && v > 0 ? v : d; };
                 if (NL.option) {
-                    NL.option({ key: "pve.range", set: "Global", group: "PVE", label: "Search range around your planets (ly)", type: "number", def: 50, min: 5, max: 500 });
-                    NL.option({ key: "pve.mineFloor", set: "Global", group: "PVE", label: "Fewest mining ships per launch", type: "number", def: 20, min: 1, max: 1000 });
-                    NL.option({ key: "pve.idleWarn", set: "Global", group: "PVE", label: "Idle miners shown red above", type: "number", def: 100, min: 1, max: 100000 });
-                    NL.option({ key: "pve.warnPct", set: "Global", group: "PVE", label: "Station capacity yellow at (%)", type: "number", def: 75, min: 1, max: 100 });
-                    NL.option({ key: "pve.urgentPct", set: "Global", group: "PVE", label: "Station capacity red at (%)", type: "number", def: 90, min: 1, max: 100 });
-                    NL.option({ key: "pve.nearGreen", set: "Global", group: "PVE", label: "Distance green up to (ly)", type: "number", def: 50, min: 1, max: 5000 });
-                    NL.option({ key: "pve.nearYellow", set: "Global", group: "PVE", label: "Distance yellow below (ly), red from there", type: "number", def: 100, min: 1, max: 5000 });
+                    NL.option({ key: "pve.range", set: NL.pveRetired ? "Fleet" : "Global", group: "PVE", label: "Search range around your planets (ly)", type: "number", def: 50, min: 5, max: 500 });
+                    NL.option({ key: "pve.mineFloor", set: NL.pveRetired ? "Fleet" : "Global", group: "PVE", label: "Fewest mining ships per launch", type: "number", def: 20, min: 1, max: 1000 });
+                    NL.option({ key: "pve.idleWarn", set: NL.pveRetired ? "Fleet" : "Global", group: "PVE", label: "Idle miners shown red above", type: "number", def: 100, min: 1, max: 100000 });
+                    NL.option({ key: "pve.warnPct", set: NL.pveRetired ? "Fleet" : "Global", group: "PVE", label: "Station capacity yellow at (%)", type: "number", def: 75, min: 1, max: 100 });
+                    NL.option({ key: "pve.urgentPct", set: NL.pveRetired ? "Fleet" : "Global", group: "PVE", label: "Station capacity red at (%)", type: "number", def: 90, min: 1, max: 100 });
+                    NL.option({ key: "pve.nearGreen", set: NL.pveRetired ? "Fleet" : "Global", group: "PVE", label: "Distance green up to (ly)", type: "number", def: 50, min: 1, max: 5000 });
+                    NL.option({ key: "pve.nearYellow", set: NL.pveRetired ? "Fleet" : "Global", group: "PVE", label: "Distance yellow below (ly), red from there", type: "number", def: 100, min: 1, max: 5000 });
                 }
                 if (NL.onOpt)
                     for (const k of ["range", "mineFloor", "idleWarn", "warnPct", "urgentPct", "nearGreen", "nearYellow"])
@@ -21025,6 +22656,11 @@
                         applyMissions(data);
                         if (S.root)
                             paint();
+                    }
+                    if (path === "/api/fleet/survey-cooldowns" && data && Array.isArray(data.cooldowns)) {
+                        applyCooldowns(data);
+                        if (S.survRoot)
+                            paintSurvey();
                     }
                     if (pveMove() && path === "/api/leadership" && data && typeof data === "object") {
                         S.leader = data;
@@ -21668,8 +23304,9 @@
                 async function loadCooldowns() {
                     const d = await getJson("/api/fleet/survey-cooldowns");
                     if (d && Array.isArray(d.cooldowns))
-                        S.cooldown = new Map(d.cooldowns.map((c) => [+c.systemId, new Date(c.cooldownEndsAt).getTime()]));
+                        applyCooldowns(d);
                 }
+                function applyCooldowns(d) { S.cooldown = new Map(d.cooldowns.map((c) => [+c.systemId, new Date(c.cooldownEndsAt).getTime()])); }
                 async function loadReports() {
                     const d = await getJson("/api/fleet/survey-reports");
                     if (d && Array.isArray(d.reports)) {
@@ -21898,6 +23535,50 @@
                 }
                 const clockOf = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
                 const slotsFoot = () => pveMove() ? "" : [patrolLine(), expLine()].filter(Boolean).map((l) => "<div>" + l + "</div>").join("");
+                const SV3_SORT = "nl2.svSort", SV3_LIMIT = 20;
+                const sv3On = (R) => !!NL.fl195 && !!R && R === S.survRoot;
+                function sv3Show(rows, R) {
+                    if (!sv3On(R))
+                        return rows;
+                    const so = lsGet(SV3_SORT, null) || { k: "dist", d: 1 };
+                    const val = (r) => so.k === "sys" ? String(r.sy.name || "") : so.k === "from" ? String((r.o.p && r.o.p.name) || "") : so.k === "probes" ? num(r.o.qty) : r.dist;
+                    const out = rows.map((r, i) => ({ r, i })).sort((a, b) => { const x = val(a.r), y = val(b.r); return x === y ? a.i - b.i : (typeof x === "string" ? x.localeCompare(y) : x - y) * so.d; }).map((x) => x.r);
+                    return S.svAll ? out : out.slice(0, SV3_LIMIT);
+                }
+                const sv3More = (rows, R) => !sv3On(R) || rows.length <= SV3_LIMIT ? ""
+                    : "<tr class=\"nl2-sv3-more\"><td colspan=\"5\"><button type=\"button\" class=\"nxs-btn\" data-svmore>" + (S.svAll ? "Show nearest " + SV3_LIMIT : "Show more (" + (rows.length - SV3_LIMIT) + ")") + "</button></td></tr>";
+                function sv3Ctl(R) {
+                    if (!sv3On(R))
+                        return;
+                    const sel = R.querySelector("[data-survrng]");
+                    if (sel && sel.value !== String(SURVEY_RANGE))
+                        sel.value = String(SURVEY_RANGE);
+                    const so = lsGet(SV3_SORT, null) || { k: "dist", d: 1 };
+                    for (const h of R.querySelectorAll("[data-svsort]")) {
+                        const a = h.querySelector(".nl2-mt-ar"), t = h.getAttribute("data-svsort") === so.k ? (so.d > 0 ? " \u25B2" : " \u25BC") : "";
+                        if (a && a.textContent !== t)
+                            a.textContent = t;
+                    }
+                }
+                function sv3Click(e) {
+                    const h = e.target.closest && e.target.closest("[data-svsort]");
+                    if (h) {
+                        const k = h.getAttribute("data-svsort"), so = lsGet(SV3_SORT, null) || { k: "dist", d: 1 };
+                        lsSet(SV3_SORT, so.k === k ? { k, d: -so.d } : { k, d: 1 });
+                        paintSurvey();
+                        return;
+                    }
+                    if (e.target.closest && e.target.closest("[data-svmore]")) {
+                        S.svAll = !S.svAll;
+                        paintSurvey();
+                    }
+                }
+                const SURV3_HTML = () => "<section class=\"nxs-wrap nxs-surv nl2-sv3\" hidden><div class=\"nxs-head\"><strong>Survey</strong><span class=\"nxs-info\"></span>"
+                    + "<span class=\"nxs-hbtns nl2-ctl\"><span class=\"nxs-dim\">Range</span><select class=\"nxs-sel\" data-survrng " + NL.tipA + "=\"How far from your planets the Survey table looks\">" + SURVEY_RANGES.map((v) => "<option value=\"" + v + "\">" + v + " ly</option>").join("") + "</select>"
+                    + "<button type=\"button\" class=\"nxs-btn nxs-gfilter\" data-gfilter=\"surv\">Filter</button><button type=\"button\" class=\"nxs-btn nxs-fclear\" data-fclear=\"surv\" " + NL.tipA + "=\"Clear this table\u2019s filters\" hidden>Clear</button>"
+                    + "<button type=\"button\" class=\"nxs-btn nxs-rf\" data-refresh=\"surv\" " + NL.tipA + "=\"Reload cooldowns, missions and probes\">Refresh</button></span></div>"
+                    + "<table class=\"nxs-table nl2-sv3-table\"><colgroup><col class=\"nl2-sv3-c1\"><col class=\"nl2-sv3-c2\"><col class=\"nl2-sv3-c3\"><col class=\"nl2-sv3-c4\"><col class=\"nl2-sv3-c5\"></colgroup><thead><tr>"
+                    + [["sys", "System"], ["from", "From"], ["probes", "Probes"], ["dist", "Distance"]].map(([k, t]) => "<th data-svsort=\"" + k + "\">" + t + "<span class=\"nl2-mt-ar\"></span></th>").join("") + "<th></th></tr></thead><tbody class=\"nxs-tbody\"></tbody></table></section>";
                 function paintSurvey() {
                     const R = S.survRoot && S.survRoot.isConnected ? S.survRoot : S.root;
                     if (!R)
@@ -21926,6 +23607,7 @@
                     }
                     R.querySelector(".nxs-surv").hidden = !rows.length && !S.survFilt && !scans.length;
                     setFilterBtn(R.querySelector(".nxs-surv"), "surv");
+                    sv3Ctl(R);
                     const fold = capped && rows.length && !S.survOpen;
                     const scanHtml = scans.map((x) => {
                         const o = scanOrder(x.sysId)[0], sy = scanSys(x.sysId);
@@ -21936,10 +23618,10 @@
                             + "<td class=\"nxs-act\"><button type=\"button\" class=\"nxs-btn\" data-scansurv=\"" + x.sysId + "\"" + (o ? "" : " disabled") + ">Survey</button></td></tr>";
                     }).join("");
                     const html0 = fold ? "<tr><td colspan=\"5\" class=\"nxs-dim\"><button type=\"button\" class=\"nxs-btn\" data-survfold>Show " + rows.length + " system" + (rows.length > 1 ? "s" : "") + "</button> anomalies are capped until reset</td></tr>"
-                        : rows.length ? (capped ? "<tr><td colspan=\"5\"><button type=\"button\" class=\"nxs-btn\" data-survfold>Collapse</button></td></tr>" : "") + rows.map((r) => "<tr" + (capped ? " class=\"nxs-capped\" " + NL.tipA + "=\"Anomalies are capped until the daily reset; surveys can still be launched\"" : "") + "><td><a class=\"nxs-sys\" href=\"/galaxy?system=" + r.sy.id + "\" data-nav>" + esc(r.sy.name || ("System #" + r.sy.id)) + "</a></td>"
+                        : rows.length ? (capped ? "<tr><td colspan=\"5\"><button type=\"button\" class=\"nxs-btn\" data-survfold>Collapse</button></td></tr>" : "") + sv3Show(rows, R).map((r) => "<tr" + (capped ? " class=\"nxs-capped\" " + NL.tipA + "=\"Anomalies are capped until the daily reset; surveys can still be launched\"" : "") + "><td><a class=\"nxs-sys\" href=\"/galaxy?system=" + r.sy.id + "\" data-nav>" + esc(r.sy.name || ("System #" + r.sy.id)) + "</a></td>"
                             + "<td>" + planetLink(r.o.p) + "</td><td>" + fmt(r.o.qty) + "</td>"
                             + "<td>" + r.dist.toFixed(1) + " ly</td>"
-                            + "<td class=\"nxs-act\"><button type=\"button\" class=\"nxs-btn\" data-survey=\"" + r.sy.id + "\">Survey</button></td></tr>").join("")
+                            + "<td class=\"nxs-act\"><button type=\"button\" class=\"nxs-btn\" data-survey=\"" + r.sy.id + "\">Survey</button></td></tr>").join("") + sv3More(rows, R)
                             : "<tr><td colspan=\"5\" class=\"nxs-dim\">" + (S.survFilt ? "Nothing matches the filter." : S.cache ? (origins.length ? "No eligible systems." : "No planet has a Probe.") : "Loading\u2026") + "</td></tr>";
                     const html = scanHtml + (scans.length && !rows.length && !S.survFilt ? "" : html0);
                     const tb = R.querySelector(".nxs-surv .nxs-tbody");
@@ -22163,6 +23845,8 @@
                     const cb = sec.querySelector(".nxs-fclear");
                     if (cb && cb.disabled !== !c)
                         cb.disabled = !c;
+                    if (cb && NL.fl195 && S.survRoot && S.survRoot.contains(sec) && cb.hidden !== !c)
+                        cb.hidden = !c;
                 }
                 function clearFilters(k) {
                     lsSet(k === "deb" ? DFILTER_KEY : k === "stn" ? SFILTER_KEY : FKEY[k], {});
@@ -23057,6 +24741,7 @@
                     }
                     else {
                         S.launched.delete(sysId);
+                        U(() => loadCooldowns()).then(paint).catch(() => { });
                         toast("Survey failed: " + (lastErr && lastErr.message || "unknown error"), true);
                     }
                     paint();
@@ -25619,6 +27304,15 @@
                 }
                 let timer = null, cdTimer = null;
                 function rootChange(e) {
+                    if (e.target.hasAttribute && e.target.hasAttribute("data-survrng")) {
+                        const v = +e.target.value;
+                        if (SURVEY_RANGES.includes(v)) {
+                            SURVEY_RANGE = v;
+                            lsSet(SURVEY_RANGE_KEY, v);
+                            paint();
+                        }
+                        return;
+                    }
                     if (e.target.hasAttribute && e.target.hasAttribute("data-ruinsrc")) {
                         lsSet(RUIN_SRC_KEY, +e.target.value);
                         S.ruinPage = 0;
@@ -26071,7 +27765,197 @@
                     }
                 }
                 const MT_RES_KEY = "nxsMineTabRes";
+                const MT3_ONE = "nl2.mtOne", MT3_MULT = "nl2.mtMult", MT3_SORT = "nl2.mtSort", MT3_MULTS = [1, 2, 4, 8], MT3_EST_MS = 600000, MT3_SHIP_MS = 60000;
+                const mt3One = () => !!NL.fl192 && !!lsGet(MT3_ONE, false);
+                const mt3Mult = () => { const m = +lsGet(MT3_MULT, 1); return mt3One() && MT3_MULTS.includes(m) ? m : 1; };
+                function mineFleet(R, f, ships, tpl, mult) {
+                    const miner = ships.find((x) => x.key === R.miner), exc = ships.find((x) => x.key === "excavator");
+                    if (!miner || !num(miner.mc))
+                        return null;
+                    const rem = num(f.remaining), excHold = exc ? num(exc.mc) : 0;
+                    const base = Math.max(1, Math.ceil(Math.max(0, rem - excHold) / num(miner.mc)));
+                    const target = Math.max(MINE_FLOOR(), base * (mult || 1));
+                    const rr = (k) => Math.round(num(tpl[k]) * 100), escorts = ships.filter((x) => !MINE_SHIPS.includes(x.key));
+                    let n = Math.min(target, miner.qty);
+                    for (const x of escorts) {
+                        const r = rr(x.key);
+                        if (r > 0)
+                            n = Math.min(n, Math.floor(x.qty * 100 / r));
+                    }
+                    n = Math.max(0, n);
+                    const act = { [R.miner]: n };
+                    if (exc)
+                        act.excavator = 1;
+                    for (const x of escorts) {
+                        const r = rr(x.key);
+                        act[x.key] = r > 0 ? Math.min(x.qty, Math.floor((r * n + 99) / 100)) : 0;
+                    }
+                    let cy = null;
+                    if (n > 0) {
+                        const hold = n * num(miner.mc) + (exc ? num(exc.mc) : 0), y = n * ((MINE_BASE[R.miner] || {})[R.type] || 0) * 2 * num(f.richness) * (exc ? 1.2 : 1);
+                        cy = y > 0 && hold > 0 ? Math.max(1, Math.ceil(Math.min(hold, rem) / y)) : null;
+                    }
+                    return { n, target, act, cy };
+                }
+                function mt3Tpl() {
+                    const t = loadTemplates();
+                    if (tplSel(t, "mine:all") === "B")
+                        return t["B~mine:all"] && typeof t["B~mine:all"] === "object" ? t["B~mine:all"] : {};
+                    const cur = t["mine:all"];
+                    if (cur && typeof cur === "object")
+                        return cur;
+                    return MINE_RES.map((r) => t["mine:" + r.key]).find((x) => x && typeof x === "object" && Object.keys(x).length) || {};
+                }
+                function mt3Ships(src) {
+                    const c = S.mtShips;
+                    if (c && c.src === src && (c.p || Date.now() - c.at < MT3_SHIP_MS))
+                        return c.ships;
+                    const me = { src, at: Date.now(), ships: c && c.src === src ? c.ships : undefined, p: null };
+                    S.mtShips = me;
+                    me.p = planetShips(src, ["probe", "spy_probe"], [], {}).then((s) => { me.ships = s || null; me.at = Date.now(); }).catch(() => { me.ships = null; })
+                        .finally(() => { me.p = null; if (S.mineRoot)
+                        paintMineTab(); });
+                    return me.ships;
+                }
+                const mt3Key = (src, R, f) => src + "|" + R.key + "|" + f.id;
+                function mt3Fill(src, R) {
+                    if (!NL.fl193 || S.mtQ)
+                        return;
+                    S.mtQ = true;
+                    (async () => {
+                        try {
+                            for (let guard = 0; guard < 40; guard++) {
+                                const st = S.mt, ships = S.mtShips && S.mtShips.src === src ? S.mtShips.ships : null;
+                                if (!S.mineRoot || !st || st.src !== src || !st.R || st.R.key !== R.key || !ships)
+                                    return;
+                                const E = S.mtEst || (S.mtEst = new Map()), tpl = mt3Tpl();
+                                const b = st.belts.find((x) => { const e = E.get(mt3Key(src, R, x.f)); return !e || Date.now() - e.at > MT3_EST_MS; });
+                                if (!b)
+                                    return;
+                                const fl = mineFleet(R, b.f, ships, tpl, 1), k = mt3Key(src, R, b.f);
+                                const list = fl ? ships.filter((x) => x.id != null && fl.act[x.key] > 0).map((x) => ({ shipDefId: x.id, quantity: fl.act[x.key] })) : [];
+                                let t = null;
+                                if (list.length) {
+                                    try {
+                                        const e = await transportCall(ESTIMATE_OP, "POST", { id: null, query: {}, body: { sourcePlanetId: src, targetSystemId: b.s.systemId, targetFieldId: b.f.id, ships: list, missionType: "mining" } });
+                                        if (e && typeof e.travelTime === "number")
+                                            t = e.travelTime;
+                                    }
+                                    catch (err) {
+                                        t = null;
+                                    }
+                                }
+                                E.set(k, { at: Date.now(), t });
+                                if (S.mineRoot)
+                                    paintMineTab();
+                                await sleep(window.__nxsTestGap === 0 ? 50 : 1100);
+                            }
+                        }
+                        finally {
+                            S.mtQ = false;
+                        }
+                    })();
+                }
+                function mt3Html() {
+                    const chips = MINE_RES.map((r) => "<button type=\"button\" class=\"nl2-mt-chip\" data-mtres=\"" + r.key + "\">" + esc(r.label) + "</button>").join("");
+                    const one = NL.fl192 ? "<label class=\"nxs-chk\" " + NL.tipA + "=\"Mine launches the fleet without the dialog; the dialog still opens when something needs a look\"><input type=\"checkbox\" data-mtone> One click mode</label>"
+                        + "<span class=\"nl2-mt-mult\" data-mtmultbox hidden>" + MT3_MULTS.map((m) => "<button type=\"button\" class=\"nl2-mt-chip nl2-mt-mx\" data-mtmult=\"" + m + "\" " + NL.tipA + "=\"" + (m === 1 ? "The miners needed to empty the belt" : m + " times the miners needed to empty the belt") + "; escorts follow your ratio\">" + m + "x</button>").join("") + "</span>" : "";
+                    const th = (k, t) => "<th data-mtsort=\"" + k + "\">" + t + "<span class=\"nl2-mt-ar\"></span></th>";
+                    return "<section class=\"nxs-wrap nxs-mtab nl2-mt3\"><div class=\"nxs-head\"><strong>Mining</strong><span class=\"nxs-info nl2-mt-n\"></span>"
+                        + "<span class=\"nxs-hbtns nl2-ctl\">" + one + "<span class=\"nl2-mt-chips\">" + chips + "</span>"
+                        + "<span class=\"nxs-dim\">From</span><select class=\"nxs-sel\" data-mtsrc data-nl2-tip=\"Distances are measured from this planet; Mine opens with it\"></select>"
+                        + "<span class=\"nxs-dim\">Range</span><span class=\"nl2-mt-rbox\"><input type=\"text\" inputmode=\"numeric\" autocomplete=\"off\" class=\"nxs-in nl2-mt-range\" data-mtrange><span class=\"nl2-mt-ly\">ly</span></span>"
+                        + "<label class=\"nxs-chk\"><input type=\"checkbox\" data-mtfull> Only 100% belts</label>"
+                        + "<button type=\"button\" class=\"nxs-btn nxs-rf\" data-mtrefresh data-nl2-tip=\"Read the belts, outposts, missions and ships again\">Refresh</button></span></div>"
+                        + "<div class=\"nxs-mineidle\"></div>"
+                        + "<table class=\"nxs-table nl2-mt-table nl2-mt3-table\"><colgroup><col class=\"nl2-mt3-c1\"><col class=\"nl2-mt3-c2\"><col class=\"nl2-mt3-c3\"><col class=\"nl2-mt3-c4\"><col class=\"nl2-mt3-c5\"><col class=\"nl2-mt3-c6\"><col class=\"nl2-mt3-c7\"></colgroup>"
+                        + "<thead><tr>" + th("name", "Belt") + th("dist", "Distance") + th("rich", "Richness") + th("rem", "Remaining") + th("pct", "% Remaining") + (NL.fl193 ? th("trip", "Total Trip") : "<th></th>") + "<th></th></tr></thead>"
+                        + "<tbody class=\"nxs-tbody\"></tbody></table>"
+                        + "<div class=\"nl2-mt-foot nxs-dim\"></div></section>";
+                }
+                function mt3Ctl(sec) {
+                    const ob = sec.querySelector("[data-mtone]"), one = mt3One(), mult = mt3Mult();
+                    if (ob && ob.checked !== one)
+                        ob.checked = one;
+                    const box = sec.querySelector("[data-mtmultbox]");
+                    if (box) {
+                        if (box.hidden === one)
+                            box.hidden = !one;
+                        for (const b of box.querySelectorAll("[data-mtmult]"))
+                            b.classList.toggle("nl2-on", +b.getAttribute("data-mtmult") === mult);
+                    }
+                    const so = lsGet(MT3_SORT, null) || { k: "dist", d: 1 };
+                    for (const h of sec.querySelectorAll("[data-mtsort]")) {
+                        const a = h.querySelector(".nl2-mt-ar"), t = h.getAttribute("data-mtsort") === so.k ? (so.d > 0 ? " \u25B2" : " \u25BC") : "";
+                        if (a && a.textContent !== t)
+                            a.textContent = t;
+                    }
+                }
+                const mt3Pct = (f) => { const c = num(f.capacity), r = num(f.remaining); if (!c)
+                    return null; return r >= c ? "100%" : Math.min(99.9, r / c * 100).toFixed(1) + "%"; };
+                function mt3Trip(b, R, src, ships, tpl, mult) {
+                    const dim = (t, tip) => "<span class=\"nxs-dim\"" + (tip ? " " + NL.tipA + "=\"" + esc(tip) + "\"" : "") + ">" + t + "</span>";
+                    if (ships === undefined)
+                        return { ms: Infinity, html: dim("\u2026") };
+                    if (!ships)
+                        return { ms: Infinity, html: dim("\u2014", "Could not read the ships on the planet") };
+                    const fl = mineFleet(R, b.f, ships, tpl, mult);
+                    if (!fl || !fl.n || !fl.cy)
+                        return { ms: Infinity, html: dim("\u2014", fl ? "No mining fleet can be sent (escort ratio or ships)" : "No " + R.miner.replace(/_/g, " ") + " on this planet") };
+                    const e = S.mtEst && S.mtEst.get(mt3Key(src, R, b.f));
+                    if (!e)
+                        return { ms: Infinity, html: dim("\u2026") };
+                    if (e.t == null)
+                        return { ms: Infinity, html: dim("\u2014", "No travel estimate") };
+                    const out = e.t * 1000, mine = fl.cy * CYCLE_MS, ms = out * 2 + mine;
+                    const cls = ms > 2 * 3600000 ? " nxs-r" : ms > 3600000 ? " nxs-y" : "";
+                    const tip = fmtCd(out) + " out \u00B7 " + fmtCd(mine) + " mining (" + fl.cy + " cycle" + (fl.cy === 1 ? "" : "s") + ", " + fmt(fl.n) + " miners" + (mult > 1 ? ", " + mult + "x" : "") + ") \u00B7 " + fmtCd(out) + " back. Assumes no pirate raid.";
+                    return { ms, html: "<span class=\"nxs-est" + cls + "\" " + NL.tipA + "=\"" + esc(tip) + "\">" + fmtCd(ms) + "</span>" };
+                }
+                function mt3Rows(sec, st, belts, R, src) {
+                    const ships = NL.fl193 ? mt3Ships(src.id) : null, tpl = NL.fl193 ? mt3Tpl() : {}, mult = mt3Mult();
+                    const so = lsGet(MT3_SORT, null) || { k: "dist", d: 1 };
+                    const rows = st.belts.map((b, i) => ({ b, i, trip: NL.fl193 ? mt3Trip(b, R, src.id, ships, tpl, mult) : null }));
+                    const val = (r) => so.k === "name" ? String(r.b.f.name || "") : so.k === "rich" ? num(r.b.f.richness) : so.k === "rem" ? num(r.b.f.remaining)
+                        : so.k === "pct" ? (num(r.b.f.capacity) ? num(r.b.f.remaining) / num(r.b.f.capacity) : 0) : so.k === "trip" ? (r.trip ? r.trip.ms : Infinity) : r.b.dist;
+                    rows.sort((a, b) => { const x = val(a), y = val(b); if (x === y)
+                        return a.i - b.i; if (x === Infinity)
+                        return 1; if (y === Infinity)
+                        return -1; return (typeof x === "string" ? x.localeCompare(y) : x - y) * so.d; });
+                    const html = rows.length ? rows.map((r) => {
+                        const b = r.b, p = mt3Pct(b.f);
+                        return "<tr><td " + NL.tipA + "=\"" + esc(b.f.name) + "\">" + esc(b.f.name) + "</td><td><span class=\"" + distCls(b.dist) + "\">" + b.dist.toFixed(1) + " ly</span></td><td>" + richPill(b.f.richness) + "</td>"
+                            + "<td>" + fmt(b.f.remaining) + "</td><td>" + (p || dashCell) + "</td><td>" + (r.trip ? r.trip.html : "") + "</td>"
+                            + "<td class=\"nxs-act\"><button type=\"button\" class=\"nxs-btn nl2-mt-go\" data-mtbelt=\"" + r.i + "\">Mine</button></td></tr>";
+                    }).join("")
+                        : "<tr><td colspan=\"7\" class=\"nxs-dim\">No Dead Space " + esc(R.label) + " belts within " + (num(lsGet(MINE_RANGE_KEY, 50)) || 50) + " ly of " + esc(src.name) + ".</td></tr>";
+                    const n = sec.querySelector(".nl2-mt-n"), nt = (belts.length > st.belts.length ? "Closest " + st.belts.length + " of " + belts.length : belts.length) + " " + R.label + " belt" + (belts.length === 1 ? "" : "s");
+                    if (n && n.textContent !== nt)
+                        n.textContent = nt;
+                    const ft = "Dead Space only \u00B7 remaining as of " + new Date(S.fieldIdx.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+                    if (NL.fl193 && ships)
+                        mt3Fill(src.id, R);
+                    return { html, ft };
+                }
+                function mt3Click(e) {
+                    const m = e.target.closest && e.target.closest("[data-mtmult]");
+                    if (m) {
+                        lsSet(MT3_MULT, +m.getAttribute("data-mtmult") || 1);
+                        paintMineTab();
+                        return true;
+                    }
+                    const h = e.target.closest && e.target.closest("[data-mtsort]");
+                    if (h) {
+                        const k = h.getAttribute("data-mtsort"), so = lsGet(MT3_SORT, null) || { k: "dist", d: 1 };
+                        lsSet(MT3_SORT, so.k === k ? { k, d: -so.d } : { k, d: 1 });
+                        paintMineTab();
+                        return true;
+                    }
+                    return false;
+                }
                 function mineTabHtml() {
+                    if (NL.fl194)
+                        return mt3Html();
                     const chips = MINE_RES.map((r) => "<button type=\"button\" class=\"nl2-mt-chip\" data-mtres=\"" + r.key + "\">" + esc(r.label) + "</button>").join("");
                     return "<section class=\"nxs-wrap nxs-mtab\"><div class=\"nxs-head\"><strong>Mining</strong><span class=\"nl2-mt-chips\">" + chips + "</span><span class=\"nxs-info\"></span>"
                         + "<span class=\"nxs-hbtns\"><span class=\"nxs-dim\">From</span><select class=\"nxs-sel\" data-mtsrc data-nl2-tip=\"Distances are measured from this planet; Mine opens with it\"></select>"
@@ -26093,6 +27977,8 @@
                     if (!sec)
                         return;
                     const st = mineTabState(), R = MINE_RES.find((r) => r.key === st.res) || MINE_RES[0];
+                    if (NL.fl194)
+                        mt3Ctl(sec);
                     for (const b of sec.querySelectorAll("[data-mtres]"))
                         b.classList.toggle("nl2-on", b.getAttribute("data-mtres") === R.key);
                     const srcs = S.cache ? mineSources() : [], src = srcs.length ? lastSrc("mine", srcs) : null;
@@ -26110,11 +27996,11 @@
                     const tb = sec.querySelector(".nxs-tbody"), foot = sec.querySelector(".nl2-mt-foot");
                     let html, ft = "";
                     if (!S.cache || !S.planets.length)
-                        html = "<tr><td colspan=\"6\" class=\"nxs-dim\">Loading your planets and the map\u2026</td></tr>";
+                        html = "<tr><td colspan=\"7\" class=\"nxs-dim\">Loading your planets and the map\u2026</td></tr>";
                     else if (!srcs.length)
-                        html = "<tr><td colspan=\"6\" class=\"nxs-dim\">No Dead Space planet to mine from.</td></tr>";
+                        html = "<tr><td colspan=\"7\" class=\"nxs-dim\">No Dead Space planet to mine from.</td></tr>";
                     else if (!S.fieldIdx)
-                        html = "<tr><td colspan=\"6\" class=\"nxs-dim\">" + (S.mtFail ? "<span class=\"nxs-r\">Could not load the belts.</span>" : "Loading belts\u2026") + "</td></tr>";
+                        html = "<tr><td colspan=\"7\" class=\"nxs-dim\">" + (S.mtFail ? "<span class=\"nxs-r\">Could not load the belts.</span>" : "Loading belts\u2026") + "</td></tr>";
                     else {
                         const outp = S.outpSet ? S.outpSet.set : new Set(), belts = [];
                         const busy = new Set((S.missionList || []).filter((m) => m.missionType === "mine" && m.targetFieldId != null && m.status !== "returning").map((m) => +m.targetFieldId));
@@ -26135,11 +28021,18 @@
                         st.belts = belts.slice(0, MINE_LIMIT);
                         st.src = src.id;
                         st.R = R;
-                        html = st.belts.length ? st.belts.map((b, i) => "<tr><td>" + esc(b.f.name) + "</td><td><span class=\"" + distCls(b.dist) + "\">" + b.dist.toFixed(1) + " ly</span></td><td>" + richPill(b.f.richness) + "</td>"
-                            + "<td>" + fmt(b.f.remaining) + "</td><td>" + (num(b.f.capacity) ? (num(b.f.remaining) / num(b.f.capacity) * 100).toFixed(2) + "%" : dashCell) + "</td>"
-                            + "<td class=\"nxs-act\"><button type=\"button\" class=\"nxs-btn nl2-mt-go\" data-mtbelt=\"" + i + "\">Mine</button></td></tr>").join("")
-                            : "<tr><td colspan=\"6\" class=\"nxs-dim\">No Dead Space " + esc(R.label) + " belts within " + range + " ly of " + esc(src.name) + ".</td></tr>";
-                        ft = (belts.length > st.belts.length ? "Closest " + MINE_LIMIT + " of " + belts.length + " " : belts.length + " ") + R.label + " belts in Dead Space \u00B7 remaining as of " + new Date(S.fieldIdx.at).toLocaleTimeString();
+                        if (NL.fl194) {
+                            const r3 = mt3Rows(sec, st, belts, R, src);
+                            html = r3.html;
+                            ft = r3.ft;
+                        }
+                        else {
+                            html = st.belts.length ? st.belts.map((b, i) => "<tr><td>" + esc(b.f.name) + "</td><td><span class=\"" + distCls(b.dist) + "\">" + b.dist.toFixed(1) + " ly</span></td><td>" + richPill(b.f.richness) + "</td>"
+                                + "<td>" + fmt(b.f.remaining) + "</td><td>" + (num(b.f.capacity) ? (num(b.f.remaining) / num(b.f.capacity) * 100).toFixed(2) + "%" : dashCell) + "</td>"
+                                + "<td class=\"nxs-act\"><button type=\"button\" class=\"nxs-btn nl2-mt-go\" data-mtbelt=\"" + i + "\">Mine</button></td></tr>").join("")
+                                : "<tr><td colspan=\"7\" class=\"nxs-dim\">No Dead Space " + esc(R.label) + " belts within " + range + " ly of " + esc(src.name) + ".</td></tr>";
+                            ft = (belts.length > st.belts.length ? "Closest " + MINE_LIMIT + " of " + belts.length + " " : belts.length + " ") + R.label + " belts in Dead Space \u00B7 remaining as of " + new Date(S.fieldIdx.at).toLocaleTimeString();
+                        }
                     }
                     if (tb.__html !== html) {
                         tb.innerHTML = html;
@@ -26149,6 +28042,8 @@
                         foot.textContent = ft;
                 }
                 function mineTabClick(e) {
+                    if (NL.fl194 && mt3Click(e))
+                        return;
                     const c = e.target.closest && e.target.closest("[data-mtres]");
                     if (c) {
                         const st = mineTabState();
@@ -26161,12 +28056,15 @@
                     if (g) {
                         const st = mineTabState(), belt = st.belts[+g.getAttribute("data-mtbelt")];
                         if (belt && st.R)
-                            openMining(st.R, belt, st.src);
+                            openMining(st.R, belt, st.src, NL.fl192 ? { oneClick: mt3One(), mult: mt3Mult() } : null);
                         return;
                     }
                     const rf = e.target.closest && e.target.closest("[data-mtrefresh]");
                     if (rf && !rf.disabled) {
                         rf.disabled = true;
+                        S.mtShips = null;
+                        if (S.mtEst)
+                            S.mtEst.clear();
                         S.fieldIdx = S.fieldIdx ? { ...S.fieldIdx, at: 0 } : null;
                         S.outpSet = S.outpSet ? { ...S.outpSet, at: 0 } : null;
                         U(() => Promise.all([loadFieldIndex(), loadMyOutposts(), loadMissions()])).catch(() => { }).finally(() => { rf.disabled = false; paintIdle(); paintMineTab(); });
@@ -26181,6 +28079,10 @@
                     }
                     else if (e.target.hasAttribute("data-mtfull")) {
                         lsSet("nxsMineFull", e.target.checked);
+                        paintMineTab();
+                    }
+                    else if (e.target.hasAttribute("data-mtone")) {
+                        lsSet(MT3_ONE, e.target.checked);
                         paintMineTab();
                     }
                 }
@@ -26252,15 +28154,17 @@
                             paintSurvey();
                             return;
                         }
-                        el.innerHTML = SURV_HTML;
+                        el.innerHTML = NL.fl195 ? SURV3_HTML() : SURV_HTML;
                         if (!el.__nlSv) {
                             el.__nlSv = true;
                             el.addEventListener("change", rootChange);
                             el.addEventListener("click", rootClick);
+                            if (NL.fl195)
+                                el.addEventListener("click", sv3Click);
                         }
                         S.survRoot = el;
                         paintSurvey();
-                        stnPrep().then(() => Promise.all([S.fleets.size ? null : loadProbes(), S.missionList ? null : loadMissions()])).then(() => paintSurvey())
+                        stnPrep().then(() => Promise.all([S.fleets.size ? null : loadProbes(), S.missionList ? null : loadMissions(), U(loadCooldowns)])).then(() => paintSurvey())
                             .catch((e) => console.warn("[pve] survey section", e && e.message || e));
                     },
                     unmountSurvey() { S.survRoot = null; },
@@ -26353,6 +28257,13 @@
                     catch (e) {
                         return "";
                     } },
+                    freight: () => { try {
+                        return NL.flDebris ? salvageReports() : [];
+                    }
+                    catch (e) {
+                        return [];
+                    } },
+                    bands: () => [NEAR_GREEN(), NEAR_YELLOW()],
                     async open(kind, o, opts) {
                         await stnPrep().catch(() => { });
                         const r = NL.pve.rowOf(kind, o);
@@ -26397,6 +28308,17 @@
                     catch (e) {
                         return 0;
                     } },
+                    availCounts() {
+                        if (!NL.flTabAvail)
+                            return null;
+                        const n = (f) => { try {
+                            return f();
+                        }
+                        catch (e) {
+                            return 0;
+                        } };
+                        return { camp: n(() => campRows().nOpen), wh: n(() => wormholeRows().nOpen), inv: n(() => invRows().length), salv: n(() => salvageReports().length) };
+                    },
                     sub(fn) { (S.pveSubs = S.pveSubs || []).push(fn); },
                 };
                 function tick() {
@@ -26660,13 +28582,13 @@
                     }
                     render();
                 }
-                async function openMining(R, belt, defaultSrcId) {
+                async function openMining(R, belt, defaultSrcId, opts) {
                     closeModal();
                     const f = belt.f, sys = belt.s, zone = sys.securityZone;
                     const srcs = mineSources();
                     const dOf = (p) => { const d = nearestPlanet(num(sys.systemX), num(sys.systemY), [p]); return d ? d.dist : Infinity; };
                     const tplKey = "mine:all";
-                    const st = { src: srcs.some((p) => p.id === defaultSrcId) ? defaultSrcId : lastSrc("mine", srcs).id, ships: [], act: {}, est: null, busy: false, sending: false, tpl: loadTemplates(), pin: new Set(), mult: 1, hand: false, note: "" };
+                    const st = { src: srcs.some((p) => p.id === defaultSrcId) ? defaultSrcId : lastSrc("mine", srcs).id, ships: [], act: {}, est: null, busy: false, sending: false, tpl: loadTemplates(), pin: new Set(), mult: Math.max(1, Math.min(20, Math.round(num(opts && opts.mult)) || 1)), hand: false, note: "" };
                     if (!st.tpl[tplKey] || typeof st.tpl[tplKey] !== "object") {
                         const old = MINE_RES.map((r) => st.tpl["mine:" + r.key]).find((t) => t && typeof t === "object" && Object.keys(t).length);
                         st.tpl[tplKey] = old ? { ...old } : {};
@@ -27023,13 +28945,40 @@
                             msg.innerHTML += "<br><span class=\"nxs-r\">Launch failed: " + esc(err && err.message || err) + "</span>";
                         }
                     });
-                    loadSource();
-                    loadMissions().then(renderFs);
-                    U(loadLeader).then(() => { if (!S.modal || S.modal !== ov)
+                    const pLoad = loadSource();
+                    const pFs = loadMissions().then(renderFs);
+                    const pLd = U(loadLeader).then(() => { if (!S.modal || S.modal !== ov)
                         return; if (!leaderAt(st.src))
                         st.leader = false; renderLeader(); scheduleEstimate(); });
-                    loadMineReports().then((L) => { if (S.modal !== ov)
+                    const pRep = loadMineReports().then((L) => { if (S.modal !== ov)
                         return; st.mrep = L; renderState(); });
+                    if (opts && opts.oneClick) {
+                        ov.classList.add("nxs-oc");
+                        const show = () => { if (ov.isConnected)
+                            ov.classList.remove("nxs-oc"); };
+                        const give = setTimeout(show, 12000);
+                        Promise.all([pLoad, pFs, pLd, pRep].map((x) => Promise.resolve(x).catch(() => { }))).then(async () => {
+                            await sleep(400);
+                            for (let i = 0; i < 60 && S.modal === ov && st.busy; i++)
+                                await sleep(150);
+                            if (S.modal !== ov || !ov.isConnected)
+                                return;
+                            const issue = !st.est || go.disabled || !(st.act[R.miner] > 0) || msg.querySelector(".nxs-r,.nxs-y") || q(".nxs-hr .nxs-r");
+                            if (issue) {
+                                clearTimeout(give);
+                                show();
+                                return;
+                            }
+                            go.click();
+                            for (let i = 0; i < 80 && ov.isConnected && st.sending; i++)
+                                await sleep(150);
+                            clearTimeout(give);
+                            if (ov.isConnected)
+                                show();
+                            else
+                                S.mtShips = null;
+                        }).catch(() => show());
+                    }
                 }
                 const style = document.createElement("style");
                 style.textContent = `
@@ -27190,14 +29139,15 @@
         }
     }
     {
-        NL.feature({
-            id: "gl-pve-fold",
-            set: "Global",
-            name: "PVE sections collapse",
-            desc: "GL-156: every PVE dashboard section collapses from its heading (count shown, remembered), with Expand all / Collapse all.",
-            init() {
-                const st = NL.store("pve-fold.");
-                NL.css("gl-pve-fold", `
+        if (!NL.pveRetired)
+            NL.feature({
+                id: "gl-pve-fold",
+                set: "Global",
+                name: "PVE sections collapse",
+                desc: "GL-156: every PVE dashboard section collapses from its heading (count shown, remembered), with Expand all / Collapse all.",
+                init() {
+                    const st = NL.store("pve-fold.");
+                    NL.css("gl-pve-fold", `
       .nxs-page .nxs-wrap[data-nl2-pf="folded"] > :not(.nxs-head){display:none!important}
       .nxs-page .nxs-wrap[data-nl2-pf="folded"] > .nxs-head{margin-bottom:0}
       .nxs-page .nxs-wrap > .nxs-head[data-nl2-pf-head]{cursor:pointer;user-select:none}
@@ -27208,54 +29158,54 @@
         cursor:pointer;font:600 13px Rajdhani,"Exo 2",sans-serif}
       .nl2-pf-all button:hover{border-color:rgba(56,189,248,.6)}
     `);
-                const keyOf = (sec) => [...sec.classList].find((c) => /^nxs-/.test(c) && c !== "nxs-wrap") || "x";
-                const set = (sec, folded) => {
-                    sec.setAttribute("data-nl2-pf", folded ? "folded" : "open");
-                    const a = sec.querySelector(":scope > .nxs-head > .nl2-pf-arr"), t = folded ? "\u25B8" : "\u25BE";
-                    if (a && a.textContent !== t)
-                        a.textContent = t;
-                    const h = sec.querySelector(":scope > .nxs-head");
-                    if (h)
-                        h.setAttribute("aria-expanded", String(!folded));
-                };
-                const toggle = (sec, folded) => { set(sec, folded); st.set(keyOf(sec), folded); };
-                const count = (sec) => {
-                    if (sec.classList.contains("nxs-flt")) {
-                        const m = /(\d+)\s*\/\s*(\d+)/.exec((NL.fleetSlotsText && NL.fleetSlotsText()) || "");
-                        return m ? m[1] + " / " + m[2] : "";
-                    }
-                    const rows = [...sec.querySelectorAll("tbody tr")].filter((tr) => !tr.hidden && !(tr.children.length === 1 && tr.children[0].hasAttribute("colspan")));
-                    return String(rows.length);
-                };
-                NL.watch(".nxs-page .nxs-wrap > .nxs-head", (head) => {
-                    const sec = head.parentElement, strong = head.querySelector(":scope > strong");
-                    if (!strong)
-                        return;
-                    if (!head.hasAttribute("data-nl2-pf-head")) {
-                        head.setAttribute("data-nl2-pf-head", "");
-                        head.insertBefore(NL.h("span", { class: "nl2-pf-arr", "aria-hidden": "true" }), strong);
-                        strong.after(NL.h("span", { class: "nl2-pf-n" }));
-                        head.addEventListener("click", (e) => {
-                            if (e.target.closest("button, input, select, label, a, .nxs-hbtns, .nxs-btn"))
-                                return;
-                            toggle(sec, sec.getAttribute("data-nl2-pf") !== "folded");
-                        });
-                        set(sec, !!st.get(keyOf(sec), false));
-                    }
-                    const n = head.querySelector(":scope > .nl2-pf-n"), c = count(sec), t = c ? "(" + c + ")" : "";
-                    if (n && n.textContent !== t)
-                        n.textContent = t;
-                });
-                NL.watch(".nxs-page > .nxs-cols", (cols) => {
-                    if (cols.previousElementSibling && cols.previousElementSibling.classList.contains("nl2-pf-all"))
-                        return;
-                    const all = (folded) => () => { for (const s of cols.querySelectorAll(".nxs-wrap"))
-                        if (s.querySelector(":scope > .nxs-head[data-nl2-pf-head]"))
-                            toggle(s, folded); };
-                    cols.before(NL.h("div", { class: "nl2-pf-all" }, NL.h("button", { type: "button", onclick: all(false) }, "Expand all"), NL.h("button", { type: "button", onclick: all(true) }, "Collapse all")));
-                });
-            },
-        });
+                    const keyOf = (sec) => [...sec.classList].find((c) => /^nxs-/.test(c) && c !== "nxs-wrap") || "x";
+                    const set = (sec, folded) => {
+                        sec.setAttribute("data-nl2-pf", folded ? "folded" : "open");
+                        const a = sec.querySelector(":scope > .nxs-head > .nl2-pf-arr"), t = folded ? "\u25B8" : "\u25BE";
+                        if (a && a.textContent !== t)
+                            a.textContent = t;
+                        const h = sec.querySelector(":scope > .nxs-head");
+                        if (h)
+                            h.setAttribute("aria-expanded", String(!folded));
+                    };
+                    const toggle = (sec, folded) => { set(sec, folded); st.set(keyOf(sec), folded); };
+                    const count = (sec) => {
+                        if (sec.classList.contains("nxs-flt")) {
+                            const m = /(\d+)\s*\/\s*(\d+)/.exec((NL.fleetSlotsText && NL.fleetSlotsText()) || "");
+                            return m ? m[1] + " / " + m[2] : "";
+                        }
+                        const rows = [...sec.querySelectorAll("tbody tr")].filter((tr) => !tr.hidden && !(tr.children.length === 1 && tr.children[0].hasAttribute("colspan")));
+                        return String(rows.length);
+                    };
+                    NL.watch(".nxs-page .nxs-wrap > .nxs-head", (head) => {
+                        const sec = head.parentElement, strong = head.querySelector(":scope > strong");
+                        if (!strong)
+                            return;
+                        if (!head.hasAttribute("data-nl2-pf-head")) {
+                            head.setAttribute("data-nl2-pf-head", "");
+                            head.insertBefore(NL.h("span", { class: "nl2-pf-arr", "aria-hidden": "true" }), strong);
+                            strong.after(NL.h("span", { class: "nl2-pf-n" }));
+                            head.addEventListener("click", (e) => {
+                                if (e.target.closest("button, input, select, label, a, .nxs-hbtns, .nxs-btn"))
+                                    return;
+                                toggle(sec, sec.getAttribute("data-nl2-pf") !== "folded");
+                            });
+                            set(sec, !!st.get(keyOf(sec), false));
+                        }
+                        const n = head.querySelector(":scope > .nl2-pf-n"), c = count(sec), t = c ? "(" + c + ")" : "";
+                        if (n && n.textContent !== t)
+                            n.textContent = t;
+                    });
+                    NL.watch(".nxs-page > .nxs-cols", (cols) => {
+                        if (cols.previousElementSibling && cols.previousElementSibling.classList.contains("nl2-pf-all"))
+                            return;
+                        const all = (folded) => () => { for (const s of cols.querySelectorAll(".nxs-wrap"))
+                            if (s.querySelector(":scope > .nxs-head[data-nl2-pf-head]"))
+                                toggle(s, folded); };
+                        cols.before(NL.h("div", { class: "nl2-pf-all" }, NL.h("button", { type: "button", onclick: all(false) }, "Expand all"), NL.h("button", { type: "button", onclick: all(true) }, "Collapse all")));
+                    });
+                },
+            });
     }
     {
         let tasksBoot = null;
@@ -28116,7 +30066,53 @@
                     const btn = (label, data) => "<button type=\"button\" class=\"nxt-btn\" " + data + ">" + label + "</button>";
                     const availTxt = (short) => (isEmpty(short) ? "<span class=\"nxt-g\">Enough</span>" : "<span class=\"nxt-r\">Short " + esc(costHtml(short)) + "</span>");
                     const SLOT_ST = ["outbound", "returning", "in_combat", "raiding", "mining", "exploring", "surveying", "stationed", "collecting", "inside_wormhole"];
+                    const MS_SORT_KEY = "nl2.moScanSort";
+                    const msSort = () => { const v = lsGet(MS_SORT_KEY, null); return v && v.k ? v : { k: "ready", d: 1 }; };
+                    function scanHtml2(scan) {
+                        const hid = scannedSectors(), hrs = scanHours(), now = Date.now(), so = msSort();
+                        const shortSec = (n) => { const m = /^\s*([A-Za-z])\S*\s+Arm\s*[-–]\s*Sector\s+(\d+)/i.exec(String(n || "")); return m ? m[1].toUpperCase() + m[2] : String(n || ""); };
+                        const leftOf = (t) => (t.ready ? 0 : t.left);
+                        const rows = scan.map((r, i) => ({ r, i, ready: SCAN_TYPES.filter(([type]) => r.types[type].ready).length, soon: Math.min(...SCAN_TYPES.map(([type]) => leftOf(r.types[type]))) }));
+                        const byName = (a, b) => String(a.r.name).localeCompare(String(b.r.name));
+                        const cmp = { ready: (a, b) => b.ready - a.ready || a.soon - b.soon || byName(a, b), name: byName };
+                        for (const [type] of SCAN_TYPES)
+                            cmp[type] = (a, b) => leftOf(a.r.types[type]) - leftOf(b.r.types[type]) || byName(a, b);
+                        const f = cmp[so.k] || cmp.ready;
+                        rows.sort((a, b) => f(a, b) * (so.k === "ready" ? 1 : so.d));
+                        const ar = (k) => (so.k === k ? "<span class=\"nxt-ms-ar\">" + (so.d > 0 ? "\u25B4" : "\u25BE") + "</span>" : "");
+                        const readyN = rows.reduce((a, x) => a + x.ready, 0);
+                        const cell = (r, i, type) => {
+                            const t = r.types[type];
+                            if (t.ready)
+                                return "<td class=\"nxt-ms-c\">" + "<button type=\"button\" class=\"nxt-btn nxt-ms-go\" data-sc=\"" + i + "|" + type + "\">Scan</button></td>";
+                            const at = now + t.left;
+                            return "<td class=\"nxt-ms-c\"><span class=\"nxt-ms-cd\" data-cd=\"" + at + "\" data-cdr=\"1\">" + NL.countdown(t.left) + "</span><span class=\"nxt-dim\">" + esc(NL.clock(at)) + "</span></td>";
+                        };
+                        const cols = "<colgroup><col><col style=\"width:260px\"><col style=\"width:260px\"></colgroup>";
+                        const label = { wormhole: "Wormhole", activity: "Pirate" };
+                        const secs = [];
+                        for (const [type] of SCAN_TYPES)
+                            for (const e of Object.values(hid[type] || {}))
+                                secs.push({ type, name: shortSec(e.name), until: e.until });
+                        const sso = lsGet(MS_SORT_KEY + "Sec", null) || { k: "until", d: 1 };
+                        const scmp = { until: (a, b) => a.until - b.until, name: (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }), type: (a, b) => a.type.localeCompare(b.type) || a.until - b.until };
+                        secs.sort((a, b) => (scmp[sso.k] || scmp.until)(a, b) * sso.d);
+                        const sar = (k) => (sso.k === k ? "<span class=\"nxt-ms-ar\">" + (sso.d > 0 ? "\u25B4" : "\u25BE") + "</span>" : "");
+                        return "<section class=\"nxd-wrap nxt-ms\"><div class=\"nxt-wh\"><strong>Moon Scans</strong><span class=\"nxt-dim nxt-ms-n\">" + rows.length + (rows.length === 1 ? " moon" : " moons") + " \u00B7 " + readyN + (readyN === 1 ? " scan" : " scans") + " ready</span>"
+                            + "<span class=\"nxt-ms-cfg\"><span class=\"nxt-dim\">Keep a scanned sector out of every moon's list for</span> <select class=\"nxt-sel\" data-scanh>"
+                            + [1, 2, 3, 4, 5, 6, 7, 8].map((h) => "<option value=\"" + h + "\"" + (h === hrs ? " selected" : "") + ">" + h + (h === 1 ? " Hour" : " Hours") + "</option>").join("") + "</select></span></div>"
+                            + "<table class=\"nxt-table nxt-ms-t\" data-ms=\"moons\">" + cols + "<thead><tr><th data-mss=\"name\">Moon" + ar("name") + "</th>"
+                            + SCAN_TYPES.map(([type, lab]) => "<th data-mss=\"" + type + "\">" + lab + ar(type) + "</th>").join("") + "</tr></thead><tbody>"
+                            + rows.map(({ r, i }) => "<tr><td><a class=\"nxt-link\" href=\"#\" data-msmoon=\"" + esc(r.name) + "\" data-nl2-tip=\"" + esc(r.name) + "\">" + esc(r.name) + "</a></td>" + SCAN_TYPES.map(([type]) => cell(r, i, type)).join("") + "</tr>").join("")
+                            + "</tbody></table><div class=\"nxt-sub\">Sectors on cooldown</div>"
+                            + "<table class=\"nxt-table nxt-ms-t\" data-ms=\"secs\">" + cols + "<thead><tr><th data-msss=\"name\">Sector" + sar("name") + "</th><th data-msss=\"type\">Scan type" + sar("type") + "</th><th data-msss=\"until\">Back in" + sar("until") + "</th></tr></thead><tbody>"
+                            + (secs.length ? secs.map((x) => "<tr><td>" + esc(x.name) + "</td><td><span class=\"nxt-ms-pill nxt-ms-" + x.type + "\">" + label[x.type] + "</span></td><td><span data-cd=\"" + x.until + "\">" + NL.countdown(x.until - now) + "</span></td></tr>").join("")
+                                : "<tr><td>\u2014</td><td>\u2014</td><td>\u2014</td></tr>")
+                            + "</tbody></table></section>";
+                    }
                     function scanHtml(scan) {
+                        if (NL.moScans !== false)
+                            return scanHtml2(scan);
                         const hid = scannedSectors(), hrs = scanHours();
                         const shortSec = (n) => { const m = /^\s*([A-Za-z])\S*\s+Arm\s*[-–]\s*Sector\s+(\d+)/i.exec(String(n || "")); return m ? m[1].toUpperCase() + m[2] : String(n || ""); };
                         const cool = (type) => {
@@ -28143,6 +30139,22 @@
                         mroot.dataset.nxd = "moons";
                         mroot.innerHTML = "<section class=\"nxd-wrap\"><div class=\"nxt-head\"><strong>Moons</strong></div></section><div class=\"nxt-body\"></div>";
                         mroot.addEventListener("click", (e) => {
+                            const lk = e.target.closest && e.target.closest("a[data-msmoon]");
+                            if (lk && mroot.contains(lk)) {
+                                e.preventDefault();
+                                if (NL.badgeOpenPlace)
+                                    NL.badgeOpenPlace({ n: lk.dataset.msmoon, moon: true }, "/shipyard");
+                                return;
+                            }
+                            const hs = e.target.closest && e.target.closest("th[data-mss],th[data-msss]");
+                            if (hs && mroot.contains(hs)) {
+                                const sec = !!hs.dataset.msss, key = sec ? MS_SORT_KEY + "Sec" : MS_SORT_KEY, k = hs.dataset.msss || hs.dataset.mss;
+                                const cur = sec ? (lsGet(key, null) || { k: "until", d: 1 }) : msSort();
+                                const nk = !sec && k === "name" && cur.k === "name" && cur.d < 0 ? { k: "ready", d: 1 } : { k, d: cur.k === k ? -cur.d : 1 };
+                                lsSet(key, nk);
+                                paint();
+                                return;
+                            }
                             const t = e.target.closest && e.target.closest("button[data-sc]");
                             if (!t || t.disabled || !mroot.contains(t) || !S.d)
                                 return;
@@ -28610,6 +30622,18 @@
     .nxt-table th:last-child,.nxt-table td:last-child{width:1%;text-align:right}
     .nxt-table.nxt-scant{width:auto;table-layout:fixed}
     .nxt-table.nxt-scant th,.nxt-table.nxt-scant td{width:auto;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .nxt-ms .nxt-wh{align-items:center}.nxt-ms-n{font-size:12px}
+    .nxt-ms-cfg{margin-left:auto;font-size:12px;white-space:nowrap}.nxt-ms-cfg .nxt-sel{font-size:12px;padding:0 4px}
+    .nxt-table.nxt-ms-t{width:100%;table-layout:fixed;font-size:14px}
+    .nxt-table.nxt-ms-t th{font-size:12px;cursor:pointer;user-select:none;width:auto;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .nxt-table.nxt-ms-t td{color:#f1f6ff;height:30px;padding:0 8px;line-height:22px;width:auto;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .nxt-ms-ar{color:#7fd4ff;margin-left:4px}
+    .nxt-btn.nxt-ms-go{width:96px;height:22px;line-height:20px;font-size:12px;text-align:center;overflow:hidden;text-overflow:ellipsis;background:rgba(94,224,138,.14);border-color:#2f8f55;color:#5ee08a}
+    .nxt-btn.nxt-ms-go:hover:not(:disabled){background:rgba(94,224,138,.26)}
+    .nxt-ms-cd{display:inline-block;width:96px;color:#cfe9ff}
+    .nxt-ms-pill{display:inline-block;padding:0 8px;border-radius:9px;font-size:12px;line-height:18px;border:1px solid}
+    .nxt-ms-wormhole{color:#b49cff;border-color:rgba(180,156,255,.45);background:rgba(180,156,255,.12)}
+    .nxt-ms-activity{color:#e5c07b;border-color:rgba(229,192,123,.45);background:rgba(229,192,123,.12)}
     .nxt-table tr.nxt-grey td:not(.nxt-act),.nxt-table tr.nxt-grey .nxt-act .nxt-dim{opacity:.45}
     .nxt-act .nxt-btn+.nxt-btn{margin-left:4px}
     .nxt-btn{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:#cfe9ff;border-radius:4px;padding:0 8px;height:18px;line-height:16px;font:inherit;font-size:11px;cursor:pointer;vertical-align:middle}
@@ -28651,12 +30675,21 @@
                     let tickQ = 0;
                     NL.watch(HOST_SEL, () => { if (!tickQ)
                         tickQ = setTimeout(() => { tickQ = 0; tick(); }, 100); });
+                    let cdReady = false;
                     setInterval(() => {
                         for (const el of [mroot].filter(Boolean).flatMap((x) => [...x.querySelectorAll("[data-cd]")])) {
                             if (el.dataset.cdh && +el.dataset.cd <= Date.now())
                                 el.dataset.cd = nextTick(+el.dataset.cd);
                             const left = (+el.dataset.cd - Date.now()) / 1000;
-                            el.textContent = left > 0 ? dur(left) : "finishing";
+                            if (el.dataset.cdr && left <= 0) {
+                                cdReady = true;
+                                continue;
+                            }
+                            el.textContent = left > 0 ? (NL.moScans !== false && el.closest(".nxt-ms") ? NL.countdown(left * 1000) : dur(left)) : "finishing";
+                        }
+                        if (cdReady) {
+                            cdReady = false;
+                            paint();
                         }
                     }, 1000);
                     tick();
