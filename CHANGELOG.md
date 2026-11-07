@@ -1,5 +1,39 @@
 # Release notes
 
+## v0.5.104 · Nov 6, 2026
+
+**🛰 Fleet**
+- Wormholes: a launched wormhole leaves Detected Wormholes at once and shows as "Launching" in Active Runs until the run arrives (FL-225)
+- Ruins table cleaned up to match the other Fleet tables (FL-221)
+- A badge when a logistics route is paused (FL-222)
+- The Wormholes badge no longer counts a wormhole that already has a run (inside, returning or done) (FL-227)
+
+**🔭 Surveys**
+- An Investigate row leaves the table the moment you click (FL-226)
+
+**🏴‍☠️ Pirates**
+- New Pirate Camps column order, and Merchant Contracts claim colours
+  <details><summary>Details</summary>
+
+  - Pirate Camps columns in the new order (FL-224)
+  - Merchant Contracts claim states in colour (FL-223)
+  </details>
+- Dread camps always open the fleet dialog in One click mode, and their tier shows as a coloured pill (FL-228)
+- The Pirates badge stops counting a camp as soon as you launch at it (FL-230)
+
+**🚢 Shipyard**
+- Queue headers show the time left and the finish time (SH-030)
+
+**🌙 Moons**
+- Moon Scans rows stay in moon picker order and never move (MO-033)
+
+**🧹 Polish**
+- An 18px gap above the Hidden bar on Buildings, Moons and Fleet Pirates (GL-204)
+- After NL Mute, Escape closes the game's Audio panel (GL-203)
+
+**🧩 Other**
+- Nothing else this time
+
 ## v0.5.103 · Nov 6, 2026
 
 **🏴‍☠️ Pirates**

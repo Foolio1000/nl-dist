@@ -1,24 +1,18 @@
 {
-  "version": "0.5.103",
-  "built": "2026-11-07T02:21:21.825Z",
+  "version": "0.5.104",
+  "built": "2026-11-07T07:11:55.830Z",
   "items": [
-    "FL-210",
-    "FL-211",
-    "FL-212",
-    "FL-213",
-    "FL-214",
-    "FL-215",
-    "FL-216",
-    "FL-217",
-    "FL-218",
-    "FL-219",
-    "FL-220",
-    "GL-201",
-    "GL-202",
-    "RE-029"
+    "FL-221 GL-203 SH-030 MO-033 FL-222 GL-204 FL-225 FL-224 FL-223 FL-227 FL-226 FL-228 FL-230"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.104",
+      "items": [
+        "FL-221 GL-203 SH-030 MO-033 FL-222 GL-204 FL-225 FL-224 FL-223 FL-227 FL-226 FL-228 FL-230"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.103",
       "items": [
@@ -703,35 +697,6 @@
       ],
       "notes": {
         "FL-075": "Make route: flat trigger and send amounts in settings"
-      }
-    },
-    {
-      "version": "0.5.84",
-      "items": [
-        "EM-025",
-        "FL-071",
-        "FL-072",
-        "FL-073",
-        "FL-074",
-        "GL-075",
-        "GL-076",
-        "SH-013",
-        "RE-006",
-        "RE-007",
-        "RE-008"
-      ],
-      "notes": {
-        "EM-025": "Command Center Research: lab upgrade end time",
-        "FL-071": "Transfer: moon Collect opens on the Fleet page",
-        "FL-072": "Call Ships: one extra cargo ship",
-        "FL-073": "Transfer: moon Collect thresholds in settings",
-        "FL-074": "Transfer: Make route on moon rows",
-        "GL-075": "Market hubs: Rare deliver button",
-        "GL-076": "To Do: Undo button",
-        "SH-013": "Shipyard badge skips full repair queues",
-        "RE-006": "Research: ROI on cards",
-        "RE-007": "Research: hide researches",
-        "RE-008": "Research badge: artifacts and trader summon"
       }
     }
   ]
