@@ -1,11 +1,18 @@
 {
-  "version": "0.5.104",
-  "built": "2026-11-07T07:11:55.830Z",
+  "version": "0.5.105",
+  "built": "2026-11-07T20:49:13.596Z",
   "items": [
-    "FL-221 GL-203 SH-030 MO-033 FL-222 GL-204 FL-225 FL-224 FL-223 FL-227 FL-226 FL-228 FL-230"
+    "FL-229 FL-231 FL-232 FL-233 FL-234 FL-235 FL-236 FL-237 FL-238 FL-239 FL-240 FL-241 FL-242 FL-243 GL-205 GL-206 GL-207 GL-208 GL-209 GL-210 RE-030 SH-031"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.105",
+      "items": [
+        "FL-229 FL-231 FL-232 FL-233 FL-234 FL-235 FL-236 FL-237 FL-238 FL-239 FL-240 FL-241 FL-242 FL-243 GL-205 GL-206 GL-207 GL-208 GL-209 GL-210 RE-030 SH-031"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.104",
       "items": [
@@ -688,15 +695,6 @@
         "FL-083": "Recall hover: time home",
         "FL-084": "Spy reports: Previous and Next",
         "FL-085": "Evacuate always includes damaged ships"
-      }
-    },
-    {
-      "version": "0.5.85",
-      "items": [
-        "FL-075"
-      ],
-      "notes": {
-        "FL-075": "Make route: flat trigger and send amounts in settings"
       }
     }
   ]

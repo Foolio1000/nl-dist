@@ -1,5 +1,40 @@
 # Release notes
 
+## v0.5.105 · Nov 7, 2026
+
+**🛰 Fleet**
+- The Next Tick countdown now shows the bio change next to it, e.g. "· −681.2 Bio" (FL-229)
+- The Mining Richness number sits centred in its pill (FL-232)
+- Surveys no longer shows a stale Investigate badge after an Investigate mission ends (FL-231)
+- Paused logistics routes now count as one badge, "Routes paused: N". You can turn this badge off in Custom > Fleet Transfer (FL-233)
+- Stations: the badge and table clear as soon as a collect launches, with no leftover rows (FL-237)
+- Quick Spy and Stations Collect open in One click mode (FL-234, FL-235)
+- The Survey table gains Wormhole and Pirate columns (FL-238)
+- Mining's idle count updates as soon as you launch (FL-236)
+- Wormholes open in One click mode. C4 wormholes are never launched automatically (FL-241)
+- The Surveys tab badge also counts moon-scan rows (FL-242)
+- The Pirates tab badge counts only camps you can attack now, and Dread camps get a clearer label (FL-239, FL-240)
+- Fleet tab controls: Table View is always the last control, with One click mode just to its left (FL-243)
+
+**🚢 Shipyard**
+- The warning when you cancel an active build can no longer be turned off for good, for both ships and buildings (SH-031)
+
+**🔬 Research**
+- The fragment picker shows how many fragments you have: the hover ends with "N available" and the column reads "Fragments (N) · Action" (RE-030)
+
+**🏷️ Badges**
+- Custom > Badges has one on/off switch per badge type, grouped by menu, plus All on and All off. Turning a type off removes it from the menu count, the hover and its Fleet tab badge. Each server keeps its own switches (GL-208)
+
+**🧹 Polish**
+- Pop-up toasts are bigger and easier to read (GL-210)
+- Custom is now its own button at the top right, next to Options (GL-207)
+- The Crew table fits the page (GL-205)
+- The leader pill shows the game's own status, so it no longer mixes up Refitting and Recovering (GL-209)
+- Messages opens on the System tab (GL-206)
+
+**🧩 Other**
+- Steadier test for the rank pills (hgl48)
+
 ## v0.5.104 · Nov 6, 2026
 
 **🛰 Fleet**
