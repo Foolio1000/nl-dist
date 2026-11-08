@@ -1,11 +1,28 @@
 {
-  "version": "0.5.106",
-  "built": "2026-11-08T07:33:42.768Z",
+  "version": "0.5.107",
+  "built": "2026-11-08T09:42:58.996Z",
   "items": [
-    "FL-245"
+    "FL-244",
+    "FL-248",
+    "FL-246",
+    "FL-247",
+    "BU-036",
+    "MO-034"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.107",
+      "items": [
+        "FL-244",
+        "FL-248",
+        "FL-246",
+        "FL-247",
+        "BU-036",
+        "MO-034"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.106",
       "items": [
@@ -648,19 +665,6 @@
         "OU-009": "Badges clear instantly: Outposts",
         "GL-077": "Badges clear instantly: Dashboards",
         "OV-007": "Badge at 100% storage"
-      }
-    },
-    {
-      "version": "0.5.87",
-      "items": [
-        "GL-086",
-        "GL-087",
-        "GL-088"
-      ],
-      "notes": {
-        "GL-086": "Maintenance: error log on the Custom screen",
-        "GL-087": "Maintenance: shared formatting helpers",
-        "GL-088": "Maintenance: shared write helper"
       }
     }
   ]

@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.106
+// @version      0.5.107
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.106", features: [] };
+    const NL = window.__nl2 = { version: "0.5.107", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -9427,6 +9427,15 @@
                     P + ".building-action-area>.upgrade-btn," + P + ".building-action-area>.construction-supply-trigger," + P + ".building-upgrading>.cancel-btn{" + col(COLS.btn) + ";" + BTN + "}",
                     P + ".building-action-area>.demolish-btn{" + col(COLS.roi) + ";width:100%!important;padding:2px 4px!important;min-height:0!important;height:24px!important;font-size:12px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}",
                     P + ".building-action-area:has(>.demolish-btn:not([style*=\"none\"]))>.nl2-roi{display:none!important}",
+                    P + ".building-action-area>.demolish-confirm{grid-row:2!important;grid-column:1/-1!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center;gap:16px;margin:4px 0 2px!important;padding:4px 8px!important;border:0!important;border-top:1px solid rgba(248,113,113,.35)!important;background:rgba(248,113,113,.06)!important;box-shadow:none!important;height:auto!important;width:auto!important;min-width:0;overflow:hidden;white-space:nowrap;font-size:13px}",
+                    P + ".demolish-confirm .demolish-refund{display:flex!important;flex-direction:row!important;align-items:center;gap:16px;flex:1 1 auto;min-width:0;margin:0!important;padding:0!important;border:0!important;background:none!important}",
+                    P + ".demolish-confirm .demolish-label{flex:0 0 auto;margin:0!important}",
+                    P + ".demolish-confirm .demolish-option{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;flex:0 1 auto;min-width:0;margin:0!important;padding:0!important;border:0!important;background:none!important}",
+                    P + ".demolish-confirm .demolish-option-main," + P + ".demolish-confirm .demolish-details{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;min-width:0;overflow:hidden;white-space:nowrap;margin:0!important;padding:0!important}",
+                    P + ".demolish-confirm .demolish-details *{white-space:nowrap;margin:0!important}",
+                    P + ".demolish-confirm .demolish-confirm-btn{flex:0 0 auto;min-height:0!important;height:24px!important;padding:2px 8px!important;margin:0!important}",
+                    P + ".demolish-confirm .demolish-actions{flex:0 0 auto;margin:0 0 0 auto!important;padding:0!important}",
+                    P + ".demolish-confirm .demolish-cancel-btn{" + BTN + "}",
                     P + ".building-action-area:has(>.construction-supply-trigger)>.upgrade-btn{display:none!important}",
                     P + ".building-action-area>.upgrade-btn[data-nl2-bt-up]{font-size:0!important}",
                     P + ".building-action-area>.upgrade-btn[data-nl2-bt-up]>svg{display:none!important}",
@@ -14647,6 +14656,7 @@
                 });
             },
         });
+        const FL_WH_TRUST_SERVER = true;
         NL.feature({
             id: "fl-wh-badge",
             set: "Fleet",
@@ -14657,7 +14667,7 @@
                 const num = (v) => Number(v) || 0;
                 const ts = (v) => { if (v == null || v === "")
                     return null; const t = typeof v === "number" ? v : Date.parse(v); return Number.isFinite(t) ? t : null; };
-                let runs = [], timer = null, last = null;
+                let runs = [], timer = null, last = null, ansAt = 0;
                 const decided = new Map();
                 const sigOf = (r) => num(r.currentEncounter) + ":" + (r.nextEncounterAt || "") + ":" + r.status;
                 function stateOf(r, now) {
@@ -14674,7 +14684,9 @@
                         if (cur >= tot)
                             return { waiting: false };
                         const until = started != null ? started + AUTO_MS : null;
-                        return until != null && until <= now ? { waiting: false } : { waiting: true, next: until };
+                        if (until != null && until <= now)
+                            return FL_WH_TRUST_SERVER && ansAt >= until ? { waiting: true } : { waiting: false };
+                        return { waiting: true, next: until };
                     }
                     if (cur + 1 >= tot)
                         return { waiting: false };
@@ -14735,6 +14747,7 @@
                 }
                 NL.onData(/^\/api\/fleet\/wormhole-runs$/, (p, d) => { if (d && Array.isArray(d.runs)) {
                     runs = d.runs;
+                    ansAt = Date.now();
                     paint();
                 } });
                 NL.onWrite(/^\/api\/fleet\/wormhole-runs\/\d+\/[a-z_-]+$/, (p) => {
@@ -15256,6 +15269,8 @@
                         recalled.add(m.id);
                         m.status = "returning";
                         ctx.log("recalled", m.id);
+                        if (NL.fl247)
+                            NL.getJson("/api/fleet/missions", ctx).then(() => NL._kick()).catch(() => { });
                     }
                     catch (e) {
                         err.set(m.id, "Recall failed: " + (e && e.message || e));
@@ -15278,15 +15293,17 @@
                         NL._kick();
                     } }, ARM_MS + 50);
                 }
+                const spyOut = (m) => !!(NL.fl247 && (m.missionType === "spy" || m.missionType === "spy_moon") && m.status === "outbound");
+                const whatOf = (m) => (m.missionType === "spy_moon" ? "Moon Recon fleet" : m.missionType === "spy" ? "spy fleet" : "Stealth Deploy fleet");
                 const isArmed = (m) => !!(arm && arm.id === m.id && Date.now() - arm.at < ARM_MS);
                 const hm = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
                 function recallEl(m, opts) {
                     if (recalled.has(m.id) || m.status === "returning")
                         return NL.h("span", { class: "nl2-fls-chip nl2-fls-ret" }, "Returning");
-                    if (m.missionType !== "spy_station" || !CAN.includes(m.status))
+                    if (!spyOut(m) && (m.missionType !== "spy_station" || !CAN.includes(m.status)))
                         return null;
-                    const armed = isArmed(m), exact = opts && opts.exactAt;
-                    return NL.h("span", { class: "nl2-fls" }, NL.h("button", { type: "button", class: "nl2-fls-btn " + (exact ? "nl2-c-green" : "nl2-c-red"), disabled: busy === m.id, "data-nl2-tip": (exact ? "Exact intelligence reached at " + hm(exact) + ". " : "") + (armed ? "Click again to recall this Stealth Deploy fleet" : "Recall this Stealth Deploy fleet (click twice within 5 s)"), onclick: (e) => { e.preventDefault(); e.stopPropagation(); onBtn(m); } }, busy === m.id ? "Recalling\u2026" : armed ? "Confirm recall" : "Recall"), err.get(m.id) ? NL.h("span", { class: "nl2-fls-note" }, err.get(m.id)) : null);
+                    const armed = isArmed(m), exact = opts && opts.exactAt, what = whatOf(m);
+                    return NL.h("span", { class: "nl2-fls" }, NL.h("button", { type: "button", class: "nl2-fls-btn " + (exact ? "nl2-c-green" : "nl2-c-red"), disabled: busy === m.id, "data-nl2-tip": (exact ? "Exact intelligence reached at " + hm(exact) + ". " : "") + (armed ? "Click again to recall this " + what : "Recall this " + what + " (click twice within 5 s)"), onclick: (e) => { e.preventDefault(); e.stopPropagation(); onBtn(m); } }, busy === m.id ? "Recalling\u2026" : armed ? "Confirm recall" : "Recall"), err.get(m.id) ? NL.h("span", { class: "nl2-fls-note" }, err.get(m.id)) : null);
                 }
                 NL.flSpyRecall = { el: recallEl, key: (m, opts) => [m.id, m.status, recalled.has(m.id), isArmed(m), busy === m.id, err.get(m.id) || "", (opts && opts.exactAt) || ""].join("|") };
                 function paint(el) {
@@ -15702,7 +15719,7 @@
       .nl2-fsl-ref:hover{text-decoration:underline}
       .nl2-fsl-note{color:var(--text-muted,#c0cce0);font-size:14px;margin:4px 0}
       .nl2-fsl-note.nl2-bad{color:#fca5a5}
-      .nl2-fsl table{border-collapse:collapse;table-layout:fixed;width:100%;max-width:1100px;background:rgba(12,24,44,.96);border-radius:8px;overflow:hidden}
+      .nl2-fsl table{border-collapse:collapse;table-layout:fixed;width:100%;max-width:1200px;background:rgba(12,24,44,.96);border-radius:8px;overflow:hidden}
       .nl2-fsl th{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0);text-align:left;padding:7px 10px;border-bottom:1px solid rgba(120,200,255,.12)}
       .nl2-fsl td{font-size:15px;padding:5px 10px;border-bottom:1px solid rgba(120,200,255,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-primary,#f1f6ff)}
       .nl2-fsl tr.nl2-fsl-moon td:nth-child(2){padding-left:26px}
@@ -15710,7 +15727,7 @@
       .nl2-fsl-src{background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.25);border-radius:6px;color:var(--text-primary,#f1f6ff);padding:4px 8px;font:500 15px Rajdhani,"Exo 2",sans-serif;max-width:200px}
       .nl2-fsl a.nl2-fsl-sys{color:#7ed4ff;text-decoration:none;cursor:pointer}.nl2-fsl a.nl2-fsl-sys:hover{text-decoration:underline}
       .nl2-fsl-btn{height:26px;width:120px;padding:2px 6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:6px;font:700 14px Rajdhani,"Exo 2",sans-serif;cursor:pointer;margin-right:6px}
-      .nl2-fsl-st{display:inline-block;padding:1px 8px;border-radius:5px;font-size:13px;font-weight:600}
+      .nl2-fsl-st{display:inline-block;padding:1px 8px;border-radius:5px;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
       .nl2-fsl-blue{background:rgba(59,130,246,.15);border:1px solid rgba(96,165,250,.5);color:#bfdbfe}
       .nl2-fsl-green{background:rgba(34,197,94,.14);border:1px solid rgba(74,222,128,.5);color:#bbf7d0}
       .nl2-fsl-red{background:rgba(239,68,68,.14);border:1px solid rgba(248,113,113,.5);color:#fecaca}
@@ -15914,10 +15931,11 @@
                             continue;
                         if (m.missionType === "spy_station" && m.status === "stationed")
                             return ["Stealth deployed", "green"];
+                        const eta = Date.parse(m.arrivesAt) || 0;
                         if (m.missionType === "spy_station" && m.status === "outbound")
-                            return ["Stealth en route", "blue"];
+                            return ["Stealth en route", "blue", null, eta];
                         if ((m.missionType === "spy" || m.missionType === "spy_moon") && m.status === "outbound")
-                            return ["Spy en route", "blue"];
+                            return ["Spy en route", "blue", null, eta];
                     }
                     const f = failed[tkey(r)];
                     if (f && Date.now() - f.at < 60000)
@@ -15928,6 +15946,29 @@
                     if (r.vac)
                         return ["Vacation", "grey"];
                     return null;
+                }
+                const left = (t) => {
+                    const s = Math.floor((t - Date.now()) / 1000);
+                    if (s <= 0)
+                        return "landing";
+                    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+                    return h ? h + "h " + m + "m" : m ? m + "m " + (s % 60) + "s" : s + "s";
+                };
+                const etaOn = (st) => !!(NL.fl246 && st && st[3]);
+                const etaText = (label, t) => label + " \u00B7 " + left(t);
+                let etaTimer = 0;
+                function etaTick() {
+                    const els = document.querySelectorAll(".nl2-fsl [data-fsl-eta]");
+                    if (!els.length) {
+                        clearInterval(etaTimer);
+                        etaTimer = 0;
+                        return;
+                    }
+                    for (const el of els) {
+                        const t = etaText(el.dataset.fslLabel, +el.dataset.fslEta);
+                        if (el.textContent !== t)
+                            el.textContent = t;
+                    }
                 }
                 const clock = (t) => { const d = new Date(t), today = d.toDateString() === new Date().toDateString(); return (today ? "" : d.toLocaleDateString([], { weekday: "short" }) + " ") + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
                 const ago = (t) => { if (!t)
@@ -16243,9 +16284,13 @@
                                 launch(b, r, kind); });
                             return b;
                         };
-                        tb.append(NL.h("tr", { class: r.kind === "moon" ? "nl2-fsl-moon" : null }, NL.h("td", { "data-nl2-tip": name }, name), NL.h("td", { "data-nl2-tip": r.name + (r.loose ? " (orbits another player's planet)" : "") }, r.name), NL.h("td", null, r.kind === "moon" ? "Moon" : "Planet"), NL.h("td", null, sysLink(r)), NL.h("td", { "data-nl2-tip": r.dist == null ? "Distance unknown" : r.dist.toLocaleString("en-US") + " ly from " + me.name }, r.dist == null ? "\u2014" : r.dist.toLocaleString("en-US") + " ly"), NL.h("td", { "data-nl2-tip": ls ? new Date(ls).toLocaleString() : "No report for this target" }, ago(ls)), NL.h("td", null, st ? NL.h("span", { class: "nl2-fsl-st nl2-fsl-" + st[1], "data-nl2-tip": st[2] || null }, st[0]) : "\u2014"), NL.h("td", null, btn("spy", "Spy"), btn("stealth", "Stealth Deploy"))));
+                        tb.append(NL.h("tr", { class: r.kind === "moon" ? "nl2-fsl-moon" : null }, NL.h("td", { "data-nl2-tip": name }, name), NL.h("td", { "data-nl2-tip": r.name + (r.loose ? " (orbits another player's planet)" : "") }, r.name), NL.h("td", null, r.kind === "moon" ? "Moon" : "Planet"), NL.h("td", null, sysLink(r)), NL.h("td", { "data-nl2-tip": r.dist == null ? "Distance unknown" : r.dist.toLocaleString("en-US") + " ly from " + me.name }, r.dist == null ? "\u2014" : r.dist.toLocaleString("en-US") + " ly"), NL.h("td", { "data-nl2-tip": ls ? new Date(ls).toLocaleString() : "No report for this target" }, ago(ls)), NL.h("td", null, !st ? "\u2014" : etaOn(st)
+                            ? NL.h("span", { class: "nl2-fsl-st nl2-fsl-" + st[1], "data-fsl-eta": st[3], "data-fsl-label": st[0], "data-nl2-tip": "Lands at " + new Date(st[3]).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }) }, etaText(st[0], st[3]))
+                            : NL.h("span", { class: "nl2-fsl-st nl2-fsl-" + st[1], "data-nl2-tip": st[2] || null }, st[0])), NL.h("td", null, btn("spy", "Spy"), btn("stealth", "Stealth Deploy"))));
                     }
                     box.append(NL.h("table", null, NL.h("colgroup", null, cols.map(([, w]) => NL.h("col", { style: { width: w } }))), NL.h("thead", null, NL.h("tr", null, cols.map(([c]) => NL.h("th", c === "Distance" ? { "data-nl2-tip": me ? "Light years from " + me.name : "Choose a From planet to see distances" } : null, c)))), tb));
+                    if (!etaTimer && tb.querySelector("[data-fsl-eta]"))
+                        etaTimer = setInterval(etaTick, 1000);
                 }
                 NL.watch(".fleet-tab-content .espionage-tab", paint);
                 for (const [k, v] of Object.entries(sent))
@@ -19722,6 +19767,7 @@
         NL.fl224 = true;
         NL.fl228 = true;
         NL.fl236 = true;
+        NL.fl244 = true;
         NL.tvRight = true;
         NL.css("fl-228", `
   .nl2-t228{display:inline-block;padding:1px 8px;border-radius:9px;font-weight:700;font-size:13px}
@@ -20127,6 +20173,10 @@
       .nl2-ru3 .nxs-ruinpg{margin-right:0}`);
             },
         });
+    }
+    {
+        NL.fl246 = true;
+        NL.fl247 = true;
     }
     {
         NL.flSvScan = true;
@@ -22278,6 +22328,116 @@
                     setAttr(sp, "data-nl2-mt-v", big ? NL.fmt(n, true) : null);
                     NL.tip(sp, big ? NL.fmt(n) : "");
                 });
+            },
+        });
+    }
+    {
+        NL.moPhalanx = true;
+        NL.feature({
+            id: "mo-phalanx",
+            set: "Moons",
+            name: "Phalanx search list",
+            desc: "MO-034: the Fleet Phalanx search shows its answers as a list under the box (colonized planets, moons and stations; not your own).",
+            init() {
+                if (NL.moPhalanx !== true)
+                    return;
+                const ME_KEY = "nl2.mo.phMe." + location.host;
+                const lsGet = (k) => { try {
+                    return localStorage.getItem(k) || "";
+                }
+                catch (e) {
+                    return "";
+                } };
+                const lsSet = (k, v) => { try {
+                    localStorage.setItem(k, v);
+                }
+                catch (e) { } };
+                const txt = (el, sel) => { const x = el.querySelector(sel); return x ? x.textContent.trim() : ""; };
+                const ownNames = () => {
+                    const s = new Set(((NL._g && NL._g.moons) || []).map((m) => m.name));
+                    const c = NL.cache && NL.cache.latest(/^\/api\/planets$/), d = c && c.data, list = Array.isArray(d) ? d : (d && d.planets) || [];
+                    for (const p of list)
+                        if (p && p.name)
+                            s.add(p.name);
+                    return s;
+                };
+                const kindOf = (it) => { const i = it.querySelector(".moon-sensor-target-icon"); return i ? (["planet", "moon", "station"].find((k) => i.classList.contains(k)) || "other") : "other"; };
+                const lyOf = (s) => { const m = /([\d,.]+)\s*ly/.exec(s || ""); return m ? Number(m[1].replace(/,/g, "")) : NaN; };
+                function draw(fleet) {
+                    const ac = fleet.querySelector(".moon-sensor-autocomplete");
+                    const items = ac ? [...ac.querySelectorAll(".moon-sensor-autocomplete-item")] : [];
+                    const rangeLy = lyOf((/Range:\s*[\d,.]+\s*ly/.exec(txt(fleet.closest(".moon-sensor-panel") || fleet, ".moon-sensor-info")) || [""])[0]);
+                    const rows = items.map((it, i) => ({ i, kind: kindOf(it), icon: txt(it, ".moon-sensor-target-icon"), name: txt(it, ".moon-sensor-target-name"), sys: txt(it, ".moon-sensor-target-system"), owner: txt(it, ".moon-sensor-target-owner"), dist: txt(it, ".moon-sensor-target-dist") }));
+                    const sig = rangeLy + "#" + rows.map((r) => [r.kind, r.name, r.sys, r.owner, r.dist].join("|")).join("~");
+                    let box = fleet.querySelector(":scope > .nl2-ph-list");
+                    if (box && box.dataset.sig === sig)
+                        return;
+                    if (!fleet.hasAttribute("data-nl2-ph"))
+                        fleet.setAttribute("data-nl2-ph", "");
+                    if (!items.length) {
+                        if (box)
+                            box.remove();
+                        return;
+                    }
+                    const own = ownNames();
+                    let me = lsGet(ME_KEY);
+                    const mine = rows.find((r) => (r.kind === "planet" || r.kind === "moon") && own.has(r.name) && r.owner);
+                    if (mine && mine.owner !== me) {
+                        me = mine.owner;
+                        lsSet(ME_KEY, me);
+                    }
+                    const shown = rows.filter((r) => {
+                        if (r.kind === "station")
+                            return true;
+                        if (r.kind !== "planet" && r.kind !== "moon")
+                            return false;
+                        if (!r.owner)
+                            return false;
+                        return !(me ? r.owner === me : own.has(r.name));
+                    });
+                    const hidden = rows.length - shown.length;
+                    if (!box) {
+                        box = NL.h("div", { class: "nl2-ph-list" });
+                        const wrap = fleet.querySelector(":scope > .moon-sensor-search-wrap");
+                        if (wrap)
+                            wrap.after(box);
+                        else
+                            fleet.prepend(box);
+                    }
+                    box.dataset.sig = sig;
+                    const head = NL.h("div", { class: "nl2-ph-n" }, shown.length + (shown.length === 1 ? " target" : " targets") + (hidden ? " \u00B7 " + hidden + " hidden (uncolonized or yours)" : ""));
+                    const t = NL.h("table", { class: "nl2-tbl nl2-ph-t" });
+                    NL.tableCols(t, [null, "190px", "84px", "96px"]);
+                    t.append(NL.h("thead", null, NL.h("tr", null, NL.h("th", null, "Target"), NL.h("th", null, "Player"), NL.h("th", null, "System"), NL.h("th", null, "Distance"))));
+                    const tb = NL.h("tbody");
+                    if (!shown.length)
+                        tb.append(NL.h("tr", { class: "nl2-ph-none" }, NL.h("td", { colspan: "4" }, "No colonized planets, moons or stations match.")));
+                    for (const r of shown) {
+                        const d = lyOf(r.dist), out = Number.isFinite(rangeLy) && Number.isFinite(d) && d > rangeLy;
+                        const tr = NL.h("tr", { class: "nl2-ph-row" + (out ? " nl2-ph-out" : ""), "data-i": String(r.i) }, NL.h("td", { "data-nl2-tip": r.name }, NL.h("span", { class: "nl2-ph-ic" }, r.icon), r.name), NL.h("td", { "data-nl2-tip": r.owner || null }, r.owner || "\u2014"), NL.h("td", null, r.sys || "\u2014"), NL.h("td", out ? { "data-nl2-tip": "Beyond this moon's " + NL.fmt(rangeLy) + " ly range" } : null, out ? "out of range" : (Number.isFinite(d) ? NL.fmt(d) : "\u2014")));
+                        if (!out)
+                            tr.addEventListener("click", () => { const it = fleet.querySelectorAll(".moon-sensor-autocomplete .moon-sensor-autocomplete-item")[r.i]; if (it)
+                                it.click(); });
+                        tb.append(tr);
+                    }
+                    t.append(tb);
+                    box.replaceChildren(head, t);
+                }
+                NL.watch(".moon-sensor-fleet", draw);
+                NL.css("mo-phalanx", `
+      [data-nl2-ph] .moon-sensor-autocomplete{display:none!important}
+      .nl2-ph-list{margin:6px 0 8px;width:100%}
+      .nl2-ph-n{font-size:12px;color:#8a9bb5;margin:0 0 4px}
+      .nl2-ph-t{--nl2-rowh:30px;font-size:14px}
+      .nl2-ph-t th{font-size:12px;font-weight:600;color:#8a9bb5;text-align:left;padding:4px 8px;border-bottom:1px solid rgba(120,160,220,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .nl2-ph-t td{text-align:left;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(120,160,220,.1)}
+      .nl2-ph-row{cursor:pointer}
+      .nl2-ph-row:hover td{background:rgba(56,189,248,.12)}
+      .nl2-ph-out{cursor:default;color:#6b7280}
+      .nl2-ph-out:hover td{background:none}
+      .nl2-ph-none td{color:#8a9bb5}
+      .nl2-ph-ic{display:inline-block;width:20px;margin-right:4px;text-align:center}
+    `);
             },
         });
     }
@@ -29274,9 +29434,14 @@
                     if (!NL.fl193 || S.mtQ)
                         return;
                     S.mtQ = true;
+                    const fol = !!NL.fl244;
                     (async () => {
                         try {
                             for (let guard = 0; guard < 40; guard++) {
+                                if (fol && S.mt && S.mt.R && S.mt.src != null) {
+                                    src = S.mt.src;
+                                    R = S.mt.R;
+                                }
                                 const st = S.mt, ships = S.mtShips && S.mtShips.src === src ? S.mtShips.ships : null;
                                 if (!S.mineRoot || !st || st.src !== src || !st.R || st.R.key !== R.key || !ships)
                                     return;
@@ -29305,6 +29470,12 @@
                         }
                         finally {
                             S.mtQ = false;
+                            if (fol && S.mineRoot) {
+                                const st = S.mt, E = S.mtEst, ships = st && S.mtShips && S.mtShips.src === st.src ? S.mtShips.ships : null;
+                                if (st && st.R && ships && (st.belts || []).some((x) => !E || !E.has(mt3Key(st.src, st.R, x.f))))
+                                    setTimeout(() => { if (S.mineRoot && !S.mtQ)
+                                        paintMineTab(); }, 0);
+                            }
                         }
                     })();
                 }

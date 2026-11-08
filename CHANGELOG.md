@@ -1,5 +1,22 @@
 # Release notes
 
+## v0.5.107 · Nov 8, 2026
+
+**🛰 Fleet**
+- Spy missions show a landing countdown while en route (FL-246)
+- Espionage and Moon Recon rows get a Recall button (FL-247)
+- The Mining Total Trip column no longer gets stuck on "…" (FL-244)
+- The Fleet badge keeps counting a wormhole run that is still waiting for your decision (FL-248)
+
+**🌙 Moons**
+- Fleet Phalanx results show as a nearest-first list under the search box; empty slots and your own planets and moons are hidden, out-of-range targets are greyed out, and a click on a row selects the target (MO-034)
+
+**🏗 Buildings**
+- In Table View, the Demolish panel opens as a full-width strip under its row (BU-036)
+
+**🧩 Other**
+- Nothing else this time
+
 ## v0.5.106 · Nov 7, 2026
 
 **🛰 Fleet**
