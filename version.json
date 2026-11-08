@@ -1,11 +1,18 @@
 {
-  "version": "0.5.105",
-  "built": "2026-11-07T20:49:13.596Z",
+  "version": "0.5.106",
+  "built": "2026-11-08T07:33:42.768Z",
   "items": [
-    "FL-229 FL-231 FL-232 FL-233 FL-234 FL-235 FL-236 FL-237 FL-238 FL-239 FL-240 FL-241 FL-242 FL-243 GL-205 GL-206 GL-207 GL-208 GL-209 GL-210 RE-030 SH-031"
+    "FL-245"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.106",
+      "items": [
+        "FL-245"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.105",
       "items": [
@@ -654,47 +661,6 @@
         "GL-086": "Maintenance: error log on the Custom screen",
         "GL-087": "Maintenance: shared formatting helpers",
         "GL-088": "Maintenance: shared write helper"
-      }
-    },
-    {
-      "version": "0.5.86",
-      "items": [
-        "FL-076",
-        "FL-078",
-        "FL-080",
-        "FL-081",
-        "RE-009",
-        "RE-010",
-        "OV-008",
-        "OV-009",
-        "OV-010",
-        "OV-011",
-        "GL-078",
-        "GL-095",
-        "FL-079",
-        "FL-082",
-        "FL-083",
-        "FL-084",
-        "FL-085"
-      ],
-      "notes": {
-        "FL-076": "Transfer settings: clearer labels",
-        "FL-078": "Moon Collect: a threshold per main resource",
-        "FL-080": "Transfer: deliver to moons below their keeps",
-        "FL-081": "Transfer: moon ships seen on load",
-        "RE-009": "Research badge clears when research starts",
-        "RE-010": "Research: ROI only where it applies",
-        "OV-008": "Fire Sale: Cancel anyway",
-        "OV-009": "Overview badge for open Fire Sale orders",
-        "OV-010": "Fire Sale keeps travel hydrogen",
-        "OV-011": "Fire Sale keeps 1 h of Bio",
-        "GL-078": "Rare deliver: button polish",
-        "GL-095": "Rare deliver: No cargo ships fix",
-        "FL-079": "Wormholes: lost and damaged % on completed runs",
-        "FL-082": "Fleet: bio tick countdown",
-        "FL-083": "Recall hover: time home",
-        "FL-084": "Spy reports: Previous and Next",
-        "FL-085": "Evacuate always includes damaged ships"
       }
     }
   ]

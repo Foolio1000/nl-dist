@@ -1,5 +1,13 @@
 # Release notes
 
+## v0.5.106 · Nov 7, 2026
+
+**🛰 Fleet**
+- You can edit rows in the Transfer Routes table (FL-245)
+
+**🧩 Other**
+- Nothing else this time
+
 ## v0.5.105 · Nov 7, 2026
 
 **🛰 Fleet**

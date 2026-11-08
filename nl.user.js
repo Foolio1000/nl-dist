@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.105
+// @version      0.5.106
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.105", features: [] };
+    const NL = window.__nl2 = { version: "0.5.106", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -16421,6 +16421,7 @@
             NL.option({ key: "fl-transfer.plsend", group: "Fleet Transfer", label: "Make route, planet \u2192 planet (Move out rows): Send Amount", type: "number", def: 50000, min: 1, step: 1000 });
         }
         NL.fl209 = true;
+        NL.fl245 = true;
         NL.feature({
             id: "fl-transfer-supto",
             set: "Fleet",
@@ -17552,6 +17553,9 @@
       .nl2-ftr-dnote{color:#9fb3d1;font-size:13px;margin-top:8px}.nl2-ftr-dmsg{margin-top:6px;color:#e8c46a;min-height:0}.nl2-ftr-dmsg.nl2-ftr-bad{color:#f87171}.nl2-ftr-dmsg.nl2-ftr-ok{color:#86efac}
       .nl2-ftr-dfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.nl2-ftr-dfoot button{font:600 14px Rajdhani,"Exo 2",sans-serif;border-radius:4px;padding:4px 12px;cursor:pointer}
       .nl2-ftr-dfoot .nl2-ftr-hb{background:none;color:#9fb3d1;border:1px solid rgba(120,200,255,.25)}
+      .nl2-ftr tr.nl2-ftr-rte td{background:rgba(126,212,255,.08)!important}.nl2-ftr tr.nl2-ftr-rte select,.nl2-ftr tr.nl2-ftr-rte input[type=number]{background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.3);border-radius:4px;color:#f1f6ff;font:500 13px Rajdhani,"Exo 2",sans-serif;padding:1px 4px;width:100%;box-sizing:border-box}
+      .nl2-ftr tr.nl2-ftr-rte input.nl2-ftr-rtbad{border-color:#f87171}.nl2-ftr tr.nl2-ftr-rte td.nl2-ftr-rtm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0;color:#9fb3d1}.nl2-ftr tr.nl2-ftr-rte td.nl2-ftr-rtm.nl2-ftr-bad{color:#f87171}
+      .nl2-ftr .nl2-ftr-rtmsg{padding:4px 6px 6px;color:#86efac}.nl2-ftr .nl2-ftr-rtmsg.nl2-ftr-bad{color:#f87171}.nl2-ftr .nl2-ftr-rtmsg button{margin-left:8px}   
       .logi-section[data-nl2-ftr-route]{outline:2px solid #f59e0b;outline-offset:4px;border-radius:6px}`);
                 const icon = (k) => NL.h("img", { class: "nl2-ftr-ic", src: "/images/resources/" + k + ".webp", alt: "", "data-nl2-tip": trName(k) });
                 const resCell = (res) => NL.h("td", null, ...Object.entries(res).filter(([, v]) => v > 0).map(([k, v]) => NL.h("span", { class: "nl2-ftr-rs" }, icon(k), trFmt(v))));
@@ -17696,6 +17700,8 @@
                         const hubPid = /^collect_/.test(r.routeMode) ? r.destinationPlanetId : r.sourcePlanetId, hub = hubs().find((h) => +h.planetId === +hubPid);
                         const cov = list.filter((t) => covers(r, t)), k = rk(r);
                         const paused = rtPaused(r), ran = trTs(r.lastExecuted);
+                        if (NL.fl245 && rtEdit && rtEdit.id === r.id)
+                            return rtEditRow(r, paused, ran);
                         return NL.h("tr", null, NL.h("td", null, MODE[r.routeMode] || String(r.routeMode || "\u2014")), NL.h("td", null, place(from)), NL.h("td", null, place(to)), NL.h("td", null, k ? icon(k) : "", k ? trName(k) : String(r.resourceType || "\u2014")), NL.h("td", { class: "nl2-ftr-r" }, trFmt(r.threshold)), NL.h("td", { class: "nl2-ftr-r" }, trFmt(r.amount)), NL.h("td", null, hub ? trClean(hub.planetName) + " (" + trN(hub.routeCount) + "/" + trN(hub.hubLevel) + ")" : "\u2014"), (() => {
                             const txt = cov.map((t) => t.task + " " + t.from.name + " (" + t.why + ")").join("; ");
                             return NL.h("td", NL.fl174 && cov.length ? { class: "nl2-ftr-cov", "data-nl2-tip": cov.map((t) => t.task + " " + t.from.name + " (" + t.why + ")").join("\n") } : null, cov.length ? txt : NL.h("span", { class: "nl2-ftr-d" }, "\u2014"));
@@ -17708,9 +17714,226 @@
                                     box.disabled = false;
                                     box.parentNode.setAttribute("data-nl2-tip", "Not resumed: " + err);
                                 }
-                            } })) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", null, ran != null ? NL.h("span", { "data-nl2-tip": trClock(ran) }, trAgo(ran)) : NL.h("span", { class: "nl2-ftr-d" }, "never run")), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }), hideBox("rt" + r.id));
+                            } })) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", null, ran != null ? NL.h("span", { "data-nl2-tip": trClock(ran) }, trAgo(ran)) : NL.h("span", { class: "nl2-ftr-d" }, "never run")), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, NL.fl245 ? NL.h("button", { type: "button", class: "nl2-ftr-hb nl2-ftr-rted", disabled: !!(rtEdit && rtEdit.busy), "data-nl2-tip": "Change this route (To, Resource, Trigger, Send)", onclick: () => rtStart(r) }, "Edit") : ""), hideBox("rt" + r.id));
                     });
                     return NL.h("table", null, NL.h("colgroup", null, ...["130px", "150px", "150px", "160px", "110px", "110px", "150px", "", "100px", "110px", TR_ACTS_W, TR_HIDE_W].map((w) => NL.h("col", { style: w ? "width:" + w : null }))), NL.h("thead", null, NL.h("tr", null, ...["Route", "From", "To", "Resource", "Trigger \u2265", "Send", "Hub", "Covers", "Status", "Last run", "", "Hide"].map((l, i) => NL.h("th", { class: "nl2-ftr-nos" + (i === 4 || i === 5 ? " nl2-ftr-r" : "") + (l === "Hide" ? " nl2-ftr-hide" : "") }, l)))), NL.h("tbody", null, ...rows));
+                }
+                let rtEdit = null, rtMsg = null;
+                const rtHubOf = (mode, srcPid, dstPid) => (/^collect_/.test(mode) ? dstPid : srcPid);
+                const rtFree = (pid) => { const h = hubs().find((x) => +x.planetId === +pid); return h ? trN(h.hubLevel) - trN(h.routeCount) : 0; };
+                function rtTos(r) {
+                    const cur = rtEnds(r).to, out = [], add = (t, id, name, label) => { if (id == null || out.some((o) => o.key === t + ":" + id))
+                        return; out.push({ key: t + ":" + id, t, id: +id, name, label: label || name }); };
+                    if (/^collect_/.test(r.routeMode)) {
+                        for (const h of hubs()) {
+                            const p = planetById(h.planetId), nm = (p && p.name) || trClean(h.planetName), mine = cur && cur.t === "planet" && cur.id === +h.planetId;
+                            if (mine || trN(h.hubLevel) - trN(h.routeCount) > 0)
+                                add("planet", h.planetId, nm, nm + " (" + trN(h.routeCount) + "/" + trN(h.hubLevel) + ")");
+                        }
+                    }
+                    else if (r.routeMode === "supply") {
+                        for (const p of planets())
+                            if (+p.id !== +r.sourcePlanetId)
+                                add("planet", p.id, p.name);
+                    }
+                    else if (r.routeMode === "supply_moon") {
+                        for (const m of trList((saved("sources") || {}).d, "moons").length ? trList((saved("sources") || {}).d, "moons") : moonsAll())
+                            add("moon", m.id, trClean(m.name));
+                    }
+                    else if (r.routeMode === "supply_outpost") {
+                        const s = trList((saved("sources") || {}).d, "outposts");
+                        for (const o of s.length ? s : trList((saved("outposts") || {}).d, "outposts"))
+                            add("outpost", o.id, trClean(o.name));
+                    }
+                    if (cur && !out.some((o) => o.key === cur.t + ":" + cur.id))
+                        out.unshift({ key: cur.t + ":" + cur.id, t: cur.t, id: cur.id, name: cur.name, label: cur.name });
+                    return out;
+                }
+                function rtBody(r, ed) {
+                    const b = { routeMode: r.routeMode };
+                    for (const f of ["sourcePlanetId", "sourceOutpostId", "sourceMoonId", "sourceStationId"])
+                        if (r[f] != null)
+                            b[f] = r[f];
+                    const to = ed ? ed.to : null;
+                    if (to)
+                        b[to.t === "moon" ? "destinationMoonId" : to.t === "outpost" ? "destinationOutpostId" : "destinationPlanetId"] = to.id;
+                    else
+                        for (const f of ["destinationPlanetId", "destinationMoonId", "destinationOutpostId"])
+                            if (r[f] != null)
+                                b[f] = r[f];
+                    b.resourceType = ed ? ed.k : r.resourceType;
+                    b.threshold = ed ? ed.trig : trN(r.threshold);
+                    b.amount = ed ? ed.send : trN(r.amount);
+                    if (r.returnResourceType) {
+                        b.returnResourceType = r.returnResourceType;
+                        b.returnAmount = r.returnAmount;
+                        b.returnThreshold = r.returnThreshold;
+                    }
+                    if (r.useJumpGates != null)
+                        b.useJumpGates = r.useJumpGates;
+                    return b;
+                }
+                async function rtCall(path, method, body) {
+                    try {
+                        const res = await NL.rawFetch(path, { method, credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: body ? JSON.stringify(body) : undefined });
+                        const j = await res.json().catch(() => null);
+                        return res.ok ? { ok: true, j } : { ok: false, err: (j && (j.error || j.message)) || "the game refused it (HTTP " + res.status + ")" };
+                    }
+                    catch (e) {
+                        return { ok: false, err: "could not reach the game: " + e.message };
+                    }
+                }
+                const rtNewId = (j) => { const v = j && (j.id != null ? j.id : j.route && j.route.id != null ? j.route.id : j.data && j.data.id); return v != null ? v : null; };
+                const rtSame = (a, b) => ["routeMode", "sourcePlanetId", "sourceOutpostId", "sourceMoonId", "sourceStationId", "destinationPlanetId", "destinationMoonId", "destinationOutpostId", "threshold", "amount"]
+                    .every((f) => (a[f] == null ? null : String(a[f])) === (b[f] == null ? null : String(b[f]))) && rk(a) === rk(b);
+                const rtDesc = (r) => {
+                    const { from, to } = rtEnds(r), k = rk(r);
+                    return (MODE[r.routeMode] || r.routeMode) + " " + (from ? from.name : "Station") + " \u2192 " + (to ? to.name : "?") + ", " + (k ? trName(k) : r.resourceType) + ", Trigger \u2265 " + trFmt(r.threshold) + ", Send " + trFmt(r.amount);
+                };
+                async function rtFind(j, before, body) {
+                    const id = rtNewId(j);
+                    if (id != null)
+                        return id;
+                    const r = routes().find((x) => !before.has(String(x.id)) && rtSame(x, body));
+                    return r ? r.id : null;
+                }
+                async function rtReread() { await trSleep(1000); try {
+                    await NL.getJson("/api/logistics/routes", ctx);
+                }
+                catch (e) { } await trSleep(1000); try {
+                    await NL.getJson("/api/logistics/hub-levels", ctx);
+                }
+                catch (e) { } }
+                async function rtPause(id) { if (id == null)
+                    return false; await trSleep(1000); return (await rtCall("/api/logistics/routes/" + id, "PATCH", { isActive: false })).ok; }
+                function rtStart(r) {
+                    const tos = rtTos(r), cur = rtEnds(r).to;
+                    rtMsg = null;
+                    rtEdit = { id: r.id, k: rk(r) || String(r.resourceType), trig: trN(r.threshold), send: trN(r.amount), to: cur ? (tos.find((o) => o.key === cur.t + ":" + cur.id) || null) : null, tos, busy: false, msg: "", bad: false };
+                    changed();
+                }
+                function rtCheck(r, ed) {
+                    if (!(ed.trig > 0) || !(ed.send > 0))
+                        return "Trigger and Send must be above 0.";
+                    if (!ed.to)
+                        return "Pick a To.";
+                    const cur = rtEnds(r).to;
+                    if (ed.k === rk(r) && ed.trig === trN(r.threshold) && ed.send === trN(r.amount) && cur && ed.to.key === cur.t + ":" + cur.id)
+                        return "No changes yet.";
+                    if (/^collect_/.test(r.routeMode) || r.routeMode === "supply") {
+                        const dup = routes().find((x) => x.id !== r.id && x.routeMode === r.routeMode && rtSame(x, { ...rtBody(r, ed), threshold: x.threshold, amount: x.amount }));
+                        if (dup)
+                            return "A route like this already exists.";
+                    }
+                    return "";
+                }
+                async function rtSave(r) {
+                    const ed = rtEdit;
+                    if (!ed || ed.busy || rtCheck(r, ed))
+                        return;
+                    const body = rtBody(r, ed), orig = rtBody(r, null), wasPaused = rtPaused(r), wasHid = isHid("rt" + r.id);
+                    const newHub = rtHubOf(r.routeMode, body.sourcePlanetId, body.destinationPlanetId);
+                    ed.busy = true;
+                    ed.bad = false;
+                    ed.msg = "Saving\u2026";
+                    changed();
+                    const before = new Set(routes().map((x) => String(x.id)));
+                    const done = (text, bad, keepEdit) => { if (keepEdit) {
+                        ed.busy = false;
+                        ed.msg = text;
+                        ed.bad = bad;
+                    }
+                    else {
+                        rtEdit = null;
+                        rtMsg = { text, bad, at: Date.now() };
+                    } changed(); };
+                    const carry = async (newId) => { if (wasPaused)
+                        await rtPause(newId); if (wasHid && newId != null)
+                        setHide("rt" + newId, true); if (wasHid)
+                        setHide("rt" + r.id, false); };
+                    const c = await rtCall("/api/logistics/routes", "POST", body);
+                    if (c.ok) {
+                        await trSleep(1000);
+                        const d = await rtCall("/api/logistics/routes/" + r.id, "DELETE");
+                        await rtReread();
+                        const newId = await rtFind(c.j, before, body);
+                        if (!d.ok) {
+                            if (wasPaused)
+                                await rtPause(newId);
+                            return done("The new route was made, but the old one could not be deleted (" + d.err + "). Both are listed now: delete the old one (" + rtDesc(r) + ") on Logistics.", true, false);
+                        }
+                        await carry(newId);
+                        return done("Route saved: " + rtDesc({ ...r, ...body }) + ".", false, false);
+                    }
+                    if (newHub == null || rtFree(newHub) > 0)
+                        return done("Not saved: " + c.err + ". The original route is unchanged.", true, true);
+                    await trSleep(1000);
+                    const d = await rtCall("/api/logistics/routes/" + r.id, "DELETE");
+                    if (!d.ok)
+                        return done("Not saved: " + c.err + ". The original route is unchanged.", true, true);
+                    await trSleep(1000);
+                    const c2 = await rtCall("/api/logistics/routes", "POST", body);
+                    if (c2.ok) {
+                        await rtReread();
+                        await carry(await rtFind(c2.j, before, body));
+                        return done("Route saved: " + rtDesc({ ...r, ...body }) + ".", false, false);
+                    }
+                    await trSleep(1000);
+                    const back = await rtCall("/api/logistics/routes", "POST", orig);
+                    await rtReread();
+                    if (back.ok) {
+                        await carry(await rtFind(back.j, before, orig));
+                        return done("Not saved: " + c2.err + ". The original route was put back as it was (its Last run starts over).", true, false);
+                    }
+                    trToast("Route lost: make it again on Logistics: " + rtDesc(r));
+                    return done("Not saved: " + c2.err + ", and the original could not be put back (" + back.err + "). Make it again on Logistics: " + rtDesc(r) + ".", true, false);
+                }
+                function rtEditRow(r, paused, ran) {
+                    const ed = rtEdit, { from } = rtEnds(r);
+                    const num = (f) => {
+                        const i = NL.h("input", { type: "number", min: "1", step: "1000", value: String(ed[f]), disabled: ed.busy, class: ed[f] > 0 ? null : "nl2-ftr-rtbad" });
+                        i.addEventListener("input", () => { ed[f] = Math.floor(trN(i.value)); i.classList.toggle("nl2-ftr-rtbad", !(ed[f] > 0)); upd(); });
+                        i.addEventListener("keydown", (e) => { if (e.key === "Enter") {
+                            e.preventDefault();
+                            rtSave(r);
+                        }
+                        else if (e.key === "Escape") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            rtEdit = null;
+                            changed();
+                        } });
+                        return i;
+                    };
+                    const toSel = NL.h("select", { disabled: ed.busy || ed.tos.length < 2, onchange: () => { ed.to = ed.tos[+toSel.value] || null; upd(); } }, ...ed.tos.map((o, i) => NL.h("option", { value: String(i), selected: !!ed.to && o.key === ed.to.key }, o.label)));
+                    const kSel = NL.h("select", { disabled: ed.busy, onchange: () => { ed.k = kSel.value; upd(); } }, ...TR_RES.map(([k, , nm]) => NL.h("option", { value: k, selected: k === ed.k }, nm)));
+                    const hubTd = NL.h("td"), msgTd = NL.h("td", { class: "nl2-ftr-rtm" });
+                    const save = NL.h("button", { type: "button", class: "nl2-c-blue nl2-ftr-rtsave", onclick: () => rtSave(r) }, ed.busy ? "Saving\u2026" : "Save");
+                    const cancel = NL.h("button", { type: "button", class: "nl2-ftr-hb nl2-ftr-rtcan", disabled: ed.busy, onclick: () => { rtEdit = null; changed(); } }, "Cancel");
+                    function upd() {
+                        const body = rtBody(r, ed), pid = rtHubOf(r.routeMode, body.sourcePlanetId, body.destinationPlanetId), h = hubs().find((x) => +x.planetId === +pid);
+                        hubTd.textContent = h ? trClean(h.planetName) + " (" + trN(h.routeCount) + "/" + trN(h.hubLevel) + ")" : "\u2014";
+                        const why = ed.busy ? "" : rtCheck(r, ed), full = pid != null && rtFree(pid) <= 0;
+                        const text = ed.msg && !ed.busy && ed.bad ? ed.msg : ed.busy ? ed.msg : why && why !== "No changes yet." ? why
+                            : "Save makes a new route and deletes this one (the game can't edit a route)" + (full ? "; " + (h ? trClean(h.planetName) : "the hub") + " has no free slot, so if needed this one goes first and is put back if the new one fails" : "") + ". Last run starts over.";
+                        msgTd.textContent = text;
+                        msgTd.setAttribute("data-nl2-tip", text);
+                        msgTd.className = "nl2-ftr-rtm" + ((ed.bad && !ed.busy && text === ed.msg) || (why && why !== "No changes yet.") ? " nl2-ftr-bad" : "");
+                        save.disabled = ed.busy || !!why;
+                        if (why)
+                            save.setAttribute("data-nl2-tip", why);
+                        else
+                            save.removeAttribute("data-nl2-tip");
+                    }
+                    upd();
+                    return NL.h("tr", { class: "nl2-ftr-rte", "data-nl2-rte": String(r.id) }, NL.h("td", null, MODE[r.routeMode] || String(r.routeMode || "\u2014")), NL.h("td", null, place(from)), NL.h("td", null, toSel), NL.h("td", null, kSel), NL.h("td", null, num("trig")), NL.h("td", null, num("send")), hubTd, msgTd, NL.h("td", null, paused ? NL.h("span", { class: "nl2-ftr-st nl2-ftr-oth" }, "paused") : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", null, ran != null ? trAgo(ran) : NL.h("span", { class: "nl2-ftr-d" }, "never run")), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, cancel, save), hideBox("rt" + r.id));
+                }
+                function rtMsgEl() {
+                    if (!rtMsg || (!rtMsg.bad && Date.now() - rtMsg.at > 120000)) {
+                        rtMsg = null;
+                        return "";
+                    }
+                    return NL.h("div", { class: "nl2-ftr-rtmsg" + (rtMsg.bad ? " nl2-ftr-bad" : "") }, rtMsg.text, NL.h("button", { type: "button", class: "nl2-ftr-hb", onclick: () => { rtMsg = null; changed(); } }, "OK"));
                 }
                 const noRoute = (list) => list.filter((t) => t.kind === "moon" && t.prod && t.prod.some((x) => x.now > TR_MOON_OVER(x.k) && !t.covered.some((r) => rk(r) === x.k)));
                 function routeHubs(t) {
@@ -17833,7 +18056,7 @@
                     }
                     const rsAll = routes(), rsAt = (saved("routes") || {}).at;
                     const rs = rsAll.filter((r) => !isHid("rt" + r.id)), rh = rsAll.length - rs.length;
-                    out.push(...section("routes", "Routes", rs.length, (NL.fl222 ? (NL.fl233 ? "paused routes count 1 in the badge" : "paused routes counted in the badge") : "not counted in the badge") + (rsAt ? " \u00B7 routes " + trAge(rsAt) : ""), rs.length ? routeTable(list) : NL.h("div", { class: "nl2-ftr-empty" }, rsAt ? (rh ? "All routes are hidden." : "No Logistics routes yet.") : "Routes load when this tab opens.")));
+                    out.push(...section("routes", "Routes", rs.length, (NL.fl222 ? (NL.fl233 ? "paused routes count 1 in the badge" : "paused routes counted in the badge") : "not counted in the badge") + (rsAt ? " \u00B7 routes " + trAge(rsAt) : ""), rs.length ? (NL.fl245 && rtMsg ? NL.h("div", null, rtMsgEl(), routeTable(list)) : routeTable(list)) : NL.h("div", { class: "nl2-ftr-empty" }, rsAt ? (rh ? "All routes are hidden." : "No Logistics routes yet.") : "Routes load when this tab opens.")));
                     if (rh) {
                         const shut = st.get("collapsed", {}).hiddenRoutes !== false;
                         out.push(NL.h("div", { class: "nl2-ftr-sec", onclick: () => { const c = { ...st.get("collapsed", {}) }; c.hiddenRoutes = !shut; st.set("collapsed", c); changed(); } }, NL.h("span", { class: "nl2-ftr-ar" }, shut ? "\u25B8" : "\u25BE"), "Hidden routes", NL.h("span", { class: "nl2-ftr-n" }, "(" + rh + ")")));
@@ -17924,6 +18147,8 @@
                         return;
                     const s = JSON.stringify([list.map((t) => [t.key, t.res, t.why, !!t.fl209p, !!t.mission, t.mission && homeAt(t.mission), t.done, hidden(t), t.to && t.to.id, t.from && t.from.id, t.ships && t.ships.text, !!routePlan(t), isFinite(t.due) ? Math.round(t.due / 60) : -1, t.noShips, t.covered.length]), routes().length, (saved("routes") || {}).at, st.get("hide", {}), st.get("collapsed", {}), st.get("sort", null), Math.floor(Date.now() / 60000)]);
                     if (s === sig && box.firstChild)
+                        return;
+                    if (NL.fl245 && rtEdit && sig !== "" && box.querySelector(".nl2-ftr-rte"))
                         return;
                     sig = s;
                     box.replaceChildren(...panel(list).filter(Boolean));
