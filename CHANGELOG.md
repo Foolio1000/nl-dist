@@ -1,5 +1,38 @@
 # Release notes
 
+## v0.5.110 · Nov 8, 2026
+
+**🛰 Fleet**
+- Active tab: mission types show as pills coloured by mission family (FL-270)
+- Badges catch up on their own: Pirates re-reads camps in the background, and the Mining tab shows idle Miners and Gas Collectors (FL-266, FL-268)
+<details><summary>Details</summary>
+
+  - Pirates badge re-reads the camp list in the background, so new camps show (FL-266)
+  - Mining tab badges for idle Miners and Gas Collectors (FL-268)
+</details>
+- Wormholes: the Attack button is green, and Hide, Attack and Unhide line up on the right; lost and damaged ships go on separate lines that wrap (FL-265, FL-267)
+<details><summary>Details</summary>
+
+  - Green Attack button, right-aligned row buttons on Detected (FL-265)
+  - Lost and Damaged ships on their own wrapping lines (FL-267)
+</details>
+- The Salvage Patrol dialog stays open until every patrol is launched, with a toast after each launch (FL-269)
+- In the fleet dialog, only the fleet slot count turns red or yellow, not the timer (GL-233)
+
+**🛡 Station defense (Defense2)**
+- The Vulnerability header drops the weekday, and Phalanx keeps the moon picker's order (GL-234, GL-235)
+<details><summary>Details</summary>
+
+  - Vulnerability window without the weekday (GL-234)
+  - Phalanx popup keeps the moon picker's order (GL-235)
+</details>
+
+**🏗 Buildings**
+- Table View: Build Next is gone and Hide sits left of the build button (BU-037)
+
+**🧩 Other**
+- Routine game messages (depleted fields, recovered artifacts and rewards, livery codes) are marked read quietly, with no sound or popup; anything legendary still shows (GL-232)
+
 ## v0.5.109 · Nov 8, 2026
 
 **🛡 Station defense (Defense2)**
