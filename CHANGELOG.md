@@ -1,5 +1,54 @@
 # Release notes
 
+## v0.5.111 · Nov 9, 2026
+
+**🛡 Station defense (Defense2)**
+- Defense2 is one page with sections instead of sub-tabs: At risk, Covered, Rescan, Recalled, Resolved and a folded Hidden list; each table sorts on its own (GL-253 to GL-256)
+- A Phalanx threshold box (default 8 minutes) moves stale Covered rows to Rescan and turns Last phalanx yellow past it; Last phalanx shows whole minutes (GL-239)
+- Defend fills 1x, 2x, 4x or 10x Scouts needed, rounded up to the next 100, with combat ships only; a row too late to reinforce gets Recall All instead (GL-257 to GL-259)
+- The Defense2 badge counts stations under attack, with a hover by section (GL-260)
+- Station list fixes and tidy-ups (GL-238, GL-241 to GL-248)
+<details><summary>Details</summary>
+
+  - One row per station even when the game repeats one (GL-238)
+  - Each daily window starts fresh, and lost counts use only battles inside the window (GL-241, GL-242)
+  - The Vulnerability window is in UTC (GL-243)
+  - Delta turns yellow under 5 minutes (GL-244)
+  - New zone column: D / O / S (GL-245)
+  - "reading…" shows only while a click loads, and clicks never wait on the background pause (GL-246, GL-247)
+  - Scout reinforce time is a dash whenever Delta is (GL-248)
+</details>
+- Battle planet is a planet-picker button in the game's planet order (GL-236)
+- Scouts needed now comes from the shared Scouts-per-ship table (GL-252)
+
+**🛰 Fleet**
+- Fleet dialogs show each ship type's speed after research, next to its count (GL-249)
+- Supply and deliver dialog for stations (GL-251), with a launch sound on every send (FL-284)
+- Mining: Route from / to columns, a plain Detail, a re-read of idle fleets, a plain Last raid and a minimum richness setting (FL-271, FL-272, FL-280, FL-281, FL-285)
+<details><summary>Details</summary>
+
+  - Route from and Route to columns (FL-271)
+  - Plain Mining Detail (FL-272)
+  - Idle fleets re-read, plain Last raid (FL-280, FL-281)
+  - Minimum richness for Mining targets (FL-285)
+</details>
+- Moon Collect routes get sensible defaults and the button reads Collect; no "Route saved" line after an Edit save (FL-274, FL-276)
+- Deliver rows show "–" in Detail, since Route to names the moon (FL-275)
+- Stations tab fixes (FL-277 to FL-279)
+- Active pill text is centred (FL-282)
+- Leaders show an XP line (FL-283)
+
+**🌙 Moons**
+- Moon Buildings table: Hide on the left and a Max Level pill (MO-037, MO-038)
+
+**🔬 Research**
+- Research table columns reordered (RE-031)
+
+**🧩 Other**
+- To Do list shows the newest items first (GL-250)
+- "Stations under capture" messages are marked read quietly (GL-240)
+- Overview sections can be hidden (OV-017)
+
 ## v0.5.110 · Nov 8, 2026
 
 **🛰 Fleet**
