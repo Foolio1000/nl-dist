@@ -1,5 +1,36 @@
 # Release notes
 
+## v0.5.109 · Nov 8, 2026
+
+**🛡 Station defense (Defense2)**
+- Tidier page: one summary header, matching tabs, and green station names where you have planets nearby
+<details><summary>Details</summary>
+
+  - One header line: our stations, under attack, lost this window, and the vulnerability window with time left (GL-229)
+  - Station Operations tabs all take our tab look while Defense2 is open (GL-230)
+  - A station's name is green when its sector holds one of your planets; hover lists them (GL-231)
+</details>
+
+**🛰 Fleet**
+- Wormholes: one red tab badge that refreshes when you open the Fleet page or the Wormholes tab, and Detected gets a Hidden bar (FL-257, FL-260, FL-264)
+<details><summary>Details</summary>
+
+  - Immediate check for new wormholes on the Fleet page and the Wormholes tab (FL-257)
+  - Hidden bar on Wormholes Detected (FL-260)
+  - One red Wormholes tab badge in the game's own style, covering wormholes to explore and runs waiting (FL-264)
+</details>
+- Surveys show the distance for systems more than 100 ly away (FL-256)
+- Pirates shows an empty camps list instead of the placeholder box (FL-259)
+- Supply hydrogen: you can edit the amount before sending (FL-261)
+- Debris "Fleets on the way" gets Phase time and Trip time columns (FL-262)
+- Transfer Routes: you can delete a route (FL-263)
+
+**🚢 Shipyard**
+- Planetary and orbital ships show as pills in different colours (SH-032)
+
+**🧩 Other**
+- Nothing else this time
+
 ## v0.5.108 · Nov 8, 2026
 
 **🛡 Station defense (Defense2)**
