@@ -1,5 +1,58 @@
 # Release notes
 
+## v0.5.108 · Nov 8, 2026
+
+**🛡 Station defense (Defense2)**
+- The station defense page gets a big round of improvements: clearer status, scout math and timing, and quieter alerts
+<details><summary>Details</summary>
+
+  - Phalanx popup opens at once from saved moon data (GL-211)
+  - Scouts needed shows only what's still missing, with 2x and 4x views (GL-212, GL-216, GL-214)
+  - Counts line shows stations under attack, landed and in-the-air fleets, and whether it's live (GL-213)
+  - Delta column: battle time minus scout reinforce time, as a live countdown (GL-215)
+  - Menu badge reads "Station attacks: N landed · M in the air" (GL-217)
+  - "You" tag on stations where one of your fleets is or is heading (GL-218)
+  - Hide a station until its attack ends; hidden rows fold into their own section (GL-219)
+  - Recalled and Resolved rules tightened, and your own alliance's fleets never count as attackers (GL-220, GL-221)
+  - Select Ships and Recall All on Recalled and Resolved rows (GL-222)
+  - The game's capture banner stays collapsed once you collapse it (GL-223)
+  - Status is the table's only colour, valued in Scouts against what's needed (GL-224)
+  - A station's name turns red when its sector holds one of your planets (GL-225)
+  - Background reads back off when the game asks, without ever blocking your clicks (GL-226)
+  - Defend uses the Highway only when you have it researched (GL-228)
+</details>
+
+**🛰 Fleet**
+- Quick Spy finds targets by planet name and shows Probe and Stealth travel times
+<details><summary>Details</summary>
+
+  - Type a planet name into Quick Spy to get spy targets (FL-249)
+  - Probe time and Stealth time columns (FL-251)
+</details>
+- Stations: a Route button on each row, and the planet list picks up new colonies (FL-254, FL-250)
+<details><summary>Details</summary>
+
+  - Route button on the Stations table (FL-254)
+  - The Station Filter's nearest-planet list includes newly colonized planets (FL-250)
+</details>
+- Mining: Total Trip retries a failed read, and the list shows 20 belts (FL-252, FL-255)
+<details><summary>Details</summary>
+
+  - Total Trip retries a failed read instead of staying blank (FL-252)
+  - Mining lists 20 belts (FL-255)
+</details>
+- Supply hydrogen to a moon fills the right default amount (FL-253)
+
+**🌙 Moons**
+- Moon Scans: pick a sector beside each ready Scan and scan it in one click (MO-035)
+- Phalanx search finds names that start with a number and a dash, like "7-azz" (MO-036)
+
+**🏗 Buildings**
+- An abandoned colony drops off the Energy badge (and the other badges) right away (BU-035)
+
+**🧩 Other**
+- Middle-click or Ctrl-click our left-menu items to open them in a new tab (GL-227)
+
 ## v0.5.107 · Nov 8, 2026
 
 **🛰 Fleet**
