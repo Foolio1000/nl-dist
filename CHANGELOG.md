@@ -1,5 +1,29 @@
 # Release notes
 
+## v0.5.113 · Nov 10, 2026
+
+**🛰 Fleet**
+- Active tab: columns reordered (Mission, Detail, From, To, Status, Ship, Phase time, Trip time, Cargo) (FL-287)
+- Mining rows show accurate Phase time and Trip time, including fleets launched before this update (FL-289)
+- Mining tab badges are removed (FL-268)
+- Stations tab: stations with a route leave the top table, and Collect sits in Routes (FL-288)
+- Active Spy Missions: Recall sits flush right and the Returning chip is gone (FL-286)
+
+**🌙 Moons**
+- Hovering a moon building shows its description from the building card (MO-039)
+- Phalanx search by player name hides alliance stations, and a search for [TAG] lists that alliance's stations (MO-040, MO-041)
+
+**🚀 Shipyard**
+- The repair badge skips damaged ships while their yard is busy (SH-033)
+- Gather Fleets lists planets first, then moons
+
+**🏛 Empire**
+- The Command Center fleet matrix fits on one screen, with shorter green figures
+
+**🧩 Other**
+- Logout is hidden in the left menu (GL-269)
+- The Deliver bar's time sits at the far right (GL-268)
+
 ## v0.5.112 · Nov 9, 2026
 
 **🛡 Station Operations**

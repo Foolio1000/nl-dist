@@ -1,17 +1,38 @@
 {
-  "version": "0.5.112",
-  "built": "2026-11-10T00:50:01.426Z",
+  "version": "0.5.113",
+  "built": "2026-11-10T09:18:18.977Z",
   "items": [
-    "GL-237",
-    "GL-261",
-    "GL-262",
-    "GL-263",
-    "GL-264",
-    "GL-265",
-    "GL-266"
+    "FL-286",
+    "FL-287",
+    "FL-288",
+    "FL-289",
+    "FL-268",
+    "MO-039",
+    "MO-040",
+    "MO-041",
+    "SH-033",
+    "GL-268",
+    "GL-269"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.113",
+      "items": [
+        "FL-286",
+        "FL-287",
+        "FL-288",
+        "FL-289",
+        "FL-268",
+        "MO-039",
+        "MO-040",
+        "MO-041",
+        "SH-033",
+        "GL-268",
+        "GL-269"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.112",
       "items": [
@@ -562,15 +583,6 @@
         "GL-133": "Crew: sort by grade",
         "GL-148": "Survey Ruins: dead-space list",
         "FL-120": "Fleet Transfer: fewer hover boxes"
-      }
-    },
-    {
-      "version": "0.5.93",
-      "items": [
-        "GL-089"
-      ],
-      "notes": {
-        "GL-089": "Internal cleanup: one shared copy of the game's transport code"
       }
     }
   ]
