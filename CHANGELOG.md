@@ -1,5 +1,22 @@
 # Release notes
 
+## v0.5.112 · Nov 9, 2026
+
+**🛡 Station Operations**
+- New Offense2 tab for our own station attacks, with its own badge (GL-237)
+- Defense2 tweaks (GL-261 to GL-265)
+<details><summary>Details</summary>
+
+  - Held and Lost are pills (GL-261)
+  - The zone shows as a pill in the System column (GL-262)
+  - Last phalanx and Battle at are blank once the window has ended (GL-263)
+  - Resolved rows stay for 12 hours (GL-264)
+  - Every time column is right-aligned, and a row that is too late to reinforce gets no Defend button (GL-265)
+</details>
+
+**🧩 Other**
+- The leader pill in the top banner turns green while the leader is Idle (GL-266)
+
 ## v0.5.111 · Nov 9, 2026
 
 **🛡 Station defense (Defense2)**
