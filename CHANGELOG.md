@@ -1,5 +1,15 @@
 # Release notes
 
+## v0.5.115 · Nov 10, 2026
+
+**🛰 Fleet**
+- Mining Trip time no longer shows blank right after a launch (FL-289)
+- Stations tab Routes: hovering Capacity shows the route's Last run (FL-293)
+- Stations tab: stations you cannot withdraw from show Resource and Capacity with a hover note and sort after the ones you can collect; the Stations badge follows the table filter and alerts when a no-withdraw station is on the list
+
+**🧩 Other**
+- Nothing else this time
+
 ## v0.5.114 · Nov 10, 2026
 
 **🛰 Fleet**

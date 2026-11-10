@@ -1,13 +1,20 @@
 {
-  "version": "0.5.114",
-  "built": "2026-11-10T18:20:09.751Z",
+  "version": "0.5.115",
+  "built": "2026-11-10T19:20:48.878Z",
   "items": [
-    "GL-270",
-    "FL-291",
-    "FL-292"
+    "FL-289",
+    "FL-293"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.115",
+      "items": [
+        "FL-289",
+        "FL-293"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.114",
       "items": [
@@ -520,15 +527,6 @@
       ],
       "notes": {
         "GL-091": "Internal cleanup: the Global module split into smaller files"
-      }
-    },
-    {
-      "version": "0.5.95",
-      "items": [
-        "GL-090"
-      ],
-      "notes": {
-        "GL-090": "Internal cleanup: page switching uses the shared route and page watchers"
       }
     }
   ]
