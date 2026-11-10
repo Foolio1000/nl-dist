@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.113
+// @version      0.5.114
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.113", features: [] };
+    const NL = window.__nl2 = { version: "0.5.114", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -915,7 +915,8 @@
     .nl2-fleet-v.nl2-bad{color:#f87171}
     .nl2-fleet-msg{margin-top:8px;color:#e8c46a;min-height:0}
     .nl2-fleet-msg.nl2-ok{color:#86efac}
-    .nl2-fleet-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
+    .nl2-fleet-tools{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}
+    .nl2-fleet-tools .nl2-fleet-btn{flex:1;white-space:nowrap}
     .nl2-fleet-tt{display:flex;align-items:center;gap:6px;flex:1;min-width:180px}
     .nl2-fleet-tt select{flex:1}
     .nl2-fleet-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
@@ -1278,9 +1279,10 @@
                             tsel.addEventListener("change", () => { st.only = tsel.value === "" ? null : tsel.value; refit(); });
                             if (o.shipTools) {
                                 const tb = (text, run) => NL.h("button", { type: "button", class: "nl2-fleet-btn nl2-sec", onclick: () => { run(); draw(); reEstimate(); } }, text);
+                                body.append(row("Transport type", tsel));
                                 body.append(NL.h("div", { class: "nl2-fleet-tools" }, tb("Select all", () => { for (const x of st.ships)
                                     x.qty = x.have; st.short = false; }), tb("Clear selection", () => { for (const x of st.ships)
-                                    x.qty = 0; st.short = false; }), NL.h("label", { class: "nl2-fleet-tt" }, "Transport type", tsel), tb("Fit transports to cargo", () => fitState(st, fitFn))));
+                                    x.qty = 0; st.short = false; }), tb("Fit transports to cargo", () => fitState(st, fitFn))));
                             }
                             else
                                 body.append(row("Transport type", tsel));
@@ -17770,6 +17772,7 @@
         NL.fl276 = true;
         NL.fl278 = true;
         NL.fl288 = true;
+        NL.fl292 = true;
         NL.feature({
             id: "fl-transfer-supto",
             set: "Fleet",
@@ -19053,6 +19056,22 @@
                         : r.destinationOutpostId != null ? { t: "outpost", id: +r.destinationOutpostId, name: ouName(r.destinationOutpostId) } : null;
                     return { from, to };
                 }
+                function stnRouteRow(r, base, sc) {
+                    const kids = [...base.children];
+                    const ran = trTs(r.lastExecuted), tip = ran != null ? "Last run " + trAgo(ran) + " \u00B7 " + trClock(ran) : "Never run";
+                    const st = kids[8].querySelector(".nl2-ftr-st");
+                    if (st)
+                        st.setAttribute("data-nl2-tip", tip);
+                    const cells = (sc ? sc.cells : [{ html: "" }, { html: "" }, { html: "" }, { html: "" }, { html: "" }, { html: "" }]).map((c) => { const td = NL.h("td", c.cls ? { class: c.cls } : null); td.innerHTML = c.html; return td; });
+                    if (!sc) {
+                        cells[1].appendChild(place(rtEnds(r).from));
+                        for (const i of [0, 2, 3, 4, 5])
+                            cells[i].appendChild(NL.h("span", { class: "nl2-ftr-d" }, "\u2014"));
+                    }
+                    const edit = base.classList.contains("nl2-ftr-rte");
+                    base.replaceChildren(...cells, kids[2], kids[4], kids[5], kids[6], edit ? kids[7] : kids[8], kids[10], kids[11]);
+                    return base;
+                }
                 function routeTable(list, wantHid, stn) {
                     const rows = (stn ? routes().filter(isStnRt) : tRoutes()).filter((r) => isHid("rt" + r.id) === !!wantHid).map((r) => {
                         const { from, to } = rtEnds(r);
@@ -19075,6 +19094,14 @@
                                 }
                             } })) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", null, ran != null ? NL.h("span", { "data-nl2-tip": trClock(ran) }, trAgo(ran)) : NL.h("span", { class: "nl2-ftr-d" }, "never run")), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, NL.fl245 ? NL.h("button", { type: "button", class: "nl2-ftr-hb nl2-ftr-rted", disabled: !!(rtEdit && rtEdit.busy), "data-nl2-tip": "Change this route (To, Resource, Trigger, Send)", onclick: () => rtStart(r) }, "Edit") : "", NL.fl263 ? rtDelBtn(r) : "", stn && NL.fl288 && NL.pve && NL.pve.stnCollectBtn ? NL.pve.stnCollectBtn(r.sourceStationId) : ""), hideBox("rt" + r.id));
                     });
+                    if (stn && NL.fl291 && NL.pve && NL.pve.stnCells) {
+                        const src = (stn ? routes().filter(isStnRt) : []).filter((r) => isHid("rt" + r.id) === !!wantHid);
+                        const items = src.map((r, i) => ({ r, row: rows[i], sc: NL.pve.stnCells(r.sourceStationId) }));
+                        items.sort((a, b) => { const fa = a.sc && a.sc.fill, fb = b.sc && b.sc.fill; return fa == null && fb == null ? 0 : fa == null ? 1 : fb == null ? -1 : fb - fa; });
+                        const ws2 = ["90px", "", "120px", "90px", "130px", "80px", "130px", "90px", "90px", "120px", "90px", "270px", TR_HIDE_W];
+                        const ls2 = ["System", "Name", "Resource", "Capacity", "Nearest planet", "Distance", "To", "Trigger \u2265", "Send", "Hub", "Status", "", "Hide"];
+                        return NL.h("table", null, NL.h("colgroup", null, ...ws2.map((w) => NL.h("col", { style: w ? "width:" + w : null }))), NL.h("thead", null, NL.h("tr", null, ...ls2.map((l) => NL.h("th", { class: "nl2-ftr-nos" + (l === "Hide" ? " nl2-ftr-hide" : "") }, l)))), NL.h("tbody", null, ...items.map((x) => stnRouteRow(x.r, x.row, x.sc))));
+                    }
                     const ws = ["130px", "150px", "150px", "160px", "110px", "110px", "150px", "", "100px", "110px", TR_ACTS_W, TR_HIDE_W], ls = ["Route", "From", "To", "Resource", "Trigger \u2265", "Send", "Hub", "Covers", "Status", "Last run", "", "Hide"];
                     if (stn) {
                         ws.splice(7, 1);
@@ -19457,12 +19484,16 @@
                 function stnRouteDialog(s) {
                     if (dlg)
                         dlg.close();
-                    const pl0 = (s.planets || []).filter((p) => p && p.id != null);
+                    const hubOf = (id) => hubs().find((h) => +h.planetId === +id) || null, hubsKnown = !!saved("hubs");
+                    let pl0 = (s.planets || []).filter((p) => p && p.id != null);
+                    if (NL.fl292 && hubsKnown && pl0.some((p) => trN((hubOf(p.id) || {}).hubLevel) > 0))
+                        pl0 = pl0.filter((p) => trN((hubOf(p.id) || {}).hubLevel) > 0);
                     if (!pl0.length)
                         return;
-                    const near = pl0.reduce((a, b) => (b.dist != null && (a.dist == null || b.dist < a.dist) ? b : a), pl0[0]);
+                    const nearOf = (list) => list.reduce((a, b) => (b.dist != null && (a.dist == null || b.dist < a.dist) ? b : a), list[0]);
+                    const freeHere = NL.fl292 && hubsKnown ? pl0.filter((p) => { const h = hubOf(p.id); return h && trN(h.hubLevel) - trN(h.routeCount) > 0; }) : [];
+                    const near = freeHere.length ? nearOf(freeHere) : nearOf(pl0);
                     const pl = NL.pickList ? NL.pickList(pl0) : pl0;
-                    const hubOf = (id) => hubs().find((h) => +h.planetId === +id) || null, hubsKnown = !!saved("hubs");
                     const slot = (p) => { const h = hubOf(p.id); return h ? { used: trN(h.routeCount), max: trN(h.hubLevel), free: trN(h.hubLevel) - trN(h.routeCount) } : { used: 0, max: 0, free: 0 }; };
                     const mine = routes().filter((r) => r.routeMode === "collect_station" && +r.sourceStationId === +s.id);
                     const allDone = mine.find((r) => String(r.resourceType) === "all");
@@ -19630,7 +19661,7 @@
                             NL.pve.stnRepaint();
                         }
                     }
-                    const s = JSON.stringify([gen, NL.fl288 && NL.pve && NL.pve.stnCollectSig ? NL.pve.stnCollectSig() : "", routes().filter(isStnRt).map((r) => [r.id, r.threshold, r.amount, r.lastExecuted, rtPaused(r), r.destinationPlanetId]), (saved("routes") || {}).at, (saved("hubs") || {}).at, st.get("hide", {}), st.get("collapsed", {}), rtEdit ? "edit" : Math.floor(Date.now() / 60000)]);
+                    const s = JSON.stringify([gen, NL.fl288 && NL.pve && NL.pve.stnCollectSig ? NL.pve.stnCollectSig() : "", NL.fl291 && NL.pve && NL.pve.stnInfoSig ? NL.pve.stnInfoSig() : "", routes().filter(isStnRt).map((r) => [r.id, r.threshold, r.amount, r.lastExecuted, rtPaused(r), r.destinationPlanetId]), (saved("routes") || {}).at, (saved("hubs") || {}).at, st.get("hide", {}), st.get("collapsed", {}), rtEdit ? "edit" : Math.floor(Date.now() / 60000)]);
                     if (s === host.__nlSig && host.firstChild)
                         return;
                     host.__nlSig = s;
@@ -25751,6 +25782,7 @@
         NL.tplInline = true;
         NL.stnFresh = true;
         NL.fl279 = true;
+        NL.fl291 = true;
         if (NL.fl279)
             NL.css("fl-279", `
   .nl2-fstn .nxs-wrap.nl2-stn9{background:none;border:0;border-radius:0;padding:0;margin:0;font-size:15px}
@@ -25761,7 +25793,8 @@
   .nl2-stn9-box a.nxs-sys{color:#7fd4ff;text-decoration:none}.nl2-stn9-box a.nxs-sys:hover{text-decoration:underline}
   .nl2-stn9-box td.nl2-ftr-acts .nl2-ftr-t{margin-left:6px}
   .nl2-stn9-box tr.nxs-ut td{cursor:pointer;color:#9fb3d1}
-  .nl2-stn9-box td.nl2-ftr-hide input{cursor:pointer;margin:0}`);
+  .nl2-stn9-box td.nl2-ftr-hide input{cursor:pointer;margin:0}`
+                + (NL.fl291 ? "\n  .nl2-ftr.nl2-ftr-x td.nl2-ftr-acts.nl2-ftr-tr button,.nl2-ftr.nl2-ftr-x td.nl2-ftr-acts.nl2-ftr-tr .nl2-ftr-gap{width:80px}" : ""));
         NL.css("gl160", ".nxs-tplmsg{margin-left:8px;font-size:13px;white-space:nowrap}.nxs-btn.nxs-tplsure{border-color:#e06c75!important;color:#e06c75!important}");
         NL.fl269 = true;
         if (!NL.pveRetired)
@@ -30555,7 +30588,7 @@
                         tickCountdowns();
                     }
                     if (NL.fl288 && S.stnRoot && NL._kick) {
-                        const cs = NL.pve.stnCollectSig();
+                        const cs = NL.pve.stnCollectSig() + (NL.fl291 ? "|" + NL.pve.stnInfoSig() : "");
                         if (cs !== S.stnCs) {
                             S.stnCs = cs;
                             NL._kick();
@@ -31291,7 +31324,7 @@
                 const STN_HTML = "<section class=\"nxs-wrap nxs-stn\" hidden><div class=\"nxs-head\"><strong>Stations</strong><span class=\"nxs-info\"></span><span class=\"nxs-hbtns\">" + STN_BTNS + "</span></div>"
                     + "<div class=\"nxs-scroll\"><table class=\"nxs-table\"><thead><tr><th>System</th><th>Name</th><th>Resource</th><th>Capacity</th><th>Nearest Planet</th><th>Bulks Available</th><th>Distance</th><th class=\"nxs-hidecell\">Suppress</th><th></th></tr></thead><tbody class=\"nxs-tbody\"></tbody></table></div></section>";
                 const STN_SHUT = "nl2.stn.shut";
-                const STN9_COLS = [["System", "110px"], ["Name", ""], ["Resource", "140px"], ["Capacity", "110px"], ["Nearest planet", "150px"], ["Bulks available", "140px"], ["Distance", "110px"], ["", "250px"], ["Suppress", "80px"]];
+                const STN9_COLS = [["System", "110px"], ["Name", ""], ["Resource", "140px"], ["Capacity", "110px"], ["Nearest planet", "150px"], ["Bulks available", "140px"], ["Distance", "110px"], ["", NL.fl291 ? "180px" : "250px"], ["Suppress", "80px"]];
                 const STN9_HTML = () => {
                     const shut = !!lsGet(STN_SHUT, false);
                     return "<section class=\"nxs-wrap nxs-stn nl2-stn9\" hidden><div class=\"nxs-head nl2-ftr-sec nl2-stn9-h\"><span class=\"nl2-ftr-ar\">" + (shut ? "\u25B8" : "\u25BE") + "</span><span>Stations</span><span class=\"nl2-ftr-n nl2-stn9-n\"></span><span class=\"nxs-info nl2-ftr-sub\"></span><span class=\"nxs-hbtns\">" + STN_BTNS + "</span></div>"
@@ -32128,6 +32161,15 @@
                         return b;
                     },
                     stnRepaint() { paintStations(); },
+                    stnCells(id) {
+                        const x = S.stations.find((q) => q.id === +id);
+                        if (!x)
+                            return null;
+                        const st = stationOf(x.id), top = fillOf(st), near = nearestPlanet(x.x, x.y, S.planets), hid = st && st.inventoryVisible === false, d = "<span class=\"nl2-ftr-d\">\u2014</span>";
+                        const sys = x.systemId ? "<a class=\"nxs-sys\" href=\"/galaxy?system=" + x.systemId + "\" data-nav>" + esc(x.systemName || "\u2014") + "</a>" : esc(x.systemName || "\u2014");
+                        return { fill: top ? top.p : null, cells: [{ html: sys }, { html: "<a class=\"nxs-sys\" href=\"/stations/" + x.id + "\" data-nav>" + esc(x.name) + "</a>" }, { html: esc(!st ? "\u2026" : hid || !top ? "\u2014" : top.r.name) }, { cls: top && top.p >= URGENT_PCT() ? "nxs-r" : top && top.p >= WARN_PCT() ? "nxs-y" : "", html: esc(!st ? "\u2026" : hid || !top ? "\u2014" : top.p.toFixed(1) + "%") }, { html: near ? planetLink(near.p) : d }, { html: near ? "<span class=\"" + distCls(near.dist) + "\">" + Math.round(near.dist) + " ly</span>" : d }] };
+                    },
+                    stnInfoSig() { return S.stations.map((x) => { const t = fillOf(stationOf(x.id)), n = nearestPlanet(x.x, x.y, S.planets); return x.id + ":" + (t ? t.r.key + Math.round(t.p * 10) : "") + ":" + (n ? n.p.id : ""); }).join(","); },
                     stnCollectSig() { return S.stations.map((x) => x.id + (stnCollectWhy(x.id) ? "" : "+")).join(","); },
                     stationLabel(id) { const x = S.stations.find((q) => q.id === +id); return x ? (x.systemName ? x.systemName + " " : "") + x.name : null; },
                     mountRow(kind, el) {

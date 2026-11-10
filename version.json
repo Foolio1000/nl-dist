@@ -1,21 +1,22 @@
 {
-  "version": "0.5.113",
-  "built": "2026-11-10T09:18:18.977Z",
+  "version": "0.5.114",
+  "built": "2026-11-10T18:20:09.751Z",
   "items": [
-    "FL-286",
-    "FL-287",
-    "FL-288",
-    "FL-289",
-    "FL-268",
-    "MO-039",
-    "MO-040",
-    "MO-041",
-    "SH-033",
-    "GL-268",
-    "GL-269"
+    "GL-270",
+    "FL-291",
+    "FL-292"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.114",
+      "items": [
+        "GL-270",
+        "FL-291",
+        "FL-292"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.113",
       "items": [
@@ -528,61 +529,6 @@
       ],
       "notes": {
         "GL-090": "Internal cleanup: page switching uses the shared route and page watchers"
-      }
-    },
-    {
-      "version": "0.5.94",
-      "items": [
-        "SH-021",
-        "SH-022",
-        "RE-018",
-        "GL-129",
-        "MO-020",
-        "GL-134",
-        "GL-135",
-        "GL-136",
-        "GL-137",
-        "GL-138",
-        "GL-139",
-        "GL-140",
-        "GL-141",
-        "GL-142",
-        "GL-143",
-        "GL-144",
-        "GL-145",
-        "GL-146",
-        "GL-147",
-        "GL-130",
-        "GL-132",
-        "GL-133",
-        "GL-148",
-        "FL-120"
-      ],
-      "notes": {
-        "SH-021": "Shipyard: build boxes use projected stock",
-        "SH-022": "Shipyard: costs update with quantity",
-        "RE-018": "Research cards: no picture and Hide at top right",
-        "GL-129": "Tasks tab removed",
-        "MO-020": "Moons badge opens the right page",
-        "GL-134": "Defense2 improvements",
-        "GL-135": "Defense2 improvements",
-        "GL-136": "Defense2 improvements",
-        "GL-137": "Defense2 narrower columns",
-        "GL-138": "Defense2 improvements",
-        "GL-139": "Defense2 improvements",
-        "GL-140": "Defense2 improvements",
-        "GL-141": "Defense2 improvements",
-        "GL-142": "Defense2 improvements",
-        "GL-143": "Defense2 improvements",
-        "GL-144": "Defense2 improvements",
-        "GL-145": "Defense2 narrower columns",
-        "GL-146": "Defense2 improvements",
-        "GL-147": "Defense2 one Attackers column",
-        "GL-130": "Crew: Table View",
-        "GL-132": "Crew: Hide all-marked",
-        "GL-133": "Crew: sort by grade",
-        "GL-148": "Survey Ruins: dead-space list",
-        "FL-120": "Fleet Transfer: fewer hover boxes"
       }
     }
   ]

@@ -1,5 +1,15 @@
 # Release notes
 
+## v0.5.114 · Nov 10, 2026
+
+**🛰 Fleet**
+- Prepare delivery: Transport type is its own row, with Select all, Clear selection and Fit transports to cargo in one row beneath it (GL-270)
+- Stations tab Routes table: new column layout, a Last run hover and narrower buttons (FL-291)
+- The Route dialog's To list is fixed (FL-292)
+
+**🧩 Other**
+- Nothing else this time
+
 ## v0.5.113 · Nov 10, 2026
 
 **🛰 Fleet**
