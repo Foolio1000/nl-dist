@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.116
+// @version      0.5.117
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.116", features: [] };
+    const NL = window.__nl2 = { version: "0.5.117", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -6682,7 +6682,10 @@
     }
     {
         if (NL.option)
-            NL.option({ key: "gl-atkexp.min", group: "Global: attack line", label: "Attack line: flag a resource over", type: "number", def: 1000, min: 0, step: 100 });
+            NL.option({ key: "gl-atkexp.minPrimary", group: "Global: attack line", label: "Attack line: flag Ore, Silicates, Hydrogen or Alloys over", type: "number", def: 2000, min: 0, step: 100 });
+        if (NL.option)
+            NL.option({ key: "gl-atkexp.min", group: "Global: attack line", label: "Attack line: flag a rare resource over", type: "number", def: 1000, min: 0, step: 100 });
+        NL.atkGreen = true;
         NL.feature({
             id: "gl-atk-exposure",
             set: "Global",
@@ -6695,6 +6698,8 @@
                 const n = (v) => (Number.isFinite(+v) ? +v : 0);
                 const data = (re) => { const c = NL.cache.latest(re); return c ? c.data : null; };
                 const minRes = () => { const v = +NL.opt("gl-atkexp.min"); return Number.isFinite(v) && v >= 0 ? v : 1000; };
+                const PRIMARY = ["ore", "silicates", "hydrogen", "alloys"];
+                const minPrimary = () => { const v = +NL.opt("gl-atkexp.minPrimary"); return Number.isFinite(v) && v >= 0 ? v : 2000; };
                 const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
                 const planets = () => { const d = data(/^\/api\/planets$/); return (d && Array.isArray(d.planets) ? d.planets : []).map((p) => ({ type: "planet", id: +p.id, name: clean(p.name) })); };
                 const moons = () => { const d = data(/^\/api\/moons\/owned$/); return (d && Array.isArray(d.moons) ? d.moons : []).map((m) => ({ type: "moon", id: +m.id, name: clean(m.name) })); };
@@ -6740,8 +6745,8 @@
                     const stock = snap(d) || snap(f) || (d && d.moon) || null;
                     if (!stock)
                         return null;
-                    const lim = minRes();
-                    const res = RES.some((k) => n(stock[k] != null ? stock[k] : stock[snake(k)]) > lim);
+                    const lim = minRes(), limP = NL.atkGreen ? minPrimary() : lim;
+                    const res = RES.some((k) => n(stock[k] != null ? stock[k] : stock[snake(k)]) > (PRIMARY.includes(k) ? limP : lim));
                     return { ships, res };
                 }
                 NL.css("gl-atk-exposure", `
@@ -6749,7 +6754,10 @@
       .nl2-atkx span{padding:1px 8px;border-radius:999px;white-space:nowrap;line-height:18px}
       .nl2-atkx .s{background:#3b82f6;color:#06182c}
       .nl2-atkx .r{background:#f59e0b;color:#2a1a00}
-      .nl2-atkx .c{background:#22a355;color:#fff}`);
+      .nl2-atkx .c{background:#22a355;color:#fff}
+      .attack-alert-banner.nl2-atkx-clear{background:rgba(22,101,52,.55)!important;border-color:rgba(74,222,128,.6)!important}
+      .attack-alert-banner.nl2-atkx-clear > .attack-alert-icon{display:none}
+      .nl2-atkx-ok{color:#4ade80;font-weight:700;flex-shrink:0;margin-right:2px}`);
                 const lines = () => [...document.querySelectorAll(".attack-alert-banner:not(.incoming-fleet-banner)")];
                 function missionFor(el) {
                     const st = el.querySelectorAll(".attack-alert-text strong");
@@ -6762,11 +6770,30 @@
                 function paint(el) {
                     const m = missionFor(el), l = m && placeOf(m), x = l && exposure(l);
                     let box = el.querySelector(":scope > .nl2-atkx");
+                    const green = (on) => {
+                        el.classList.toggle("nl2-atkx-clear", on);
+                        let ok = el.querySelector(":scope > .nl2-atkx-ok");
+                        if (on && !ok) {
+                            ok = NL.h("span", { class: "nl2-atkx-ok" }, "\u2713");
+                            const ic = el.querySelector(":scope > .attack-alert-icon");
+                            el.insertBefore(ok, ic || el.firstChild);
+                        }
+                        if (!on && ok)
+                            ok.remove();
+                    };
                     if (!x) {
                         if (box)
                             box.remove();
+                        green(false);
                         return;
                     }
+                    if (NL.atkGreen && !x.ships && !x.res) {
+                        if (box)
+                            box.remove();
+                        green(true);
+                        return;
+                    }
+                    green(false);
                     const word = l.type === "moon" ? "moon" : "planet";
                     const tags = [];
                     if (x.ships)
@@ -6865,10 +6892,26 @@
                     }
                 });
                 let due = null;
+                async function fastPlaces() {
+                    const ps = new Set(["/api/leadership"]);
+                    for (const el of lines()) {
+                        const m = missionFor(el), l = m && placeOf(m);
+                        if (l) {
+                            ps.add(base(l) + "/fleet");
+                            ps.add(base(l));
+                        }
+                    }
+                    await Promise.all([...ps].map((p) => NL.getJson(p, ctx)));
+                    paintAll();
+                    refresh(false);
+                }
                 NL.onWrite(/^\/api\/(fleet\/|moons\/\d+\/(send|dispatch)$|market\/orders)/, () => {
                     if (due || !lines().length)
                         return;
-                    due = setTimeout(() => { due = null; refresh(true); }, 1200);
+                    due = setTimeout(() => { due = null; if (NL.atkGreen)
+                        fastPlaces().catch(() => { });
+                    else
+                        refresh(true); }, NL.atkGreen ? 300 : 1200);
                 });
             },
         });
@@ -18012,6 +18055,7 @@
         NL.fl278 = true;
         NL.fl288 = true;
         NL.fl292 = true;
+        NL.fl305 = true;
         NL.feature({
             id: "fl-transfer-supto",
             set: "Fleet",
@@ -18333,7 +18377,17 @@
                 const fullIn = (rows) => Math.min(...rows.map((x) => (x.now >= x.cap ? 0 : (x.cap - x.now) / x.rate * 3600)));
                 const hubs = () => (saved("hubs") || {}).d || [];
                 const freeHubs = () => hubs().filter((h) => trN(h.hubLevel) - trN(h.routeCount) > 0);
-                const routes = () => (saved("routes") || {}).d || [];
+                const stnPend = new Map();
+                const routes = () => {
+                    const d = (saved("routes") || {}).d || [];
+                    if (!stnPend.size)
+                        return d;
+                    const have = new Set(d.filter((r) => r.routeMode === "collect_station" || r.sourceStationId != null).map((r) => +r.sourceStationId));
+                    for (const sid of [...stnPend.keys()])
+                        if (have.has(sid))
+                            stnPend.delete(sid);
+                    return stnPend.size ? d.concat([...stnPend.values()]) : d;
+                };
                 const isStnRt = (r) => r.routeMode === "collect_station" || r.sourceStationId != null;
                 const tRoutes = () => (NL.fl278 ? routes().filter((r) => !isStnRt(r)) : routes());
                 const rk = (r) => trSnake(r.resourceType) || trSnake(String(r.resourceType || "").toLowerCase().replace(/[\s-]+/g, "_"));
@@ -19129,7 +19183,7 @@
       .nl2-ftr-toast{position:fixed;right:20px;bottom:20px;z-index:2147483000;background:#0a1322;color:#f1f6ff;border:1px solid #f59e0b;border-radius:6px;padding:8px 12px;font-size:14px}
       .nl2-ftr tbody tr td.nl2-ftr-empty{background:rgba(245,158,11,.22);box-shadow:inset 3px 0 0 #f59e0b}
       .nl2-ftr .nl2-ftr-st{display:inline-block;border:1px solid;border-radius:3px;font-size:11.5px;font-weight:700;padding:0 5px;text-transform:uppercase}
-      .nl2-ftr .nl2-ftr-trav{border-color:#60a5fa;color:#93c5fd}.nl2-ftr .nl2-ftr-in{border-color:#22c55e;color:#86efac}.nl2-ftr .nl2-ftr-oth{border-color:#64748b;color:#cbd5e1}
+      .nl2-ftr .nl2-ftr-trav{border-color:#60a5fa;color:#93c5fd}.nl2-ftr .nl2-ftr-in{border-color:#22c55e;color:#86efac}.nl2-ftr .nl2-ftr-oth{border-color:#64748b;color:#cbd5e1}.nl2-ftr .nl2-ftr-lost{border-color:#ef4444;color:#fca5a5}
       .nl2-ftr tr.nl2-ftr-enr td{color:#6b7a90}.nl2-ftr tr.nl2-ftr-enr a.nl2-ftr-l{color:#4f7d99}.nl2-ftr tr.nl2-ftr-enr img{opacity:.45}
       .nl2-ftr tr.nl2-ftr-tot td{color:#fbbf24;font-weight:700}
       .nl2-ftr button{font:600 13px Rajdhani,"Exo 2",sans-serif;border-radius:4px;padding:2px 9px;margin-right:4px;cursor:pointer}
@@ -19301,6 +19355,12 @@
                     const st = kids[8].querySelector(".nl2-ftr-st");
                     if (st)
                         st.setAttribute("data-nl2-tip", tip);
+                    if (NL.fl305 && (r.nlPend || stnLost(r))) {
+                        kids[8].replaceChildren(NL.h("span", { class: "nl2-ftr-st " + (r.nlPend ? "nl2-ftr-trav" : "nl2-ftr-lost"), "data-nl2-tip": r.nlPend ? "Creating this route in the game\u2026" : "Station no longer owned by your alliance: delete this route" }, r.nlPend ? "creating" : "lost"));
+                        if (r.nlPend)
+                            for (const b of kids[10].querySelectorAll("button"))
+                                b.disabled = true;
+                    }
                     const cells = (sc ? sc.cells : [{ html: "" }, { html: "" }, { html: "" }, { html: "" }, { html: "" }, { html: "" }]).map((c) => { const td = NL.h("td", c.cls ? { class: c.cls } : null); td.innerHTML = c.html; return td; });
                     if (sc)
                         cells[3].setAttribute("data-nl2-tip", tip);
@@ -19767,6 +19827,39 @@
                     }
                     create.addEventListener("click", async () => {
                         const p = pl[pi];
+                        if (NL.fl305) {
+                            const sid = +s.id, body = { routeMode: "collect_station", destinationPlanetId: +p.id, sourceStationId: sid, resourceType: "all", threshold: trig, amount: send, useJumpGates: gates };
+                            stnPend.set(sid, Object.assign({ id: "new" + sid, nlPend: true, isActive: true }, body));
+                            close();
+                            let err = "";
+                            try {
+                                const res = await NL.rawFetch("/api/logistics/routes", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });
+                                const j = await res.json().catch(() => null);
+                                if (!res.ok)
+                                    err = (j && (j.error || j.message)) || "the game refused it (HTTP " + res.status + ")";
+                            }
+                            catch (e) {
+                                err = "could not reach the game: " + e.message;
+                            }
+                            if (err) {
+                                stnPend.delete(sid);
+                                changed();
+                                trToast("Route not created for " + s.name + ": " + err);
+                                return;
+                            }
+                            try {
+                                await NL.getJson("/api/logistics/routes", ctx);
+                            }
+                            catch (e) { }
+                            stnPend.delete(sid);
+                            changed();
+                            await trSleep(1000);
+                            try {
+                                await NL.getJson("/api/logistics/hub-levels", ctx);
+                            }
+                            catch (e) { }
+                            return;
+                        }
                         busy = true;
                         refresh();
                         msg.className = "nl2-ftr-dmsg";
@@ -19850,6 +19943,17 @@
                     }
                     return out;
                 }
+                const stnLost = (r) => !!(NL.fl305 && !r.nlPend && NL.pve && NL.pve.stnOwned && NL.pve.stnOwned(r.sourceStationId) === false);
+                if (NL.fl305)
+                    NL.stnRtPausedLines = () => {
+                        if (!NL.fl222 || (NL.fl233 && NL.opt && NL.opt("fl-transfer.routebadge") === false) || !saved("routes"))
+                            return [];
+                        const l = routes().filter((r) => isStnRt(r) && !r.nlPend && fl209Paused(r) && !isHid("rt" + r.id)).map((r) => {
+                            const { from, to } = rtEnds(r);
+                            return "Station: route " + (stnLost(r) ? "to delete (station lost)" : "paused") + ": " + (from ? from.name : "Station " + r.sourceStationId) + " \u2192 " + (to ? to.name : "?");
+                        });
+                        return NL.fl233 && l.length > 1 ? ["Station: routes paused: " + l.length] : l;
+                    };
                 if (NL.fl288)
                     NL.stnRouted = () => (saved("routes") ? new Set(routes().filter(isStnRt).map((r) => +r.sourceStationId)) : null);
                 function stnPanel() {
@@ -32886,6 +32990,12 @@
                 }
                 function stnNoWd(st) { return !!(NL.stnWd && st && st.noWd); }
                 function STN_NOWD_TIP(st) { return "You can\u2019t withdraw from this station" + (st && st.withdrawAccessRole ? " (" + String(st.withdrawAccessRole) + " only)" : "") + ": grant access in Alliance > Station Storage"; }
+                function stnRtPaused() { try {
+                    return pveMove() && NL.stnRtPausedLines ? NL.stnRtPausedLines() : [];
+                }
+                catch (e) {
+                    return [];
+                } }
                 function stnNoWdRows() {
                     if (!NL.stnWd)
                         return [];
@@ -32905,9 +33015,9 @@
                         const st = stnBadgeRows(), xi = xpIdle() ? 1 : 0, nb = (NL.navBadges = NL.navBadges || {});
                         nb["/fleet"] = nb["/fleet"] || {};
                         nb["/leadership"] = nb["/leadership"] || {};
-                        const nw = stnNoWdRows();
-                        nb["/fleet"].pveStations = { n: st.length + nw.length, tip: st.map(({ x, f }) => "Station: " + x.name + " " + f.r.name + " " + Math.round(f.p) + "%")
-                                .concat(nw.map(({ x }) => "Can\u2019t withdraw: " + (x.systemName ? x.systemName + " " : "") + x.name)).join("\n") };
+                        const nw = stnNoWdRows(), pr = stnRtPaused();
+                        nb["/fleet"].pveStations = { n: st.length + nw.length + pr.length, tip: st.map(({ x, f }) => "Station: " + x.name + " " + f.r.name + " " + Math.round(f.p) + "%")
+                                .concat(nw.map(({ x }) => "Can\u2019t withdraw: " + (x.systemName ? x.systemName + " " : "") + x.name), pr).join("\n") };
                         nb["/leadership"].pveLeader = { n: xi, tip: xi ? "Leader idle: Command XP left today" : "" };
                         const sig = JSON.stringify([nb["/fleet"].pveStations, xi]);
                         if (sig !== S.moveSig) {
@@ -33687,9 +33797,10 @@
                                 NL._kick();
                         }
                     },
+                    stnOwned: (id) => (S.stations.length ? S.stations.some((x) => x.id === +id) : null),
                     stationCount: () => {
                         try {
-                            const n = stnBadgeRows().length + stnNoWdRows().length;
+                            const n = stnBadgeRows().length + stnNoWdRows().length + stnRtPaused().length;
                             const nb = ((NL.navBadges || {})["/fleet"] || {}).pveStations;
                             if (NL.stnWd && pveMove() && !S.stnCountFix && (!nb || nb.n !== n)) {
                                 S.stnCountFix = true;

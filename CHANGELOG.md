@@ -1,5 +1,16 @@
 # Release notes
 
+## v0.5.117 · Nov 12, 2026
+
+**🛡 Attack line**
+- When the attacked planet or moon is clear, the whole line turns green with a ✓; Ore, Silicates, Hydrogen and Alloys flag only over 2,000 (rare stays 1,000); after Fire Sale, Evacuate or any fleet send the line updates within about half a second (GL-280)
+
+**🛰 Fleet**
+- Stations tab: routes to lost stations show a LOST pill, Create route shows its row at once, and the badge has a line for paused station routes (FL-305)
+
+**🧩 Other**
+- Nothing else this time
+
 ## v0.5.116 · Nov 12, 2026
 
 **🛡 Station Operations**
