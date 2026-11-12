@@ -1,12 +1,62 @@
 {
-  "version": "0.5.115",
-  "built": "2026-11-10T19:20:48.878Z",
+  "version": "0.5.116",
+  "built": "2026-11-12T18:06:48.893Z",
   "items": [
-    "FL-289",
-    "FL-293"
+    "GL-271",
+    "GL-272",
+    "GL-273",
+    "GL-274",
+    "GL-275",
+    "GL-276",
+    "GL-277",
+    "GL-278",
+    "GL-279",
+    "FL-298",
+    "FL-299",
+    "FL-300",
+    "FL-301",
+    "FL-302",
+    "FL-303",
+    "FL-304",
+    "RE-032",
+    "RE-033",
+    "MO-042",
+    "GA-007",
+    "GA-008",
+    "OV-018",
+    "OU-014"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.116",
+      "items": [
+        "GL-271",
+        "GL-272",
+        "GL-273",
+        "GL-274",
+        "GL-275",
+        "GL-276",
+        "GL-277",
+        "GL-278",
+        "GL-279",
+        "FL-298",
+        "FL-299",
+        "FL-300",
+        "FL-301",
+        "FL-302",
+        "FL-303",
+        "FL-304",
+        "RE-032",
+        "RE-033",
+        "MO-042",
+        "GA-007",
+        "GA-008",
+        "OV-018",
+        "OU-014"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.115",
       "items": [
@@ -518,15 +568,6 @@
         "RE-019": "Research Plan self-heal",
         "SH-023": "Ship maintenance badge",
         "SH-024": "Shipyard idle split"
-      }
-    },
-    {
-      "version": "0.5.96",
-      "items": [
-        "GL-091"
-      ],
-      "notes": {
-        "GL-091": "Internal cleanup: the Global module split into smaller files"
       }
     }
   ]

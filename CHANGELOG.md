@@ -1,5 +1,37 @@
 # Release notes
 
+## v0.5.116 · Nov 12, 2026
+
+**🛡 Station Operations**
+- Defense2 round 6: only station missions count, Recall buttons on fleet sub-rows, Recalled merged into Resolved, a Salvage button and dialog, exact battle times, and the Scan popup closes after a shared scan (GL-273 to GL-279)
+- The Station attacks badge line opens Defense2, and a new Our attacks line opens Offense2 (GL-273 to GL-279)
+
+**🛰 Fleet**
+- Prepare delivery lists every resource type: normal ones always shown, rare ones in a collapsible section (GL-271)
+- Ruins tab gets One click mode (FL-298)
+- Debris: Collect then Cancel leaves the row in To collect (FL-299)
+- Trip time hover shows seconds in "Home at" (FL-300)
+- Fleet > Reports details show the debris field (FL-301)
+- New Unsupplied ships panel (FL-302)
+- New Player Targets raid tab (FL-303)
+- Stations tab: Suppress is now Hide, with a collapsed Hidden section (FL-304)
+
+**🔬 Research**
+- Research table View: short costs turn red as soon as the planet's stock arrives (RE-032)
+- Effects show what the next level gives in the game's wording; maxed rows show everything at full value (RE-033)
+
+**🌙 Moons**
+- Moon Thresholds list Ore, Silicates, Hydrogen, Alloys, Quantum Dust, Dark Matter (MO-042)
+
+**🌌 Galaxy**
+- System panel shows alliance tags (GA-007)
+- The Enemies filter gets a *none* option for players without an alliance (GA-008)
+
+**🧩 Other**
+- Fire Sale can post all Bio (OV-018)
+- Outposts Relocate lists belts in S0 again (OU-014)
+- Hide ▾ Show no longer leaves an empty box on screen (GL-272)
+
 ## v0.5.115 · Nov 10, 2026
 
 **🛰 Fleet**
