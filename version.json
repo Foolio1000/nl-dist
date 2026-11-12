@@ -1,12 +1,24 @@
 {
-  "version": "0.5.117",
-  "built": "2026-11-12T21:28:00.776Z",
+  "version": "0.5.118",
+  "built": "2026-11-12T23:46:02.908Z",
   "items": [
-    "GL-280",
-    "FL-305"
+    "FL-306",
+    "FL-307",
+    "FL-308",
+    "GL-281"
   ],
   "notes": {},
   "history": [
+    {
+      "version": "0.5.118",
+      "items": [
+        "FL-306",
+        "FL-307",
+        "FL-308",
+        "GL-281"
+      ],
+      "notes": {}
+    },
     {
       "version": "0.5.117",
       "items": [
@@ -406,53 +418,6 @@
         "SH-025"
       ],
       "notes": {}
-    },
-    {
-      "version": "0.5.98",
-      "items": [
-        "FL-136",
-        "FL-137",
-        "FL-138",
-        "FL-140",
-        "FL-139",
-        "FL-141",
-        "FL-142",
-        "GL-170",
-        "GL-171",
-        "GL-172",
-        "GL-173",
-        "GL-174",
-        "GL-175",
-        "MO-023",
-        "RE-011",
-        "RE-021",
-        "BU-019",
-        "BU-024",
-        "BU-025",
-        "OV-015"
-      ],
-      "notes": {
-        "FL-136": "Fleet slots count right after Fleet",
-        "FL-137": "Transfer improvements",
-        "FL-138": "Transfer improvements",
-        "FL-140": "Transfer improvements",
-        "FL-139": "Readable labels over banner art",
-        "FL-141": "Transfer Why column categories",
-        "FL-142": "PVE tabs layout",
-        "GL-170": "Defense2 uses shared phalanx and spy reports",
-        "GL-171": "Season presets",
-        "GL-172": "Command Center menu icon",
-        "GL-173": "Station Ops in the main menu during an attack",
-        "GL-174": "Options close on an outside click",
-        "GL-175": "Storage full: any resource at 100%",
-        "MO-023": "Moon storage rules",
-        "RE-011": "Research hover text no longer names a player",
-        "RE-021": "Fragments picker stays open",
-        "BU-019": "Energy hover example text",
-        "BU-024": "Buildings Table View",
-        "BU-025": "Buildings Table View tidy-up",
-        "OV-015": "Fire Sale greyed until Galactic Exchange"
-      }
     }
   ]
 }

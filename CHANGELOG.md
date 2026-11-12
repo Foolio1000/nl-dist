@@ -1,5 +1,15 @@
 # Release notes
 
+## v0.5.118 · Nov 12, 2026
+
+**🛰 Fleet**
+- Espionage: saving a report moves it into a new Saved Spy Reports section above Spy Reports (FL-306)
+- Active tab: attack rows are highlighted in red (FL-307)
+- An opened spy report gets a Table View with Delta, with Ships and Damaged Ships sections (Damaged hidden when empty) (FL-308)
+
+**🧩 Other**
+- Our buttons click reliably even when you press near the edge while the table redraws (Defense2 especially) (GL-281)
+
 ## v0.5.117 · Nov 12, 2026
 
 **🛡 Attack line**

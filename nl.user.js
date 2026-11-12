@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.117
+// @version      0.5.118
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.117", features: [] };
+    const NL = window.__nl2 = { version: "0.5.118", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -512,6 +512,55 @@
     .nl2-todo-list label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
     .nl2-todo-list span{overflow-wrap:anywhere}`);
     }
+    NL.clickRescue = true;
+    (() => {
+        const ours = (b) => b && (/\bnl2/.test(b.className || "") || !!b.closest("[class*=\"nl2\"]"));
+        const btnOf = (t) => (t && t.closest ? t.closest("button, [role=\"button\"]") : null);
+        let down = null;
+        document.addEventListener("pointerdown", (e) => {
+            down = null;
+            if (!NL.clickRescue || e.button !== 0)
+                return;
+            const b = btnOf(e.target);
+            if (!b || b.disabled || !ours(b))
+                return;
+            const r = b.getBoundingClientRect();
+            down = { b, cls: b.className, text: (b.textContent || "").trim(), r: { l: r.left, t: r.top, rr: r.right, bb: r.bottom } };
+        }, true);
+        document.addEventListener("pointerup", (e) => {
+            const d = down;
+            down = null;
+            if (!d || !NL.clickRescue || e.button !== 0)
+                return;
+            if (d.b.isConnected && d.b.contains(e.target))
+                return;
+            const near = e.clientX >= d.r.l - 6 && e.clientX <= d.r.rr + 6 && e.clientY >= d.r.t - 6 && e.clientY <= d.r.bb + 6;
+            if (!near)
+                return;
+            let t = d.b.isConnected ? d.b : null;
+            if (!t) {
+                let best = 6.01;
+                for (const u of document.querySelectorAll("button, [role=\"button\"]")) {
+                    if (u.className !== d.cls || (u.textContent || "").trim() !== d.text)
+                        continue;
+                    const r = u.getBoundingClientRect(), dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right), dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom), dd = Math.max(dx, dy);
+                    if (dd < best) {
+                        best = dd;
+                        t = u;
+                    }
+                }
+            }
+            if (!t || t.disabled)
+                return;
+            const eat = (ev) => { if (ev.target !== t) {
+                ev.stopPropagation();
+                ev.preventDefault();
+            } };
+            document.addEventListener("click", eat, true);
+            setTimeout(() => { document.removeEventListener("click", eat, true); if (t.isConnected && !t.disabled)
+                t.click(); }, 0);
+        }, true);
+    })();
     const cfg = NL.store("");
     NL.feature = function (def) { if (def && def.id && typeof def.init === "function")
         NL.features.push(def); };
@@ -15618,6 +15667,8 @@
         });
         const FAT_SLOTS_ST = ["outbound", "returning", "in_combat", "raiding", "mining", "exploring", "surveying", "stationed", "collecting", "inside_wormhole"];
         NL.flReloc = true;
+        NL.fl307 = true;
+        const fatAtk = (m) => !!NL.fl307 && !!m && ["attack", "attack_moon", "attack_station"].includes(m.missionType);
         const fatReloc = (m) => !!NL.flReloc && !!m && m.missionType === "relocate_outpost";
         const fatHolds = (m) => !(m.logisticsRouteId != null || m.missionType === "patrol" || m.missionType === "leadership_move") && FAT_SLOTS_ST.includes(m.status);
         NL.feature({
@@ -15670,6 +15721,7 @@
       ${L} > .nl2-fat > div > .mission-type-badge{display:inline-block;max-width:calc(100% - 18px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
       ${L} > .nl2-fat > div + div{border-left:1px solid rgba(120,200,255,.1)}
       ${L} > .nl2-fat.nl2-z{background:rgb(15,27,46)}
+      ${L} > .nl2-fat.nl2-fat-atk,${L} > .nl2-fat.nl2-fat-atk.nl2-z{background:rgb(72,18,26)}  
       ${L} > .nl2-fat-h{color:#8fb3d9;font-weight:600;font-size:13.6px;white-space:nowrap}
       ${L} > .nl2-fat-sec{display:flex;align-items:center;gap:8px;font:700 15px Rajdhani,"Exo 2",sans-serif;color:#cfe3f7;padding:8px 4px 4px;cursor:pointer;user-select:none}
       ${L} > .nl2-fat-sec .nl2-fat-n{color:#8aa;font-weight:500}${L} > .nl2-fat-sec .nl2-fat-sub{color:#7f93a8;font-size:12.5px;font-weight:500}
@@ -15931,7 +15983,7 @@
                                 paint();
                             } }, (rec ? "\u2715 " : sel ? "\u21B6 " : "") + (armedNow ? "Confirm" : t.replace(/^\W+/, "")));
                     }));
-                    return NL.h("div", { class: "nl2-fat" + (z ? " nl2-z" : ""), "data-nl2-fat-id": String(id), style: { order: String(i) } }, cell(NL.h("span", { class: "nl2-fat-arc", title: "Show the game's card", onclick: () => toggle(id) }, open.has(id) ? "\u25BE" : "\u25B8"), rl ? NL.h("span", { class: badge ? badge.className : "mission-type-badge", "data-nl2-mfam": "log", "data-nl2-tip": "Outpost Relocation" }, "Relocation")
+                    return NL.h("div", { class: "nl2-fat" + (z ? " nl2-z" : "") + (fatAtk(m) ? " nl2-fat-atk" : ""), "data-nl2-fat-id": String(id), style: { order: String(i) } }, cell(NL.h("span", { class: "nl2-fat-arc", title: "Show the game's card", onclick: () => toggle(id) }, open.has(id) ? "\u25BE" : "\u25B8"), rl ? NL.h("span", { class: badge ? badge.className : "mission-type-badge", "data-nl2-mfam": "log", "data-nl2-tip": "Outpost Relocation" }, "Relocation")
                         : badge ? plainBadge(badge, m) : NL.h("span", { class: "mission-type-badge", "data-nl2-mfam": mFam(m.missionType) }, String(m.missionType || "").replace(/_/g, " ")), NL.fl181 && m.leadershipVessel ? NL.h("span", { class: "nl2-fat-star", "data-nl2-tip": "\u2605 " + leader(m, card) }, " \u2605") : null), ...(NL.fl178 ? [(() => { const d = rl ? NL.esc(relocName(m, src)) : detailHtml(m), el = NL.h("div"); el.innerHTML = d || "\u2013"; for (const t of el.querySelectorAll(".nxs-mtag"))
                             t.replaceWith(t.getAttribute(NL.tipA || "data-nl2-tip") || t.getAttribute("title") || t.textContent); if (/^to\s/.test((el.textContent || "").trim()))
                             el.textContent = "\u2013"; const tx = (el.textContent || "").trim(); if (tx && tx !== "\u2013" && tx !== "\u2014")
@@ -16808,6 +16860,7 @@
     }
     {
         NL.espRowNoRet = true;
+        NL.espSaved = true;
         NL.feature({
             id: "fl-esp-tab",
             set: "Fleet",
@@ -16823,14 +16876,15 @@
                     + "border-left:2.4px solid rgb(100,223,245)!important;margin:8px 0 6px!important;display:flex!important;align-items:center;gap:8px;cursor:pointer;user-select:none";
                 NL.css("fl-esp-tab", `
       ${T}{gap:4px!important}
-      ${T} > .spy-active > h4.tab-section-title,${T} > h4,${T} > .nl2-fsl .nl2-fsl-h{${HEAD}}
+      ${T} > .spy-active > h4.tab-section-title,${T} > h4,${T} > .nl2-esp-sv > h4,${T} > .nl2-fsl .nl2-fsl-h{${HEAD}}
       ${T} > .nl2-fsl{margin:0 0 4px!important}${T} > .nl2-fsl .nl2-fsl-head{margin:0 0 4px!important}${T} > .nl2-fsl .nl2-fsl-h .nl2-car{display:none}
       ${T} [data-nl2-esp-h]::before{content:'▾';display:inline-block;width:12px;font-size:14px;color:var(--text-muted,#c0cce0)}
       ${T} [data-nl2-esp-h="closed"]::before{content:'▸'}
-      ${T} > h4[data-nl2-esp-n]::after{content:'(' attr(data-nl2-esp-n) ')';margin-left:-3px;order:1}
+      ${T} > .nl2-esp-sv > h4[data-nl2-esp-n]::after,${T} > h4[data-nl2-esp-n]::after{content:'(' attr(data-nl2-esp-n) ')';margin-left:-3px;order:1}
       ${T} > h4 > .nl2-esp-win{order:2;margin-left:12px;display:inline-flex;align-items:center;gap:6px;font:500 14px Rajdhani,"Exo 2",sans-serif;letter-spacing:0;color:var(--text-muted,#c0cce0);cursor:default}
       ${T} > h4 > .nl2-esp-win select{background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.25);border-radius:6px;color:var(--text-primary,#f1f6ff);padding:2px 6px;font:500 14px Rajdhani,"Exo 2",sans-serif}
       ${T} .reports-list > .report-card[data-nl2-esp-old]{display:none!important}
+      ${T} > .nl2-esp-sv{margin:0}${T} > .nl2-esp-sv[data-nl2-esp-closed] > table{display:none!important}
       ${T} > .spy-active[data-nl2-esp-closed] > .reports-list,${T}[data-nl2-esp-rclosed] > h4 + .reports-list{display:none!important}
       ${T} .reports-list[data-nl2-esp-tbl] > .report-card:not([data-nl2-esp-open]){display:none!important}
       ${T} .nl2-esp{border-collapse:collapse;table-layout:fixed;width:100%;background:rgba(12,24,44,.96);border-radius:8px;overflow:hidden;font-family:Rajdhani,"Exo 2",sans-serif}
@@ -16930,7 +16984,8 @@
                     if (!(NL.routerPush && NL.routerPush(path)))
                         location.href = path;
                 }
-                function heads(tab) {
+                const isSaved = (c) => { const b = c.querySelector(".report-save-btn"); return !!(b && b.classList.contains("saved")); };
+                function heads(tab, sv) {
                     const sh = shut();
                     const sa = tab.querySelector(":scope > .spy-active"), sah = sa && sa.querySelector(":scope > h4");
                     const rh = [...tab.children].find((x) => x.tagName === "H4");
@@ -16959,9 +17014,10 @@
                     else
                         tab.removeAttribute("data-nl2-esp-rclosed");
                     const list = rh && rh.nextElementSibling;
-                    const cards = list ? list.querySelectorAll(":scope > .report-card") : [], n = cards.length;
-                    const shown = [...cards].filter((c) => !c.hasAttribute("data-nl2-esp-old")).length;
-                    const cnt = shown === n ? String(n) : shown + " of " + n;
+                    const cards = list ? list.querySelectorAll(":scope > .report-card") : [];
+                    const mine = sv ? [...cards].filter((c) => !isSaved(c)) : [...cards];
+                    const shown = mine.filter((c) => !c.hasAttribute("data-nl2-esp-old")).length;
+                    const cnt = shown === mine.length ? String(mine.length) : shown + " of " + mine.length;
                     if (rh && rh.getAttribute("data-nl2-esp-n") !== cnt)
                         rh.setAttribute("data-nl2-esp-n", cnt);
                     const qh = tab.querySelector(":scope > .nl2-fsl .nl2-fsl-h");
@@ -17057,12 +17113,47 @@
                     const rows = info.map(({ c, m, loc, who, ex }) => NL.h("tr", null, playerCell(who, ownerLinkOf(who, facts)), cell(loc), cell(txt(c, ".rep-type-label")), NL.h("td", null, chip(c.querySelector(".rep-outcome"))), cell(localTime(timeTxt(c.querySelector(".rep-time")), m), m && m.arrivesAt ? "Arrives " + clock(m.arrivesAt) : null), NL.h("td", { class: "nl2-esp-actc" }, rowRecall(m, ex))));
                     table(list, "nl2-esp-m", [["Player", "150px"], ["Target", "170px"], ["Mission", "130px"], ["Status", "110px"], ["Time", "auto"], ["", "140px"]], rows);
                 }
-                function reportsTable(list, facts, win) {
-                    const sig = JSON.stringify([win, win ? Math.floor(Date.now() / 60000) : 0, facts.map((f) => [f.c.className, txt(f.c, ".rep-main"), (f.c.querySelector(".report-save-btn") || {}).className])]);
+                const REP_COLS = [["Player", "150px"], ["Target", "170px"], ["Alliance", "80px"], ["Type", "130px"], ["Result", "160px"], ["Intel", "auto"], ["Received", "100px"], ["", "140px"]];
+                const repSig = (win, facts) => JSON.stringify([win, win ? Math.floor(Date.now() / 60000) : 0, facts.map((f) => [f.c.className, txt(f.c, ".rep-main"), (f.c.querySelector(".report-save-btn") || {}).className])]);
+                function reportsTable(list, facts, win, sv) {
+                    const sig = repSig(win, facts) + (sv ? "s" : "");
                     if (list.dataset.nl2EspSig === sig && list.querySelector(":scope > table.nl2-esp-r"))
                         return;
                     list.dataset.nl2EspSig = sig;
-                    const rows = facts.filter((f) => !f.c.hasAttribute("data-nl2-esp-old")).map(({ c, at, prec, loc, who }) => {
+                    table(list, "nl2-esp-r", REP_COLS, repRows(facts.filter((f) => !f.c.hasAttribute("data-nl2-esp-old") && !(sv && isSaved(f.c)))));
+                }
+                function savedSection(tab, rh, facts) {
+                    let box = tab.querySelector(":scope > .nl2-esp-sv");
+                    const saved = facts.filter((f) => isSaved(f.c));
+                    if (!saved.length) {
+                        if (box)
+                            box.remove();
+                        return;
+                    }
+                    if (!box) {
+                        const h = NL.h("h4", { class: "tab-section-title" }, "Saved Spy Reports");
+                        h.addEventListener("click", () => toggle("saved"));
+                        box = NL.h("div", { class: "nl2-esp-sv" }, h);
+                    }
+                    if (box.nextElementSibling !== rh)
+                        tab.insertBefore(box, rh);
+                    const h = box.querySelector(":scope > h4"), closed = !!shut().saved, want = closed ? "closed" : "open";
+                    if (h.getAttribute("data-nl2-esp-h") !== want)
+                        h.setAttribute("data-nl2-esp-h", want);
+                    if (h.getAttribute("data-nl2-esp-n") !== String(saved.length))
+                        h.setAttribute("data-nl2-esp-n", String(saved.length));
+                    if (closed)
+                        box.setAttribute("data-nl2-esp-closed", "");
+                    else
+                        box.removeAttribute("data-nl2-esp-closed");
+                    const sig = repSig(0, saved);
+                    if (box.dataset.nl2EspSig === sig && box.querySelector(":scope > table.nl2-esp-r"))
+                        return;
+                    box.dataset.nl2EspSig = sig;
+                    table(box, "nl2-esp-r", REP_COLS, repRows(saved));
+                }
+                function repRows(facts) {
+                    return facts.map(({ c, at, prec, loc, who }) => {
                         const tag = txt(c, ".spy-target-owner-alliance").replace(/^\[|\]$/g, "");
                         const ownerLink = c.querySelector("a.spy-target-owner-link");
                         const save = c.querySelector(".report-save-btn"), del = c.querySelector(".report-delete-btn"), saved = !!(save && save.classList.contains("saved"));
@@ -17072,7 +17163,6 @@
                                 c.setAttribute("data-nl2-esp-open", ""); del.click(); NL._kick(); } }, "Delete") : null);
                         return NL.h("tr", { class: "nl2-esp-go" + (c.classList.contains("read") ? "" : " nl2-esp-unread"), onclick: () => c.click() }, playerCell(who, ownerLink), cell(loc), NL.h("td", null, tag ? NL.h("a", { class: "nl2-esp-lnk", "data-nl2-tip": "Open the [" + tag + "] alliance page", onclick: (e) => { e.preventDefault(); e.stopPropagation(); openAlliance(tag); } }, "[" + tag + "]") : "\u2014"), cell(txt(c, ".rep-type-label")), NL.h("td", null, chip(c.querySelector(".rep-outcome"))), NL.h("td", { "data-nl2-tip": prec || null }, intel(prec)), cell(txt(c, ".rep-time"), at ? clock(at) : null), NL.h("td", { class: "nl2-esp-actc" }, act));
                     });
-                    table(list, "nl2-esp-r", [["Player", "150px"], ["Target", "170px"], ["Alliance", "80px"], ["Type", "130px"], ["Result", "160px"], ["Intel", "auto"], ["Received", "100px"], ["", "140px"]], rows);
                 }
                 const WINS = [[0, "All"], [1, "1h"], [2, "2h"], [4, "4h"], [8, "8h"], [24, "24h"], [168, "Week"]];
                 const winGet = () => { const v = Number(S.get("rwin", 0)); return WINS.some(([h]) => h === v) ? v : 0; };
@@ -17113,7 +17203,8 @@
                     if (rh)
                         winPicker(rh);
                     applyWin(facts, win);
-                    heads(tab);
+                    const sv = on && NL.espSaved && !!rh;
+                    heads(tab, sv);
                     for (const l of [sa, rl]) {
                         if (!l)
                             continue;
@@ -17137,9 +17228,16 @@
                     }
                     if (rl) {
                         if (on)
-                            reportsTable(rl, facts, win);
+                            reportsTable(rl, facts, win, sv);
                         else
                             drop(rl, "nl2-esp-r");
+                    }
+                    if (sv && rl)
+                        savedSection(tab, rh, facts);
+                    else {
+                        const b = tab.querySelector(":scope > .nl2-esp-sv");
+                        if (b)
+                            b.remove();
                     }
                 });
             },
@@ -18021,6 +18119,249 @@
                         bar.replaceWith(nb);
                     else
                         d.appendChild(nb);
+                });
+            },
+        });
+    }
+    {
+        NL.flSpyTable = true;
+        NL.feature({
+            id: "fl-spy-table",
+            set: "Fleet",
+            name: "Spy report Table View",
+            desc: "FL-308: an opened spy report (Fleet > Espionage) shows its sections as tables, with a Delta against the prior report on the same planet.",
+            init(ctx) {
+                if (!NL.flSpyTable)
+                    return;
+                const D = ".fleet-tab-content .spy-report-detail";
+                NL.css("fl-spy-table", `
+      ${D}[data-nl2-spt] > .spy-intel-data{display:none!important}
+      ${D} .nl2-spt-tv{display:flex;align-items:center;gap:6px;font:600 14px Rajdhani,"Exo 2",sans-serif;color:var(--text-muted,#c0cce0);cursor:pointer;user-select:none;white-space:nowrap}
+      ${D} .nl2-spt-tv input{margin:0;accent-color:#38bdf8;cursor:pointer}
+      ${D} > .nl2-spt-bar{position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:10px;z-index:2}
+      ${D} > .nl2-spt{display:flex;flex-direction:column;gap:18px;margin-top:4px}
+      ${D} .nl2-spt-sec{display:flex;flex-direction:column;gap:6px}
+      ${D} .nl2-spt-sec > h5{margin:0;font:700 17px Rajdhani,"Exo 2",sans-serif;color:var(--text-primary,#e2e8f0);border-left:2.4px solid #38bdf8;padding-left:8px;display:flex;align-items:baseline;gap:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      ${D} .nl2-spt-sec > h5 small{font:500 13px Rajdhani,"Exo 2",sans-serif;color:#94a3b8;overflow:hidden;text-overflow:ellipsis}
+      ${D} .nl2-spt-delta{border:1px solid #19526b;border-radius:6px;padding:10px 12px;background:rgba(56,189,248,.04)}
+      ${D} table.nl2-spt-t{font:500 14px Rajdhani,"Exo 2",sans-serif;font-variant-numeric:tabular-nums;--nl2-rowh:30px}
+      ${D} table.nl2-spt-t th{height:24px;text-align:left;font-size:12px;font-weight:600;color:#94a3b8;padding:0 10px;border-bottom:1px solid #19526b}
+      ${D} table.nl2-spt-t td{text-align:left;padding:0 10px;border-bottom:1px solid rgba(255,255,255,.06);color:var(--text-primary,#e2e8f0)}
+      ${D} table.nl2-spt-t tbody tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+      ${D} table.nl2-spt-t td img{width:20px;height:20px;vertical-align:middle;margin-right:6px}
+      ${D} table.nl2-spt-t td.nl2-spt-grp{color:#7dd3fc;font-weight:600}
+      ${D} table.nl2-spt-t td.nl2-spt-up{color:#4ade80;font-weight:600}
+      ${D} table.nl2-spt-t td.nl2-spt-dn{color:#f87171;font-weight:600}
+      ${D} table.nl2-spt-t td.nl2-spt-none{color:#94a3b8;font-style:italic}
+      ${D} .nl2-spt-l2{color:#fbbf24} ${D} .nl2-spt-l3{color:#4ade80}`);
+                const RES = { ore: "Ore", silicates: "Silicates", hydrogen: "Hydrogen", alloys: "Alloys", cryoIce: "Cryo-Ice", plasmaCore: "Plasma Core", bioExtract: "Bio-Extract", quantumDust: "Quantum Dust", darkMatter: "Dark Matter", antimatter: "Antimatter" };
+                const RESEARCH = { adaptive_shields: "Adaptive Shields", advanced_shielding: "Advanced Shielding", assault_tactics: "Assault Tactics", basic_armor: "Basic Armor Plating", battleship_design: "Battleship Design", bomber_wing: "Bomber Wing Doctrine", carrier_operations: "Carrier Operations", composite_armor: "Composite Armor", cruiser_design: "Cruiser Design", dreadnought_design: "Dreadnought Design", fighter_doctrine: "Fighter Doctrine", fleet_auxiliary: "Fleet Auxiliary Systems", fleet_tactics: "Fleet Tactics", fortress_protocols: "Fortress Protocols", heavy_armor: "Heavy Armor", ion_cannons: "Ion Cannons", kinetic_weapons: "Kinetic Weapons", laser_weapons: "Laser Weapons", mine_warfare: "Mine Warfare", missile_systems: "Missile Systems", phase_shields: "Phase Shields", plasma_weapons: "Plasma Weapons", point_defense: "Point Defense Systems", shield_harmonics: "Shield Harmonics", shield_theory: "Shield Theory", torpedo_systems: "Torpedo Systems", weapons_overcharge: "Weapons Overcharge", stealth_technology: "Stealth Technology", titan_design: "Titan Design", ship_mastery: "Ship Mastery" };
+                const titled = (k) => String(k).split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+                const LEVEL = { 1: "(1) Broad fleet estimate", 2: "(2) Ship types and count ranges", 3: "(3) Exact intelligence" };
+                const fk = (e) => Object.keys(e).find((k) => k.startsWith("__reactFiber$"));
+                function propsOf(el) {
+                    const k = el && fk(el);
+                    if (!k)
+                        return null;
+                    for (let f = el[k], i = 0; f && i < 6; f = f.return, i++) {
+                        const p = f.memoizedProps;
+                        if (p && Array.isArray(p.reports))
+                            return p;
+                    }
+                    return null;
+                }
+                const tOf = (r) => Date.parse(r.createdAt || (r.intel && r.intel.capturedAt) || 0) || 0;
+                function levelOf(r) {
+                    const s = r && r.intel && r.intel.fleet && r.intel.fleet.ships;
+                    if (!Array.isArray(s))
+                        return 1;
+                    if (s.some((x) => x.quantity != null))
+                        return 3;
+                    if (s.some((x) => x.quantityRange))
+                        return 2;
+                    return r.intel.tier >= 4 ? 3 : r.intel.tier === 3 ? 2 : 1;
+                }
+                const up = (v) => v == null ? 0 : typeof v === "number" ? v : Number(v.max != null ? v.max : v.min) || 0;
+                const show = (v) => v == null ? "\u2014" : typeof v === "number" ? NL.fmt(v) : v.min === v.max ? NL.fmt(v.max) : NL.fmt(v.min) + "\u2013" + NL.fmt(v.max);
+                function sections(r) {
+                    const i = (r && r.intel) || {}, out = {}, ships = i.fleet && Array.isArray(i.fleet.ships) ? i.fleet.ships : null;
+                    if (ships) {
+                        out.ships = ships.map((s) => ({ k: s.key, label: s.name || titled(s.key), v: s.quantity != null ? s.quantity : s.quantityRange }));
+                        out.damaged = ships.map((s) => ({ k: s.key, label: s.name || titled(s.key), v: s.damagedQuantity != null ? s.damagedQuantity : s.damagedRange }));
+                    }
+                    if (i.resources && typeof i.resources === "object")
+                        out.resources = Object.keys(i.resources).map((k) => ({ k, label: RES[k] || titled(k), v: i.resources[k] }));
+                    const lv = (x) => x.level != null ? x.level : x.levelRange;
+                    if (Array.isArray(i.buildings))
+                        out.buildings = i.buildings.map((b) => ({ k: b.key, label: b.name || titled(b.key), v: lv(b) }));
+                    if (Array.isArray(i.defenses))
+                        out.defenses = i.defenses.map((b) => ({ k: b.key, label: b.name || titled(b.key), v: lv(b) }));
+                    if (i.combatResearch && Array.isArray(i.combatResearch.levels))
+                        out.research = i.combatResearch.levels.map((x) => ({ k: x.key, label: RESEARCH[x.key] || titled(x.key), v: x.level }));
+                    return out;
+                }
+                const SECS = [["ships", "Ships"], ["damaged", "Damaged Ships"], ["resources", "Resources"], ["buildings", "Buildings"], ["defenses", "Defenses"], ["research", "Combat research"]];
+                function priorOf(P, cur) {
+                    const t = tOf(cur), pid = cur.targetPlanetId == null ? null : cur.targetPlanetId, mid = cur.targetMoonId == null ? null : cur.targetMoonId;
+                    if (pid == null && mid == null)
+                        return null;
+                    let best = null;
+                    for (const r of P.reports || []) {
+                        if (r === cur || r.id === cur.id)
+                            continue;
+                        if ((r.targetPlanetId == null ? null : r.targetPlanetId) !== pid || (r.targetMoonId == null ? null : r.targetMoonId) !== mid)
+                            continue;
+                        const rt = tOf(r);
+                        if (!(rt < t) || levelOf(r) < 2)
+                            continue;
+                        if (!best || rt > tOf(best))
+                            best = r;
+                    }
+                    return best;
+                }
+                function deltaRows(cur, prev) {
+                    const a = sections(prev), b = sections(cur), rows = [];
+                    for (const [key, name] of SECS) {
+                        if (!a[key] || !b[key])
+                            continue;
+                        const pm = new Map(a[key].map((x) => [x.k, x])), seen = new Set(), list = [];
+                        for (const x of b[key]) {
+                            seen.add(x.k);
+                            const p = pm.get(x.k);
+                            list.push({ label: x.label, was: up(p && p.v), now: up(x.v) });
+                        }
+                        for (const p of a[key])
+                            if (!seen.has(p.k))
+                                list.push({ label: p.label, was: up(p.v), now: 0 });
+                        list.filter((x) => x.was !== x.now).forEach((x, n) => rows.push({ sec: n ? "" : name, ...x }));
+                    }
+                    return rows;
+                }
+                const table = (cols, widths, rows) => {
+                    const t = NL.h("table", { class: "nl2-tbl nl2-spt-t" }, NL.h("thead", {}, NL.h("tr", {}, cols.map((c) => NL.h("th", {}, c)))), NL.h("tbody", {}, rows));
+                    return NL.tableCols(t, widths);
+                };
+                const td = (v, cls, tip) => NL.h("td", { class: cls || null, title: tip || (typeof v === "string" ? v : null) }, v);
+                const sec = (title, sub, body, cls) => NL.h("div", { class: "nl2-spt-sec" + (cls ? " " + cls : "") }, NL.h("h5", {}, title, sub || null), body);
+                const iconFor = (gameEl, label) => {
+                    const im = gameEl && [...gameEl.querySelectorAll("img")].find((x) => x.alt === label || x.title === label);
+                    return im ? im.cloneNode(false) : null;
+                };
+                const nameCell = (gameEl, label) => { const c = NL.h("td", { title: label }); const im = iconFor(gameEl, label); if (im) {
+                    im.removeAttribute("style");
+                    im.removeAttribute("title");
+                    c.append(im);
+                } c.append(label); return c; };
+                const lvlSpan = (n) => NL.h("span", { class: n >= 3 ? "nl2-spt-l3" : "nl2-spt-l2" }, LEVEL[n]);
+                function build(det, cur, prev) {
+                    const game = det.querySelector(":scope > .spy-intel-data"), s = sections(cur), out = NL.h("div", { class: "nl2-spt" }), lv = levelOf(cur);
+                    if (lv >= 2 && prev) {
+                        const rows = deltaRows(cur, prev), pt = tOf(prev), ago = NL.fmtDur((tOf(cur) - pt) / 1000);
+                        const body = rows.length ? rows.map((x) => {
+                            const d = x.now - x.was;
+                            return NL.h("tr", {}, td(x.sec, "nl2-spt-grp"), td(x.label), td(NL.fmt(x.was)), td(NL.fmt(x.now)), td((d > 0 ? "+" : "\u2212") + NL.fmt(Math.abs(d)), d > 0 ? "nl2-spt-up" : "nl2-spt-dn"));
+                        })
+                            : [NL.h("tr", {}, NL.h("td", { colspan: 5, class: "nl2-spt-none" }, "No changes"))];
+                        out.append(sec("Delta", NL.h("small", {}, "vs report of " + new Date(pt).toLocaleString() + " (" + ago + " earlier) \u00B7 ", lvlSpan(levelOf(prev))), table(["Section", "Item", "Prior", "Now", "Change"], ["180px", null, "160px", "160px", "140px"], body), "nl2-spt-delta"));
+                    }
+                    const f = cur.intel && cur.intel.fleet;
+                    if (f) {
+                        const totEl = game && game.querySelector(".spy-intel-total"), tot = totEl ? totEl.textContent.replace(/^[^:]*:\s*/, "").trim() : show(f.total);
+                        const rows = [NL.h("tr", {}, td("Operational fleet"), td(tot || "\u2014"))];
+                        for (const z of f.sizes || [])
+                            rows.push(NL.h("tr", {}, td("Hull size: " + titled(z.size)), td(show(z.range && z.range.min === z.range.max ? z.range.max : z.range))));
+                        out.append(sec("Fleet", null, table(["Item", "Value"], [null, "220px"], rows)));
+                    }
+                    const listTable = (key, title, col, valCol, filter) => {
+                        let items = s[key];
+                        if (!items)
+                            return;
+                        if (filter)
+                            items = items.filter(filter);
+                        if (!items.length && filter)
+                            return;
+                        const rows = items.length ? items.map((x) => NL.h("tr", {}, nameCell(game, x.label), td(show(x.v))))
+                            : [NL.h("tr", {}, NL.h("td", { colspan: 2, class: "nl2-spt-none" }, "None detected"))];
+                        out.append(sec(title, null, table([col, valCol], [null, "220px"], rows)));
+                    };
+                    listTable("ships", "Ships", "Ship", "Operational");
+                    listTable("damaged", "Damaged Ships", "Ship", "Damaged", (x) => up(x.v) > 0);
+                    listTable("resources", "Resources", "Resource", "Amount");
+                    listTable("buildings", "Buildings", "Building", "Level");
+                    listTable("defenses", "Defenses", "Defense", "Level");
+                    listTable("research", "Combat research", "Research", "Level");
+                    const bonus = game ? [...game.querySelectorAll(".spy-research-bonus-list li")].map((li) => li.textContent.replace(/\s+/g, " ").trim()).filter(Boolean) : [];
+                    if (s.research && bonus.length)
+                        out.append(sec("Technology bonuses", null, table(["Bonus"], [null], bonus.map((b) => NL.h("tr", {}, td(b))))));
+                    return out;
+                }
+                const isOn = () => ctx.store.get("on", true) !== false;
+                function placeBox(det) {
+                    let lab = det.querySelector(".nl2-spt-tv");
+                    if (!lab) {
+                        const cb = NL.h("input", { type: "checkbox" });
+                        cb.addEventListener("change", () => { ctx.store.set("on", cb.checked); NL._kick(); });
+                        lab = NL.h("label", { class: "nl2-spt-tv", title: "Show this report as tables, with a Delta against the prior report on the same planet" }, cb, "Table View");
+                    }
+                    lab.querySelector("input").checked = isOn();
+                    const nav = det.querySelector(":scope > .nl2-esn"), own = det.querySelector(":scope > .nl2-spt-bar");
+                    if (nav) {
+                        if (nav.firstElementChild !== lab)
+                            nav.prepend(lab);
+                        if (own)
+                            own.remove();
+                    }
+                    else {
+                        const bar = own || NL.h("div", { class: "nl2-spt-bar" });
+                        if (lab.parentNode !== bar)
+                            bar.append(lab);
+                        if (!own)
+                            det.appendChild(bar);
+                    }
+                }
+                function clear(det) {
+                    det.removeAttribute("data-nl2-spt");
+                    const t = det.querySelector(":scope > .nl2-spt");
+                    if (t)
+                        t.remove();
+                }
+                NL.watch(".fleet-tab-content .espionage-tab", (tab) => {
+                    if (tab.hasAttribute("data-nl2-spt"))
+                        tab.removeAttribute("data-nl2-spt");
+                    for (const x of tab.querySelectorAll(":scope > .nl2-spt, :scope > .nl2-spt-bar"))
+                        x.remove();
+                });
+                NL.watch(D, (det) => {
+                    const u = history.state && history.state.usr;
+                    const P = propsOf(det), id = u && u.fleetEspionageDetail === "spy" ? u.fleetEspionageReportId : null;
+                    const cur = P && id != null ? (P.reports || []).find((r) => String(r.id) === String(id)) : null;
+                    if (!cur || !det.querySelector(":scope > .spy-intel-data")) {
+                        clear(det);
+                        const l = det.querySelector(".nl2-spt-tv");
+                        if (l)
+                            l.remove();
+                        const b = det.querySelector(":scope > .nl2-spt-bar");
+                        if (b)
+                            b.remove();
+                        return;
+                    }
+                    placeBox(det);
+                    if (!isOn()) {
+                        clear(det);
+                        return;
+                    }
+                    const prev = levelOf(cur) >= 2 ? priorOf(P, cur) : null, game = det.querySelector(":scope > .spy-intel-data");
+                    const sig = [cur.id, prev ? prev.id : 0, (P.reports || []).length, game.childElementCount, game.querySelectorAll(".spy-research-bonus-list li").length].join("|");
+                    let t = det.querySelector(":scope > .nl2-spt");
+                    if (!det.hasAttribute("data-nl2-spt"))
+                        det.setAttribute("data-nl2-spt", "");
+                    if (t && t.dataset.sig === sig && t.previousElementSibling === game)
+                        return;
+                    const nt = build(det, cur, prev);
+                    nt.dataset.sig = sig;
+                    if (t)
+                        t.remove();
+                    game.after(nt);
                 });
             },
         });
