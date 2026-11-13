@@ -1,5 +1,24 @@
 # Release notes
 
+## v0.5.119 · Nov 13, 2026
+
+**⚔️ PVP**
+- New PVP page in the left menu, right below Fleet: just the Player Targets table, no tabs (GL-283)
+- Expanding a planet reads only that one system and lists its enemy moons under it (FL-315)
+- Last read time and a Refresh button; old rows stay on screen while new results come in (FL-316)
+- Spy report column shows the age of the newest report; a click opens that report on the Espionage tab (FL-317)
+- The table no longer redraws while a dropdown or shield box is in use (FL-318)
+- Alliances listed in the game's rank order (FL-319)
+- Spy opens the fleet dialog; Attack goes to the planet in Galaxy and opens Send Fleet (FL-320)
+
+**🛰 Fleet**
+- Combat Simulator fills from level 2 spy reports and your own planet's ships (FL-310 to FL-313)
+- Relocation Trip time now matches the Phase time (FL-314)
+- Stations table columns no longer squash after Collect on a Routes row (FL-309)
+
+**🚀 Shipyard**
+- Gather Fleets: Exclude checkbox right of each planet name; an excluded row is greyed out, locked, and its Transfer can't be clicked; remembered between sessions (SH-035)
+
 ## v0.5.118 · Nov 12, 2026
 
 **🛰 Fleet**
