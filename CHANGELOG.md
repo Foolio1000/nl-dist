@@ -1,5 +1,30 @@
 # Release notes
 
+## v0.5.121 · Nov 14, 2026
+
+**⚔️ PVP**
+- Our own Attack and Spy dialogs on the PVP page: nearest planet as the source, Attack or Raid with the game's options, fuel, travel and arrival in UTC (FL-330 to FL-343)
+- The game's Send fleet shows a ticking UTC clock next to Arrives (FL-331)
+- Military cell shows the player's 7-day change (FL-345)
+
+**🛰 Fleet**
+- Active fleets: Raid rows highlighted red with Trip time (FL-323), solid Type pills (FL-324), Collect Debris counted as Transport (FL-327)
+- Spy reports: Fleets, Buildings, Combat Research and Technology Bonuses start collapsed (FL-326); Delta estimates in italic amber with an Estimate or Exact label (FL-325)
+- Reports Table View: the other player's name (FL-328); times in UTC and your local time (FL-344)
+- Expeditions: Launch Expedition shows right after a refresh (FL-329)
+
+**🏛 Command Center**
+- Resources tab: Market Hubs section (EM-031), subtotals, total and storage colors (EM-032), full numbers with commas, right-aligned (EM-033)
+
+**🛡 Defense2**
+- Salvage button in light orange, buttons ordered Defend, Scan, Salvage (GL-287)
+- Headers and data aligned, with light grey column lines (GL-288)
+- Salvage dialog fixes (GL-289)
+
+**🧩 Other**
+- Times follow each player's own time zone instead of Pacific (GL-286)
+- 7-day ranking change tracked from a daily rankings snapshot (GL-290)
+
 ## v0.5.120 · Nov 14, 2026
 
 **🛰 Fleet**
