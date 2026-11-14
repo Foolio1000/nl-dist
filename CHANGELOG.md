@@ -1,5 +1,29 @@
 # Release notes
 
+## v0.5.120 · Nov 14, 2026
+
+**🛰 Fleet**
+- Active fleets: new Type column (FL-321) and a filter for each section (FL-322)
+
+**🌙 Moons**
+- Jump Gate: Select All button picks every fleet (MO-043)
+- Demolish buttons on moons work again (MO-044)
+
+**🚀 Shipyard**
+- Fleet on Planet: Planetary and Orbital shipyards shown as pills in different colors (SH-036)
+
+**🏛 Command Center**
+- New Resources tab (EM-029)
+- Fleet matrix shows shipyard queue times (EM-030)
+
+**🏠 Overview**
+- Simulate button on incoming attack rows runs the attack against your defense (OV-019)
+
+**🧩 Other**
+- Build times of 25 hours or more show in days and hours, for example 13d 16h (GL-285)
+- Building repairs badge now sits on Overview (GL-284)
+- Leader crew table cleaned up, with a Guild picklist (GL-282)
+
 ## v0.5.119 · Nov 13, 2026
 
 **⚔️ PVP**
