@@ -1,5 +1,18 @@
 # Release notes
 
+## v0.5.124 · Nov 15, 2026
+
+**📊 Tables**
+- One table standard across our tables: same header and body sizes, sort on header click (ascending, descending, then the table's own order), remembered per table (GL-294)
+- Fleet tabs and Active fleets follow the standard (FL-374)
+- Buildings, moon Buildings and Shipyard grids get a header row, dividers and zebra rows (BU-038, MO-045, SH-037)
+- Research table follows the standard (RE-034)
+- Table View sits in each table's own control row
+
+**🧩 Other**
+- Behind the scenes: wormhole runs (FL-373) and the Stations section (FL-372) moved into their own files; no change in how they work
+- Style checks cover the table standard (GL-295)
+
 ## v0.5.123 · Nov 15, 2026
 
 **⚔️ PVP**
