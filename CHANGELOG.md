@@ -1,5 +1,23 @@
 # Release notes
 
+## v0.5.122 · Nov 15, 2026
+
+**⚔️ PVP**
+- Shield end times in local AM/PM, no weekday (FL-353 to FL-355, FL-364)
+- Player names open their rankings page (FL-365)
+- New column right of Scouts: total resources on the planet, short number (FL-366)
+- Shield and inactive icons match the galaxy card (FL-358 to FL-360)
+- Star saves or unsaves the planet's newest spy report (FL-361)
+- Salvage button opens our own Pre-position Salvage dialog; Send dispatches the game's debris collection (FL-362)
+- Notes box height kept per row (FL-352); Spy report link works while the PVP page is open (FL-356); more polish and sorting (FL-357, FL-363)
+
+**🛰 Fleet**
+- Spy report banner: intel level pill (FL-346) and a Save toggle (FL-347)
+- Delta compares only Ships, Resources and Defenses (FL-348)
+- Quick Spy and Saved Spy Reports hide while a report is open (FL-349)
+- Every report section folds; the long ones start collapsed (FL-350)
+- Returning Raid and Attack rows are no longer red (FL-351)
+
 ## v0.5.121 · Nov 14, 2026
 
 **⚔️ PVP**
