@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.122
+// @version      0.5.123
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.122", features: [] };
+    const NL = window.__nl2 = { version: "0.5.123", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -9369,9 +9369,9 @@
             id: "gl-crew-rows",
             set: "Global",
             name: "Crew rows with effects",
-            desc: "GL-282: on the Leader page crew Table View, one row per crew member (Name, Role, Grade, Assign) with each effect on its own line underneath; no icon, slot or nickname.",
+            desc: "GL-282/291: on the Leader page crew Table View, one row per crew member (Name, Role with assigned count, Grade, Assign) with each effect on its own line underneath; no icon, slot or nickname.",
             init() {
-                const COLS = "minmax(120px,2fr) minmax(110px,1.4fr) minmax(80px,.9fr) 130px";
+                const COLS = "minmax(120px,2fr) minmax(130px,1.4fr) minmax(80px,.9fr) 90px";
                 const S = ".leadership-crew-roster[data-nl2-crtv][data-nl2-crrows]";
                 const C = S + " .leadership-crew-card";
                 const K = C + " .leadership-crew-card-copy";
@@ -9384,7 +9384,9 @@
       ${K} > small{grid-column:2!important;grid-row:1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
       ${K} > span:first-child:not(.leadership-crew-action){grid-column:3!important;grid-row:1!important;white-space:nowrap!important;overflow:hidden!important}
       ${K} > .leadership-crew-action{grid-column:4!important;grid-row:1!important;justify-self:end;overflow:hidden!important}
-      ${K} > .leadership-crew-action .leadership-inline-action{width:120px;max-width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      ${K} > .leadership-crew-action .leadership-inline-action{width:84px;padding-left:4px!important;padding-right:4px!important;max-width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      ${K} > .leadership-crew-action .leadership-inline-action[data-nl2-crbtn]{font-size:0!important}
+      ${K} > .leadership-crew-action .leadership-inline-action[data-nl2-crbtn]::after{content:attr(data-nl2-crbtn);font-size:var(--nl2-crbtn-fs,13px)}
       ${K} > strong[data-nl2-crname]{font-size:0!important}
       ${K} > strong[data-nl2-crname]::after{content:attr(data-nl2-crname);font-size:15px}
       ${K} > small[data-nl2-crrole]{font-size:0!important}
@@ -9401,6 +9403,22 @@
       .leadership-crew-card > label.inventory-mark-quantity > select.nl2-crqty{display:none}
       ${C} > label.inventory-mark-quantity > select.nl2-crqty{display:inline-block!important;min-width:48px;cursor:pointer;background:#0b1620;color:#dbe6f5;border:1px solid #3a5266;border-radius:3px;padding:1px 4px;font:inherit}
     `);
+                let dataCnt = null;
+                NL.onData(/^\/api\/leadership(\?|$)/, (p, d) => {
+                    if (!d || !Array.isArray(d.modules))
+                        return;
+                    const c = {};
+                    for (const m of d.modules) {
+                        const md = m && m.metadata;
+                        if (!md || !md.crew || !/^crew_\d+$/.test(String(m.slot || "")))
+                            continue;
+                        const r = md.role ? String(md.role) : ROLE[key(md.origin)];
+                        if (r)
+                            c[r] = (c[r] || 0) + 1;
+                    }
+                    dataCnt = c;
+                    NL._kick();
+                });
                 const GR = { genius: "Genius (4)", savant: "Savant (3)", veteran: "Veteran (2)", specialist: "Specialist (1)" };
                 const put = (el, attr, v) => {
                     if ((el.getAttribute(attr) || null) === v)
@@ -9451,7 +9469,19 @@
                         sec.setAttribute("data-nl2-crrows", "");
                         NL._kick();
                     }
-                    for (const card of sec.querySelectorAll(".leadership-crew-card")) {
+                    const cards = [...sec.querySelectorAll(".leadership-crew-card")];
+                    const srch = sec.querySelector(".leadership-crew-controls input:not([type=checkbox])");
+                    let cnt = {};
+                    if (srch && srch.value.trim() && dataCnt)
+                        cnt = dataCnt;
+                    else
+                        for (const card of cards) {
+                            const first = card.querySelector(".leadership-crew-card-copy > span:first-child:not(.leadership-crew-action)");
+                            const sm = card.querySelector(".leadership-crew-card-copy > small"), r = sm && ROLE[key(sm.textContent)];
+                            if (r && first && /^\s*Assigned to slot\s+\d+/i.test(first.textContent || ""))
+                                cnt[r] = (cnt[r] || 0) + 1;
+                        }
+                    for (const card of cards) {
                         const copy = card.querySelector(".leadership-crew-card-copy");
                         if (!copy)
                             continue;
@@ -9463,7 +9493,14 @@
                         const sm = copy.querySelector(":scope > small");
                         if (sm) {
                             const r = ROLE[key(sm.textContent)];
-                            put(sm, "data-nl2-crrole", r || null);
+                            put(sm, "data-nl2-crrole", r ? r + " (" + (cnt[r] || 0) + ")" : null);
+                        }
+                        const btn = copy.querySelector(":scope > .leadership-crew-action .leadership-inline-action");
+                        if (btn) {
+                            const un = /^\s*unassign crew\s*$/i.test(btn.textContent || "");
+                            if (un && !btn.hasAttribute("data-nl2-crbtn") && !btn.style.getPropertyValue("--nl2-crbtn-fs"))
+                                btn.style.setProperty("--nl2-crbtn-fs", getComputedStyle(btn).fontSize);
+                            put(btn, "data-nl2-crbtn", un ? "Unassign" : null);
                         }
                         const first = copy.firstElementChild;
                         if (first && first.tagName === "SPAN" && !first.classList.contains("leadership-crew-action")) {
@@ -9573,6 +9610,8 @@
     {
         NL.rank7dOn = true;
         NL.rank7dPvp = true;
+        NL.rank7dIdle = true;
+        NL.rankPlainTop = true;
         {
             const st = NL.store("gl-rank7d."), KEEP = 14, DAY = 86400000;
             const CAT = { overall: "overallScore", military: "militaryScore", economy: "economyScore", research: "researchScore" };
@@ -9609,6 +9648,30 @@
                     return null;
                 const pct = Math.round(((cur - base) / base) * 1000) / 10;
                 return { pct: pct === 0 ? 0 : pct, points: s.concat([cur]) };
+            };
+            NL.rank7dIdleOf = (userId, now) => {
+                if (!NL.rank7dOn || !NL.rank7dIdle || userId == null)
+                    return false;
+                const e = live.get(String(userId));
+                if (!e)
+                    return false;
+                let cur = scoreOf(e, "overall");
+                if (cur == null || e.overallScore == null) {
+                    const m = scoreOf(e, "military"), ec = scoreOf(e, "economy"), r = scoreOf(e, "research");
+                    if (m != null && ec != null && r != null)
+                        cur = m + ec + r;
+                }
+                if (cur == null)
+                    return false;
+                const t = utc(now || Date.now());
+                for (let i = 2; i <= 7; i++) {
+                    const d = dayOf(shift(t, -i));
+                    const r = d && d.u && d.u[String(userId)];
+                    if (!r || r[0] == null)
+                        continue;
+                    return r[0] === cur;
+                }
+                return false;
             };
             const COL = { up: "#4ade80", down: "#f87171", flat: "#94a3b8" };
             const colOf = (p) => (p > 0 ? COL.up : p < 0 ? COL.down : COL.flat);
@@ -9738,6 +9801,7 @@
                 const old = table.querySelectorAll(".nl2-r7");
                 if (!cat || !NL.rank7dOn || !hr) {
                     old.forEach((el) => el.remove());
+                    table.querySelectorAll("tr.nl2-r7-idle").forEach((tr) => tr.classList.remove("nl2-r7-idle"));
                     return;
                 }
                 if (!hr.querySelector("th.nl2-r7"))
@@ -9752,6 +9816,7 @@
                     }
                     if (td.innerHTML !== html)
                         td.innerHTML = html;
+                    tr.classList.toggle("nl2-r7-idle", !!e && NL.rank7dIdleOf(e.userId));
                 }
                 lastCat = cat;
             }
@@ -9773,6 +9838,12 @@
         td.nl2-r7 .nl2-r7-pc{display:inline-block;min-width:52px;text-align:right;font-weight:700;vertical-align:middle}
         td.nl2-r7 .nl2-r7-sp{vertical-align:middle;margin-left:8px}
         .nl2-r7-none{color:#94a3b8}
+        table.rankings-table tr.rank-row.nl2-r7-idle:not(.rank-row-me){background:rgba(249,115,22,.22)!important}
+      `);
+                    if (NL.rankPlainTop)
+                        NL.css("gl-rank-plaintop", `
+        table.rankings-table tbody tr[class*="rank-row-top-"]:not(.rank-row-me){background:transparent;box-shadow:none}
+        table.rankings-table tbody tr[class*="rank-row-top-"]:not(.rank-row-me):hover{background:var(--bg-card-hover)}
       `);
                     NL.onData(/^\/api\/rankings\/players(\?|$)/, (p, d) => { if (d && Array.isArray(d.leaderboard)) {
                         NL.rank7dLive(d.leaderboard);
@@ -16535,6 +16606,7 @@
         NL.fl323 = true;
         NL.fl324 = true;
         NL.fl351 = true;
+        NL.fl367 = true;
         NL.flType = true;
         const FAT_TYPES = [["pvp", "PVP"], ["tra", "Transport"], ["pve", "PVE"], ["spy", "Espionage"], ["min", "Mining"], ["oth", "Other"]];
         const FAT_TYPE_LBL = Object.fromEntries(FAT_TYPES);
@@ -16660,9 +16732,20 @@
                 const RES_NAME = Object.assign({ artifact: "Artifact", artifacts: "Artifact" }, FLW_RES);
                 const RES_FULL = { ore: "Ore", silicates: "Silicates", hydrogen: "Hydrogen", alloys: "Alloys", cryo_ice: "Cryo-Ice", quantum_dust: "Quantum Dust", plasma_core: "Plasma Core", bio_extract: "Bio-Extract", dark_matter: "Dark Matter", antimatter: "Antimatter", artifact: "Artifact", artifacts: "Artifact" };
                 const resPairs = (o) => Object.entries(o || {}).filter(([k, v]) => RES_NAME[k] && n(v) > 0).map(([k, v]) => [k, n(v)]);
+                const fmtC = (v) => {
+                    if (!NL.fl367 || Math.abs(v) < 1000)
+                        return fmtN(v);
+                    let i = 0, x = v;
+                    const U = ["", "K", "M", "B", "T"];
+                    while (Math.abs(+x.toPrecision(3)) >= 1000 && i < 4) {
+                        x /= 1000;
+                        i++;
+                    }
+                    return +x.toPrecision(3) + U[i];
+                };
                 const resNodes = (l) => l.flatMap(([k, v]) => (FLW_RES[k]
-                    ? [NL.h("img", { class: "game-resource-icon nl2-fat-ri", src: "/images/resources/" + k + ".webp", alt: RES_FULL[k] || k }), NL.h("span", { class: "nl2-fat-ra" }, fmtN(v))]
-                    : [NL.h("span", { class: "nl2-fat-ra" }, RES_NAME[k] + " " + fmtN(v))]));
+                    ? [NL.h("img", { class: "game-resource-icon nl2-fat-ri", src: "/images/resources/" + k + ".webp", alt: RES_FULL[k] || k }), NL.h("span", { class: "nl2-fat-ra" }, fmtC(v))]
+                    : [NL.h("span", { class: "nl2-fat-ra" }, RES_NAME[k] + " " + fmtC(v))]));
                 const resTip = (l) => l.map(([k, v]) => (RES_FULL[k] || RES_NAME[k]) + " " + fmtN(v)).join("\n");
                 const cargo = (raw) => {
                     let o = raw;
@@ -25052,6 +25135,75 @@
             return out;
         };
         NL.ptgShieldEndWin = (endMins, now) => (endMins == null ? null : NL.ptgShieldWin((endMins - PTG_SHIELD_H * 60 + 1440) % 1440, now));
+        const PTG_FKEYS = ["player", "tag", "mil", "shield", "status", "spy", "dMin", "dMax", "sMin", "sMax", "rMin", "rMax"];
+        NL.ptgFiltOn = (f) => !!f && PTG_FKEYS.some((k) => f[k] != null && f[k] !== "");
+        NL.ptgNum = (s) => { const m = String(s == null ? "" : s).trim().replace(/,/g, "").match(/^(\d+(?:\.\d+)?)\s*([kmbt]?)$/i); if (!m)
+            return null; return +m[1] * ({ "": 1, k: 1000, m: 1000000, b: 1000000000, t: 1000000000000 })[m[2].toLowerCase()]; };
+        NL.ptgFilter = (rows, f, ctx) => {
+            if (!NL.ptgFiltOn(f))
+                return rows;
+            const c = ctx || {}, now = c.now || Date.now();
+            const rng = (v, lo, hi) => { const a = NL.ptgNum(lo), b = NL.ptgNum(hi); if (a == null && b == null)
+                return true; if (v == null)
+                return false; return (a == null || v >= a - 1e-9) && (b == null || v <= b + 1e-9); };
+            const ok = (r) => {
+                if (f.player && String(r.ownerId) !== String(f.player))
+                    return false;
+                if (f.tag && (f.tag === "-" ? !!r.tag : r.tag !== f.tag))
+                    return false;
+                if (f.mil) {
+                    if (f.mil === "none") {
+                        if (r.military != null)
+                            return false;
+                    }
+                    else if (r.military == null || r.military > +f.mil)
+                        return false;
+                }
+                if (f.shield) {
+                    const w = r.win, up = !!(w && w.start <= now && w.end > now);
+                    if (f.shield === "up" && !up)
+                        return false;
+                    if (f.shield === "down" && (!w || up))
+                        return false;
+                    if (f.shield === "soon" && !(up && w.end - now <= 3600000))
+                        return false;
+                    if (f.shield === "unset" && w)
+                        return false;
+                }
+                if (f.status) {
+                    const ia = !!(c.inact && c.inact(r)), vac = !!(r.vac || (c.vac && c.vac(r)));
+                    if (f.status === "sleep" && !r.sleep)
+                        return false;
+                    if (f.status === "vac" && !vac)
+                        return false;
+                    if (f.status === "inact" && (!ia || vac))
+                        return false;
+                    if (f.status === "active" && (r.sleep || vac || ia))
+                        return false;
+                }
+                if (f.spy) {
+                    const air = !!(c.air && c.air(r));
+                    if (f.spy === "has" && r.spyId == null)
+                        return false;
+                    if (f.spy === "air" && !air)
+                        return false;
+                    if (f.spy === "det" && !r.det)
+                        return false;
+                    if (f.spy === "none" && (r.spyId != null || air))
+                        return false;
+                }
+                return rng(r.dist, f.dMin, f.dMax) && rng(r.scouts, f.sMin, f.sMax) && rng(r.res, f.rMin, f.rMax);
+            };
+            const out = [];
+            let keep = false;
+            for (const r of rows) {
+                if (r.kind === "planet")
+                    keep = ok(r);
+                if (keep)
+                    out.push(r);
+            }
+            return out;
+        };
         NL.feature({
             id: "fl-targets",
             set: "Fleet",
@@ -25117,10 +25269,25 @@
       .nl2-ptg a{color:#7fd4ff;text-decoration:none;cursor:pointer}.nl2-ptg a:hover{text-decoration:underline}
       .nl2-ptg-empty{padding:14px 9px;color:#8aa}
       .nl2-ptg-gap{height:14px}
-      .nl2-ptg-g > div.nl2-ptg-soon{color:#4ade80;font-weight:700}
+      .nl2-ptg-g > div.nl2-ptg-soon,.nl2-ptg-g > div.nl2-ptg-rich{color:#4ade80;font-weight:700}
+.nl2-ptg-g.nl2-ptg-h > div.nl2-ptg-mute{color:#64748b}
+      .nl2-ptg-g > div.nl2-ptg-mute input.nl2-ptg-sh{color:#8a94a6;background:rgba(148,163,184,.06);border-color:rgba(148,163,184,.18)}
+      .nl2-ptg-g > div.nl2-ptg-mute input.nl2-ptg-sh:focus{color:#d9e6f7;border-color:rgba(120,200,255,.45)}
+      .nl2-ptg-hm{position:fixed;z-index:10050;display:flex;flex-direction:column;gap:2px;padding:6px;min-width:130px;background:rgb(11,21,37);border:1px solid rgba(120,200,255,.35);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:14px Rajdhani,"Exo 2",sans-serif}
+      .nl2-ptg-hmt{color:#8fb3d9;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:0 6px 2px}
+      .nl2-ptg-hm button{font:600 14px Rajdhani,"Exo 2",sans-serif;text-align:left;color:#d9e6f7;background:none;border:0;border-radius:4px;padding:4px 8px;cursor:pointer}
+      .nl2-ptg-hm button:hover{background:rgba(120,200,255,.14)}
       .nl2-ptg-ico{display:inline-flex;vertical-align:-2px;margin-left:6px;color:#7dd3fc}
       .nl2-ptg-ico-vac{color:#fbbf24}
       .nl2-ptg-inact{color:#94a3b8}
+      .nl2-ptg-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 6px;font-size:14px}
+      .nl2-ptg select.nl2-ptg-fs{height:26px;font-size:14px;max-width:170px}
+      .nl2-ptg .nl2-on{border-color:#7fd4ff}
+      .nl2-ptg-fm{display:inline-flex;align-items:center;gap:4px;color:#8aa}
+      .nl2-ptg-fl{color:#8fb3d9;font-weight:600}
+      .nl2-ptg input.nl2-ptg-fi{width:58px;height:26px;font:14px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7;background:rgb(11,21,37);border:1px solid rgba(120,200,255,.25);border-radius:4px;padding:2px 6px;box-sizing:border-box}
+      .nl2-ptg input.nl2-ptg-fi.nl2-ptg-bad{border-color:#ef4444}
+      .nl2-ptg-fc{color:#8aa;margin-left:4px}
       a.nl2-ptg-pl{color:inherit;text-decoration:none;cursor:pointer}a.nl2-ptg-pl:hover{color:#7dd3fc;text-decoration:underline}`);
                 const own = { get: () => st.get("enemies", { alliances: [], players: [], none: false }), set: (v) => st.set("enemies", v) };
                 const EN = () => (NL.enemies && typeof NL.enemies.get === "function" && typeof NL.enemies.set === "function" ? NL.enemies : own);
@@ -25134,6 +25301,41 @@
                 } };
                 const shields = () => st.get("shields", {});
                 const setOf = (k) => new Set(Object.keys(st.get(k, {}) || {}));
+                const hideMap = () => { const o = st.get("hide", {}) || {}, now = Date.now(); let gone = false; for (const [k, v] of Object.entries(o))
+                    if (v !== 1 && !(+v > now)) {
+                        delete o[k];
+                        gone = true;
+                    } if (gone)
+                    st.set("hide", o); return o; };
+                const hideSet = () => new Set(Object.keys(hideMap()));
+                const hideFor = (id, days) => { const o = hideMap(); o[id] = days ? Date.now() + days * 86400000 : 1; st.set("hide", o); paint(); };
+                let hideT = 0;
+                const hideTimer = () => {
+                    clearTimeout(hideT);
+                    hideT = 0;
+                    if (!on)
+                        return;
+                    const next = Object.values(hideMap()).filter((v) => v !== 1).map(Number).sort((a, b) => a - b)[0];
+                    if (next)
+                        hideT = setTimeout(() => { hideT = 0; paint(); }, Math.min(2 ** 31 - 1, Math.max(1000, next - Date.now() + 500)));
+                };
+                const leftTxt = (ms) => { const m = Math.max(1, Math.round(ms / 60000)), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60; return d ? d + "d " + h + "h" : h ? h + "h " + mm + "m" : mm + "m"; };
+                let hideMenu = null;
+                const closeHideMenu = () => { if (hideMenu) {
+                    hideMenu.remove();
+                    hideMenu = null;
+                } };
+                document.addEventListener("pointerdown", (e) => { if (hideMenu && !hideMenu.contains(e.target))
+                    closeHideMenu(); }, true);
+                function openHideMenu(btn, id) {
+                    closeHideMenu();
+                    const pick = (days) => { closeHideMenu(); hideFor(id, days); };
+                    hideMenu = NL.h("div", { class: "nl2-ptg-hm", role: "menu" }, NL.h("div", { class: "nl2-ptg-hmt" }, "Hide for"), ...[[1, "1 day"], [2, "2 days"], [3, "3 days"], [0, "Indefinitely"]].map(([d, t]) => NL.h("button", { type: "button", role: "menuitem", onclick: () => pick(d) }, t)));
+                    document.body.appendChild(hideMenu);
+                    const b = btn.getBoundingClientRect(), w = hideMenu.offsetWidth, h = hideMenu.offsetHeight;
+                    hideMenu.style.left = Math.max(4, Math.min(innerWidth - w - 4, b.right - w)) + "px";
+                    hideMenu.style.top = (b.bottom + h + 4 > innerHeight ? b.top - h - 4 : b.bottom + 4) + "px";
+                }
                 const flip = (k, id) => { const o = st.get(k, {}) || {}; if (o[id])
                     delete o[id];
                 else
@@ -25431,6 +25633,12 @@
                 const prefs = () => Object.assign({ from: null, range: 50, sort: "dist", dir: "asc" }, st.get("prefs", {}));
                 const setPref = (k, v) => { const p = prefs(); p[k] = v; st.set("prefs", p); };
                 const openSet = () => new Set((st.get("open", []) || []).map(String));
+                const filts = () => { let a = st.get("filters", null); if (!a || typeof a !== "object") {
+                    a = { pri: {}, list: { dMax: String(+prefs().range || 50) }, hid: {} };
+                    st.set("filters", a);
+                } return a; };
+                const filtOf = (sec) => Object.assign({}, filts()[sec] || {});
+                const setFilt = (sec, f) => { const a = filts(); a[sec] = f; st.set("filters", a); paint(); };
                 function decorate(rows, now) {
                     const shs = shields(), notes = st.get("notes", {}) || {}, keyOf = (r) => (r.kind === "moon" ? "m:" : "p:") + r.id;
                     for (const r of rows) {
@@ -25503,8 +25711,8 @@
                         }
                         D.hits = NL.ptgHitIndex(D.rep.list, skip, null);
                     }
-                    const S = setOf("star"), H = setOf("hide"), isEn = matcher(en);
-                    const inList = (c) => isEn(c) && (() => { const d = NL.ptgDist(at, c); return d != null && d <= +p.range + 1e-9; })();
+                    const S = setOf("star"), H = hideSet(), isEn = matcher(en);
+                    const inList = (c) => isEn(c) && NL.ptgDist(at, c) != null;
                     const all = Object.assign({}, opt, { range: 1000000000000, enemies: { none: true }, match: () => true });
                     const pick = (f) => (at ? NL.ptgRows(cols.filter(f), moonsBySys, all) : []);
                     const rows = NL.ptgEnemyCount(en) ? pick((c) => !S.has(String(c.id)) && !H.has(String(c.id)) && inList(c)) : [];
@@ -25554,7 +25762,7 @@
                     drawn = -1;
                     draw();
                 };
-                NL.ptgUnmount = () => { on = false; box.remove(); stopTick(); if (cdT) {
+                NL.ptgUnmount = () => { on = false; box.remove(); stopTick(); closeHideMenu(); clearTimeout(hideT); hideT = 0; if (cdT) {
                     clearInterval(cdT);
                     cdT = 0;
                 } };
@@ -25824,7 +26032,7 @@
                     inp.addEventListener("change", save);
                     inp.addEventListener("keydown", (e) => { if (e.key === "Enter")
                         inp.blur(); });
-                    return NL.h("div", { class: "nl2-ptg-in" }, inp);
+                    return NL.h("div", { class: "nl2-ptg-in" + (V2 ? " nl2-ptg-mute" : "") }, inp);
                 }
                 function noteCell(r) {
                     const key = (r.kind === "moon" ? "m:" : "p:") + r.id;
@@ -25960,8 +26168,16 @@
                     let xc;
                     if (r.kind === "planet") {
                         const x = NL.h("button", { type: "button", class: "nl2-ptg-ib nl2-ptg-x", "aria-label": sec === "hid" ? "Unhide" : "Hide" }, sec === "hid" ? "\u21BA" : "\u00D7");
-                        NL.tip(x, sec === "hid" ? "Unhide" : "Hide");
-                        x.addEventListener("click", () => flip("hide", String(r.id)));
+                        const hv = sec === "hid" ? hideMap()[String(r.id)] : null;
+                        NL.tip(x, sec === "hid" ? "Unhide \u00B7 " + (hv === 1 || hv == null ? "hidden indefinitely" : "back in " + leftTxt(hv - Date.now())) : "Hide");
+                        x.addEventListener("click", () => { if (sec === "hid") {
+                            const o = hideMap();
+                            delete o[String(r.id)];
+                            st.set("hide", o);
+                            paint();
+                        }
+                        else
+                            openHideMenu(x, String(r.id)); });
                         xc = NL.h("div", { class: "nl2-ptg-xc" }, x);
                     }
                     else
@@ -25969,17 +26185,69 @@
                     const cells = [name, addrCell(r), playerCell(r), mil, NL.h("div", null, r.tag ? "[" + r.tag + "]" : dash), NL.h("div", null, r.dist.toFixed(1) + " ly"), shieldCell(r)];
                     if (!NL.ptgIsUtc())
                         cells.push(endCell(w, now));
-                    cells.push(NL.h("div", null, r.scouts != null ? r.scouts.toLocaleString("en-US") : dash), NL.h("div", null, r.res != null ? NL.fmt(r.res, true) : dash), spyCellOf(r, now), hitCellOf(r), noteCell(r), xc);
+                    cells.push(NL.h("div", null, r.scouts != null ? r.scouts.toLocaleString("en-US") : dash), NL.h("div", { class: r.res != null && r.res >= 1000000 ? "nl2-ptg-rich" : null }, r.res != null ? NL.fmt(r.res, true) : dash), spyCellOf(r, now), hitCellOf(r), noteCell(r), xc);
                     return NL.h("div", { class: cls, style: NL.ptgIsUtc() ? "grid-template-columns:" + GRID.split(" ").filter((x, i, a) => i !== 7).join(" ") : null }, ...cells);
+                }
+                const fctx = (now) => ({ now, air: (r) => inAir(r, now), inact: (r) => { const ia = D.inact[String(r.ownerId)]; return !!(ia && Date.now() - ia.at < 12 * 3600000 && ia.i); }, vac: (r) => { const ia = D.inact[String(r.ownerId)]; return !!(ia && Date.now() - ia.at < 12 * 3600000 && ia.v); } });
+                const MIL_TOP = [10, 25, 50, 100, 250, 500];
+                function filterRow(sec, all, shown) {
+                    const f = filtOf(sec), set = (k, v) => { const g = filtOf(sec); if (v === "" || v == null)
+                        delete g[k];
+                    else
+                        g[k] = v; setFilt(sec, g); };
+                    const planets = all.filter((r) => r.kind === "planet");
+                    const dd = (k, label, opts) => {
+                        const sel = NL.h("select", { class: "nl2-ptg-fs" + (f[k] ? " nl2-on" : ""), "aria-label": label }, NL.h("option", { value: "" }, label + ": all"), ...opts.map(([v, t]) => NL.h("option", { value: v, selected: String(f[k] || "") === v }, t)));
+                        if (f[k] && !opts.some(([v]) => v === String(f[k])))
+                            sel.appendChild(NL.h("option", { value: String(f[k]), selected: true }, String(f[k])));
+                        sel.addEventListener("change", () => { sel.blur(); set(k, sel.value); });
+                        return sel;
+                    };
+                    const pl = new Map();
+                    for (const r of planets)
+                        if (r.ownerId != null && r.owner)
+                            pl.set(String(r.ownerId), r.owner);
+                    const tags = [...new Set(planets.map((r) => r.tag).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+                    const mm = (k1, k2, label, ph) => {
+                        const box1 = (k) => {
+                            const i = NL.h("input", { type: "text", class: "nl2-ptg-fi" + (f[k] ? " nl2-on" : ""), placeholder: k === k1 ? "min" : "max", value: f[k] || "", "aria-label": label + (k === k1 ? " min" : " max") });
+                            i.addEventListener("change", () => { const v = i.value.trim(); if (v && NL.ptgNum(v) == null) {
+                                i.classList.add("nl2-ptg-bad");
+                                return;
+                            } set(k, v); });
+                            i.addEventListener("keydown", (e) => { if (e.key === "Enter")
+                                i.blur(); });
+                            return i;
+                        };
+                        return NL.h("span", { class: "nl2-ptg-fm" }, NL.h("span", { class: "nl2-ptg-fl" }, label), box1(k1), "\u2013", box1(k2), ph ? NL.h("span", { class: "nl2-ptg-fl" }, ph) : null);
+                    };
+                    const kids = [
+                        dd("player", "Player", [...pl.entries()].sort((a, b) => a[1].localeCompare(b[1], undefined, { sensitivity: "base" }))),
+                        dd("tag", "Alliance", [...tags.map((t) => [t, "[" + t + "]"]), ["-", "No alliance"]]),
+                        dd("mil", "Military", [...MIL_TOP.map((n) => [String(n), "Top " + n]), ["none", "Unranked"]]),
+                        dd("shield", "Shield", [["up", "Up"], ["down", "Down"], ["soon", "Ends within 60 min"], ["unset", "Not set"]]),
+                        dd("status", "Status", [["sleep", "Sleep shield"], ["vac", "Vacation"], ["inact", "Inactive"], ["active", "None of these"]]),
+                        dd("spy", "Spy", [["has", "Has a report"], ["air", "In air"], ["det", "Detected"], ["none", "No report"]]),
+                        mm("dMin", "dMax", "Distance", "ly"),
+                        mm("sMin", "sMax", "Scouts"),
+                        mm("rMin", "rMax", "Resources"),
+                    ];
+                    if (NL.ptgFiltOn(f)) {
+                        const n = shown.filter((r) => r.kind === "planet").length;
+                        kids.push(NL.h("span", { class: "nl2-ptg-fc" }, "Showing " + n + " of " + planets.length), NL.h("a", { class: "nl2-ptg-fx", onclick: () => setFilt(sec, {}) }, "Clear"));
+                    }
+                    return NL.h("div", { class: "nl2-ptg-f", "data-nl2-sec": sec }, ...kids);
                 }
                 function draw() {
                     const a = document.activeElement;
-                    if (a && box.contains(a) && (a.tagName === "SELECT" || a.tagName === "TEXTAREA" || a.matches("input.nl2-ptg-sh")))
+                    if (a && box.contains(a) && (a.tagName === "SELECT" || a.tagName === "TEXTAREA" || a.matches("input.nl2-ptg-sh, input.nl2-ptg-fi")))
                         return;
                     if (D.down)
                         return;
                     drawn = ver;
-                    const { p, mine, src, at, en, rows, pri, hid, now } = view();
+                    const { p, mine, src, at, en, rows: rows0, pri: pri0, hid: hid0, now } = view();
+                    const fc = fctx(now), FL = (l, sec) => (V2 ? NL.ptgFilter(l, filtOf(sec), fc) : l);
+                    const rows = FL(rows0, "list"), pri = FL(pri0, "pri"), hid = FL(hid0, "hid");
                     const fromSel = NL.h("select", { "aria-label": "From" }, mine.length ? mine.map((m) => NL.h("option", { value: String(m.id), selected: String(m.id) === String(p.from) }, m.name)) : NL.h("option", { value: "" }, "Loading\u2026"));
                     fromSel.addEventListener("change", () => { setPref("from", fromSel.value); fromSel.blur(); paint(); });
                     const rangeSel = NL.h("select", { "aria-label": "Range" }, PTG_RANGES.map((v) => NL.h("option", { value: String(v), selected: v === +p.range }, v + " ly")));
@@ -26005,36 +26273,42 @@
                                 if (r.kind === "planet" && o.has(String(r.id)))
                                     readSys(r.systemId, true); });
                         } }, "Refresh");
-                    const bar = NL.h("div", { class: "nl2-ptg-bar" }, NL.h("span", { class: "nl2-ptg-n" }, bits.join(" \u00B7 ")), NL.h("label", null, "From", fromSel), NL.h("label", null, "Range", rangeSel), refresh);
+                    const bar = NL.h("div", { class: "nl2-ptg-bar" }, NL.h("span", { class: "nl2-ptg-n" }, bits.join(" \u00B7 ")), NL.h("label", null, "From", fromSel), V2 ? null : NL.h("label", null, "Range", rangeSel), refresh);
                     const z = NL.ptgPtZone(now), utc = NL.ptgIsUtc();
                     const COLS = V2 ? COLS2.filter((c) => !(utc && c[0] === "pte")) : COLS1;
                     const headFor = () => NL.h("div", { class: "nl2-ptg-g nl2-ptg-h", style: V2 && utc ? "grid-template-columns:" + GRID.split(" ").filter((x, i) => i !== 7).join(" ") : null }, COLS.map(([k, l]) => {
                         const t = (k === "pts" || k === "pte" ? l + " " + z : l) + (p.sort === k ? (p.dir === "desc" ? " \u25BE" : " \u25B4") : "");
-                        return NL.h("div", SORTABLE.has(k) ? { onclick: () => { const q = prefs(); if (q.sort === k)
+                        return NL.h("div", Object.assign(V2 && k === "she" ? { class: "nl2-ptg-mute" } : {}, SORTABLE.has(k) ? { onclick: () => { const q = prefs(); if (q.sort === k)
                                 q.dir = q.dir === "desc" ? "asc" : "desc";
                             else {
                                 q.sort = k;
                                 q.dir = "asc";
-                            } st.set("prefs", q); paint(); } } : null, t);
+                            } st.set("prefs", q); paint(); } } : {}), t);
                     }));
                     const open = openSet();
                     const block = (list, sec) => { let zi = 0; return list.map((r) => { if (r.kind === "planet")
                         zi++; return rowEl(r, zi, now, open, sec); }); };
                     const parts = [bar, enemyLine(en)];
-                    if (pri.length)
-                        parts.push(NL.h("div", { class: "nl2-ptg-sec" }, "Priority"), headFor(), ...block(pri, "pri"));
-                    if (rows.length)
-                        parts.push(...(pri.length ? [NL.h("div", { class: "nl2-ptg-gap" })] : []), headFor(), ...block(rows, "list"));
+                    if (!V2) {
+                        if (rows.length)
+                            parts.push(headFor(), ...block(rows, "list"));
+                    }
+                    else {
+                        if (pri0.length)
+                            parts.push(NL.h("div", { class: "nl2-ptg-sec" }, "Priority"), filterRow("pri", pri0, pri), ...(pri.length ? [headFor(), ...block(pri, "pri")] : [NL.h("div", { class: "nl2-ptg-empty" }, "No priority targets match the filters.")]));
+                        if (rows0.length)
+                            parts.push(...(pri0.length ? [NL.h("div", { class: "nl2-ptg-gap" })] : []), filterRow("list", rows0, rows), ...(rows.length ? [headFor(), ...block(rows, "list")] : []));
+                    }
                     const msg = !NL.ptgEnemyCount(en) ? (pri.length ? "" : "Add an alliance, none or a player to Enemies to list their colonies.")
                         : !src ? "Waiting for your planet list." : !D.cols ? (D.ciBusy ? "Reading colonies\u2026" : D.err || "No colony data yet.")
-                            : !at ? `${src.name} isn't in the colony list.` : !rows.length ? `No enemy colonies within ${p.range} ly of ${src.name}.` : "";
+                            : !at ? `${src.name} isn't in the colony list.` : !rows.length ? (V2 ? (rows0.length ? "No enemy colonies match the filters." : "No enemy colonies found.") : `No enemy colonies within ${p.range} ly of ${src.name}.`) : "";
                     if (msg)
                         parts.push(NL.h("div", { class: "nl2-ptg-empty" }, msg));
-                    if (V2 && hid.length) {
-                        const ho = !!st.get("hidOpen", false), nh = hid.filter((r) => r.kind === "planet").length;
+                    if (V2 && hid0.length) {
+                        const ho = !!st.get("hidOpen", false), nh = hid0.filter((r) => r.kind === "planet").length;
                         parts.push(NL.h("div", { class: "nl2-ptg-sec nl2-ptg-hid", onclick: () => { st.set("hidOpen", !ho); paint(); } }, (ho ? "\u25BE " : "\u25B8 ") + "Hidden (" + nh + ")"));
                         if (ho)
-                            parts.push(headFor(), ...block(hid, "hid"));
+                            parts.push(filterRow("hid", hid0, hid), ...(hid.length ? [headFor(), ...block(hid, "hid")] : [NL.h("div", { class: "nl2-ptg-empty" }, "No hidden planets match the filters.")]));
                     }
                     box.replaceChildren(...parts);
                     if (V2) {
@@ -26049,6 +26323,8 @@
                     }
                     if (V2 && !cdT && box.querySelector("[data-nl2-cd]"))
                         cdT = setInterval(cdTick, 1000);
+                    if (V2)
+                        hideTimer();
                 }
             },
         });
