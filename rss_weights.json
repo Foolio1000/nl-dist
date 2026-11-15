@@ -1,0 +1,31 @@
+{
+ "version": "2026-11-15",
+ "source": "https://claude.ai/artifact/A3c3Bupwpx2ay3vGszXfZ2",
+ "note": "RSS weight per unit, keyed by server (NL.instance) and API resource key. Mirror of David's RSS Weights sheet.",
+ "weights": {
+  "nf2": {
+   "ore": 1.0,
+   "silicates": 2.0,
+   "hydrogen": 2.0,
+   "alloys": 6.0,
+   "cryoIce": 3.0,
+   "plasmaCore": 4.0,
+   "bioExtract": 10.0,
+   "quantumDust": 6.0,
+   "darkMatter": 6.0,
+   "antimatter": 32.0
+  },
+  "s0": {
+   "ore": 1.0,
+   "silicates": 2.0,
+   "hydrogen": 1.5,
+   "alloys": 10.0,
+   "cryoIce": 3.0,
+   "plasmaCore": 6.0,
+   "bioExtract": 10.0,
+   "quantumDust": 6.0,
+   "darkMatter": 6.0,
+   "antimatter": 32.0
+  }
+ }
+}
