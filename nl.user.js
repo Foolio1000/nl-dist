@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.126
+// @version      0.5.127
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.126", features: [] };
+    const NL = window.__nl2 = { version: "0.5.127", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1011,13 +1011,13 @@
     .nl2-fleet-spd{color:var(--text-muted,#c0cce0);font-size:.85em;font-weight:400}
     .nl2-fleet select{flex:1;min-width:0;background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.12);border-radius:6px;color:var(--text-primary,#f1f6ff);padding:7px 10px;font:inherit}
     .nl2-fleet select[disabled]{opacity:.6}
-    .nl2-fleet input{width:92px;background:rgba(12,24,44,.96);border:1px solid rgba(120,200,255,.12);border-radius:4px;color:var(--text-primary,#f1f6ff);padding:4px 6px;font:inherit;text-align:center}
+    .nl2-fleet input{width:92px;text-align:center}   
     .nl2-fleet input.nl2-bad{border-color:rgba(248,113,113,.7)}
     .nl2-fleet-step{background:none;border:0;color:var(--text-primary,#f1f6ff);font-weight:700;cursor:pointer;padding:0 4px;font-size:14px}
     .nl2-fleet-max{background:none;border:0;color:#7ed4ff;font:inherit;cursor:pointer;padding:0 7px}
     .nl2-fleet-v{font:inherit}
     .nl2-fleet-ro{padding-left:0}
-    .nl2-fleet-qty{display:inline-flex;align-items:center;background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.12);border-radius:4px;padding:2px 4px}
+    .nl2-fleet-qty{display:inline-flex;align-items:center;background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.25);border-radius:6px;padding:2px 4px}.nl2-fleet-qty:focus-within{border-color:#60a5fa}   
     .nl2-fleet-qty input{border:0;background:transparent;width:96px;padding:3px 2px}
     .nl2-fleet-minus{width:16px;margin-left:-22px}
     .nl2-fleet-eta{box-sizing:border-box;margin:6px 0 2px;padding:8px 10px;border:1px solid rgba(120,200,255,.12);border-radius:6px;background:rgba(5,10,20,.6)}
@@ -7391,51 +7391,163 @@
     {
         {
             const T = {
-                titan: [2610, 290],
-                dreadnought: [354, 485],
-                carrier: [34.6, 2616],
-                battleship: [21.2, 739],
-                cruiser: [17.9, 2496],
-                "missile cruiser": [16.4, 1492],
-                interceptor: [9.7, 3629],
-                "electronic warfare ship": [4, 558],
-                "assault shuttle": [4, 1715],
-                "torpedo frigate": [3.8, 776],
-                fighter: [3.6, 2738],
-                scout: [1.6, 3985],
-                "hacker ship": [0.8, 350],
+                titan: [3368, 8674510],
+                dreadnought: [316, 623880],
+                carrier: [62.1, 12611],
+                battleship: [37, 21238],
+                "missile cruiser": [29.4, 9474],
+                bomber: [28, 10891],
+                cruiser: [26.8, 6420],
+                interceptor: [16.9, 2676],
+                "torpedo frigate": [8.49, 4439],
+                "assault shuttle": [7.71, 2147],
+                fighter: [7.2, 1304],
+                "ew ship": [3.98, 7035],
+                scout: [2.76, 397],
+                "hacker ship": [0.826, 2339],
             };
-            const ALIAS = { ewar: "electronic warfare ship", "electronic warfare": "electronic warfare ship", hacker: "hacker ship" };
-            const perShip = {}, rssPer = {};
+            const CIVIL = {
+                "engineer ship": [3.72, 22151],
+                excavator: [3.02, 6876],
+                "bulk carrier": [3.01, 4015],
+                "repair ship": [3.01, 4023],
+                "ore freighter": [2.16, 3059],
+                "ice drill": [2.16, 3213],
+                "mine layer": [1.89, 2607],
+                "gas collector": [1.4, 1762],
+                "colony ship": [1.11, 14519],
+                miner: [1.08, 1535],
+                "lunar shuttle": [1.07, 10812],
+                "stealth ship": [0.929, 3900],
+                tanker: [0.806, 1456],
+                "transport shuttle": [0.558, 924],
+                freighter: [0.279, 618],
+                "spy probe": [0.2, 1349],
+                probe: [0.193, 421],
+            };
+            const DEF = {
+                "missile defense": [[1, 2], [5, 59], [10, 860]],
+                "laser defense": [[1, 2], [5, 123], [10, 1861]],
+                "railgun defense": [[1, 2], [5, 95], [10, 1549]],
+                "plasma defense": [[1, 3], [5, 185], [10, 3605]],
+                "ion defense": [[1, 4], [5, 123], [10, 1861]],
+                "ew system": [[1, 1], [5, 18], [10, 266]],
+                "shield generator": [[1, 2], [5, 10], [10, 247]],
+            };
+            const ALIAS = {
+                ewar: "ew ship",
+                "electronic warfare": "ew ship",
+                "electronic warfare ship": "ew ship",
+                ew: "ew ship",
+                hacker: "hacker ship",
+                "mining vessel": "miner",
+                "mining ship": "miner",
+                "electronic warfare system": "ew system",
+                missile: "missile defense",
+                laser: "laser defense",
+                railgun: "railgun defense",
+                plasma: "plasma defense",
+                ion: "ion defense",
+                shield: "shield generator",
+            };
+            const perShip = {}, rssPer = {}, civil = {};
             for (const k of Object.keys(T)) {
                 perShip[k] = T[k][0];
-                rssPer[k] = Math.round((T[k][0] / T[k][1]) * 1000000);
+                rssPer[k] = T[k][1];
+            }
+            for (const k of Object.keys(CIVIL)) {
+                perShip[k] = CIVIL[k][0];
+                rssPer[k] = CIVIL[k][1];
+                civil[k] = true;
             }
             Object.freeze(perShip);
             Object.freeze(rssPer);
+            Object.freeze(civil);
+            const known = (s) => perShip[s] != null || DEF[s] != null;
             const key = (sh) => {
-                const s = String((sh && typeof sh === "object" ? sh.name || sh.key || sh.type : sh) || "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-                return ALIAS[s] || (s.endsWith("s") && perShip[s.slice(0, -1)] != null ? s.slice(0, -1) : s);
+                const s = String((sh && typeof sh === "object" ? sh.key || sh.name || sh.type : sh) || "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+                if (ALIAS[s])
+                    return ALIAS[s];
+                if (known(s))
+                    return s;
+                const one = s.endsWith("s") ? s.slice(0, -1) : s;
+                return ALIAS[one] || one;
             };
             const num = (v) => (Number.isFinite(+v) && +v > 0 ? +v : 0);
             const countOf = (sh) => num(sh.quantity != null ? sh.quantity : sh.count != null ? sh.count : sh.qty != null ? sh.qty : sh.amount);
-            const need = (fleet) => {
-                const rows = Array.isArray(fleet) ? fleet : Object.keys(fleet || {}).map((k) => ({ name: k, quantity: fleet[k] }));
-                let sum = 0, rss = 0;
-                const byType = {};
-                for (const sh of rows) {
+            const levelOf = (d) => {
+                if (d == null)
+                    return 0;
+                if (typeof d !== "object")
+                    return num(d);
+                if (d.level != null && typeof d.level !== "object")
+                    return num(d.level);
+                const r = d.levelRange || (d.level && typeof d.level === "object" ? d.level : null);
+                if (r)
+                    return num(r.max != null ? r.max : r.min);
+                return 0;
+            };
+            const defenseAt = (k, L) => {
+                const P = DEF[key(k)];
+                L = num(L);
+                if (!P || !L)
+                    return 0;
+                if (L <= P[0][0])
+                    return P[0][1] * L / P[0][0];
+                for (let i = 1; i < P.length; i++) {
+                    const [l0, v0] = P[i - 1], [l1, v1] = P[i];
+                    if (L <= l1)
+                        return Math.exp(Math.log(v0) + (Math.log(v1) - Math.log(v0)) * (L - l0) / (l1 - l0));
+                }
+                const [la, va] = P[P.length - 2], [lb, vb] = P[P.length - 1];
+                return vb * Math.pow(vb / va, (L - lb) / (lb - la));
+            };
+            const rowsOf = (x, val) => (Array.isArray(x) ? x : Object.keys(x || {}).map((k) => ({ name: k, [val]: x[k] })));
+            const need = (ships, defenses) => {
+                const M = NL.scoutModel;
+                let combat = 0, civ = 0, def = 0, rss = 0;
+                const byType = {}, types = {}, missing = [];
+                for (const sh of rowsOf(ships, "quantity")) {
                     if (!sh)
                         continue;
                     const k = key(sh), n = countOf(sh), v = perShip[k];
-                    if (!n || v == null)
+                    if (!n)
                         continue;
-                    sum += n * v;
+                    if (v == null) {
+                        if (!missing.includes(k))
+                            missing.push(k);
+                        continue;
+                    }
+                    if (civil[k])
+                        civ += n * v;
+                    else {
+                        combat += n * v;
+                        types[k] = 1;
+                    }
                     rss += n * rssPer[k];
                     byType[k] = (byType[k] || 0) + n * v;
                 }
-                const small = rss > 0 && rss < NL.scoutModel.smallRss;
-                const scouts = sum > 0 ? Math.ceil(sum * NL.scoutModel.mixed * (small ? NL.scoutModel.smallMult : 1)) : 0;
-                return { scouts, sum, rss: Math.round(rss), small, byType };
+                for (const d of rowsOf(defenses, "level")) {
+                    if (!d)
+                        continue;
+                    const k = key(d), L = levelOf(d);
+                    if (!L)
+                        continue;
+                    if (!DEF[k]) {
+                        if (!missing.includes(k))
+                            missing.push(k);
+                        continue;
+                    }
+                    const v = defenseAt(k, L);
+                    def += v;
+                    byType[k] = (byType[k] || 0) + v;
+                }
+                const mixedOn = Object.keys(types).length >= 2;
+                const small = rss > 0 && rss < M.smallRss;
+                const sum = combat + civ + def;
+                const raw = combat * (mixedOn ? M.mixed : 1) + civ + def;
+                const scouts = raw > 0 ? Math.ceil(raw * (small ? M.smallMult : 1) - 1e-9) : 0;
+                return { scouts, sum, combat, civil: civ, defenses: def, mixed: mixedOn, rss: Math.round(rss), small, byType, missing };
             };
             const DEB_PRIMARY = 0.725, DEB_RARE = 0.3625;
             const costs = () => {
@@ -7459,9 +7571,8 @@
                 const C = costs();
                 if (!C)
                     return null;
-                const rows = Array.isArray(fleet) ? fleet : Object.keys(fleet || {}).map((k) => ({ name: k, quantity: fleet[k] }));
                 const out = { ore: 0, silicates: 0, alloys: 0, rare: {}, total: 0, missing: [] };
-                for (const sh of rows) {
+                for (const sh of rowsOf(fleet, "quantity")) {
                     if (!sh)
                         continue;
                     const k = key(sh), n = countOf(sh);
@@ -7487,16 +7598,22 @@
                 out.total = out.ore + out.silicates + out.alloys + Object.values(out.rare).reduce((a, b) => a + b, 0);
                 return out;
             };
+            const defenseLevels = {};
+            for (const k of Object.keys(DEF))
+                defenseLevels[k] = Object.freeze(DEF[k].map((p) => Object.freeze(p.slice())));
             NL.scoutModel = Object.freeze({
-                asOf: "2026-11-02",
-                lossLine: 0.2,
-                mixed: 0.9,
+                asOf: "2026-11-16",
+                lossLine: 0.05,
+                mixed: 0.78,
                 smallRss: 1000000,
-                smallMult: 1.2,
+                smallMult: 1.06,
                 perShip,
                 rssPer,
+                civil,
                 key,
                 of: (sh) => perShip[key(sh)] || 0,
+                defenseAt,
+                defenseLevels: Object.freeze(defenseLevels),
                 need,
                 debris,
                 debrisRates: { primary: DEB_PRIMARY, rare: DEB_RARE, hydrogen: 0 },
@@ -8121,7 +8238,7 @@
       .nl2-d2-pop td,.nl2-d2-pop th{padding:5px 6px;border-bottom:1px solid rgba(120,200,255,.08);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;font-size:14px}
       .nl2-d2-pop th{font-size:12px;color:var(--text-muted,#c0cce0);text-transform:uppercase}
       .nl2-d2-pop .nl2-r{text-align:right}
-      .nl2-d2-pop input{width:80px;background:rgba(12,24,44,.96);border:1px solid rgba(120,200,255,.2);border-radius:4px;color:inherit;padding:3px 6px;font:inherit;text-align:right}
+      .nl2-d2-pop input{width:80px;text-align:right}
       .nl2-d2-msg{margin-top:8px;color:var(--text-muted,#c0cce0);font-size:13px}.nl2-d2-msg.nl2-bad{color:#fca5a5}.nl2-d2-msg.nl2-ok{color:#86efac}
       .nl2-d2-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
       .nl2-d2-sts{display:inline-block;border-radius:4px;padding:1px 8px;font-weight:700;border:1px solid transparent;vertical-align:middle;white-space:nowrap}
@@ -8155,7 +8272,7 @@
       html body .nl2-d2-b.nl2-c-orange{background:#fed7aa!important;border:1px solid #9a3412!important;color:#9a3412!important;box-shadow:none!important;text-shadow:none!important}   
       html body .nl2-d2-b.nl2-c-orange:hover:not([disabled]){background:#fdba74!important}html body .nl2-d2-b.nl2-c-orange[disabled]{background:#d1d5db!important;border-color:#6b7280!important;color:#6b7280!important}
       .nl2-fleet-above .nl2-d2-sv-ok{color:#4ade80;font-weight:700}.nl2-fleet-above .nl2-d2-sv-bad{color:#f87171;font-weight:700}
-      html body .nl2-d2-thr input{width:52px;background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.35);border-radius:4px;color:var(--text-primary,#f1f6ff);padding:2px 4px;font:600 14px Rajdhani,"Exo 2",sans-serif;text-align:center}`);
+      html body .nl2-d2-thr input{width:52px;text-align:center}`);
             const tagOf = (s) => { const m = /^\s*(\[[^\]]+\])/.exec(String(s || "")); return m ? m[1] : ""; };
             const shipsN = (ships) => (ships || []).reduce((a, s) => a + n0(s.quantity), 0);
             const fleetN = (f) => (f.ships && f.ships.length ? shipsN(f.ships) : n0(f.total && (f.total.max != null ? f.total.max : f.total.min)));
@@ -8296,7 +8413,7 @@
                 for (const f of cDef)
                     for (const sh of f.ships || [])
                         defV += n0(sh.quantity) * ownVal(sh);
-                const needV = attV * 0.9 * 1.25;
+                const needV = NL.scoutModel && NL.scoutModel.need ? NL.scoutModel.need(cAtt.flatMap((f) => f.ships || [])).scouts : 0;
                 const clear = OFF && !hidden && needV <= 0 && defV > 0 && reads.some((x) => x.sourceKind === "phalanx");
                 const unknown = !clear && (hidden || needV <= 0);
                 const pct = clear ? null : unknown ? null : defV / needV;
@@ -10068,7 +10185,7 @@
       ${C} > label.inventory-mark-quantity > svg{display:none!important}
       ${C} > label.inventory-mark-quantity > input{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;border:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important}
       .leadership-crew-card > label.inventory-mark-quantity > select.nl2-crqty{display:none}
-      ${C} > label.inventory-mark-quantity > select.nl2-crqty{display:inline-block!important;min-width:48px;cursor:pointer;background:#0b1620;color:#dbe6f5;border:1px solid #3a5266;border-radius:3px;padding:1px 4px;font:inherit}
+      ${C} > label.inventory-mark-quantity > select.nl2-crqty{display:inline-block!important;min-width:48px;cursor:pointer}
     `);
                 let dataCnt = null;
                 NL.onData(/^\/api\/leadership(\?|$)/, (p, d) => {
@@ -12844,7 +12961,7 @@
             name: "Lab level range",
             desc: "Min and max Research Lab level boxes beside Hide Completed / Only Levelable; shows only researches needing a Lab level in that range.",
             init(ctx) {
-                NL.css("re-lab", ".nl2-relab{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.nl2-relab select.nl2-relab-in{width:72px!important;min-width:72px!important;height:30px!important;padding:0 6px!important;margin:0!important;box-sizing:border-box!important;cursor:pointer;border-radius:6px!important;border:1px solid #2a3a52!important;background:#0b1424!important;color:#f1f6ff!important;font:inherit;font-size:14px!important;opacity:1!important}.nl2-relab select.nl2-relab-in option{background:#0b1424;color:#f1f6ff}.nl2-relab select.nl2-relab-in:focus{outline:none;border-color:#38bdf8!important}.nl2-relab select.nl2-relab-in.nl2-set{border:2px solid #f5b83d!important;box-shadow:0 0 8px rgba(245,184,61,.55)!important;color:#ffd27a!important}.nl2-relab.nl2-on .nl2-relab-l{color:#f5b83d}.nl2-relab.nl2-bad select.nl2-relab-in{box-shadow:none!important;border-color:#e06c6c!important;color:#e06c6c!important}.nl2-relab .nl2-relab-x{cursor:pointer;color:#8a96a6;padding:0 2px}.nl2-relab .nl2-relab-x:hover{color:#f1f6ff}");
+                NL.css("re-lab", ".nl2-relab{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.nl2-relab select.nl2-relab-in{width:72px!important;min-width:72px!important;height:30px!important;margin:0!important;box-sizing:border-box!important;cursor:pointer;opacity:1!important}.nl2-relab select.nl2-relab-in.nl2-set{border:2px solid #f5b83d!important;box-shadow:0 0 8px rgba(245,184,61,.55)!important;color:#ffd27a!important}.nl2-relab.nl2-on .nl2-relab-l{color:#f5b83d}.nl2-relab.nl2-bad select.nl2-relab-in{box-shadow:none!important;border-color:#e06c6c!important;color:#e06c6c!important}.nl2-relab .nl2-relab-x{cursor:pointer;color:#8a96a6;padding:0 2px}.nl2-relab .nl2-relab-x:hover{color:#f1f6ff}");
                 let min = ctx.store.get("min", ""), max = ctx.store.get("max", "");
                 const val = (s) => (String(s).trim() === "" ? null : Math.floor(+s));
                 const range = () => {
@@ -13725,7 +13842,7 @@
                     ".nl2-retb th .nl2-retb-ic{width:16px;height:16px;margin:0}",
                     ".nl2-retb .nl2-r{color:#e06c6c}.nl2-retb .nl2-g{color:#7fd6a0}.nl2-retb .nl2-y{color:#e6c34a}.nl2-retb .nl2-b{color:#6fb0ff}.nl2-retb .nl2-na,.nl2-retb .nl2-dim{color:#8a96a6}",
                     ".nl2-retb .nl2-retb-act{display:flex;align-items:center;justify-content:flex-end;gap:6px}",
-                    ".nl2-retb select.nl2-retb-fr{width:46px;height:24px;box-sizing:border-box;padding:0 2px;margin:0;background:#130f24;color:#c99fff;border:1px solid #4a3a7a;border-radius:5px;font:inherit;font-size:12px;cursor:pointer}",
+                    ".nl2-retb select.nl2-retb-fr{width:46px;height:24px;min-height:0;box-sizing:border-box;padding:0 2px;margin:0;cursor:pointer}",
                     ".nl2-retb .nl2-retb-frph{display:inline-block;width:46px}",
                     ".nl2-retbw{max-width:100%;overflow:hidden}",
                     ".nl2-retb .nl2-retb-br{display:inline-block;width:18px;height:18px;border-radius:4px;text-align:center;font-size:11px;line-height:18px;font-weight:700;margin-right:7px;vertical-align:1px}",
@@ -15117,12 +15234,11 @@
       .nl2-gf th{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted,#9fb3d1)}
       .nl2-gf th.nl2-gf-dmg{color:#fbbf24}
       .nl2-gf .nl2-gf-place{text-align:left;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis}
-      .nl2-gf input.nl2-gf-n{width:64px;box-sizing:border-box;background:rgba(12,24,44,.96);border:1px solid rgba(120,200,255,.12);color:inherit;border-radius:4px;padding:2px 4px;
-        font:500 14px Rajdhani,"Exo 2",sans-serif;text-align:right}
+      .nl2-gf input.nl2-gf-n{width:64px;box-sizing:border-box;padding:2px 4px;text-align:right}
       .nl2-gf input.nl2-gf-n.nl2-gf-ed{border-color:#a855f7;box-shadow:0 0 0 1px #a855f7 inset}
       .nl2-gf input.nl2-gf-n:disabled{opacity:.35}
       .nl2-gf .nl2-gf-of{color:var(--text-muted,#9fb3d1);font-size:12px;margin-left:3px}
-      .nl2-gf select{background:rgba(12,24,44,.96);color:inherit;border:1px solid rgba(120,200,255,.12);border-radius:4px;font:inherit;padding:2px}
+      .nl2-gf select{padding:2px}
       .nl2-gf td.nl2-gf-est{font-style:italic}
       .nl2-gf tr.nl2-gf-bad td{color:#f87171}
       .nl2-gf tr.nl2-gf-sent td{opacity:.55}
@@ -15672,7 +15788,7 @@
       .nl2-mb .nl2-mb-x:hover{color:var(--text-primary,#f1f6ff)}
       .nl2-mb .nl2-mb-top{display:flex;align-items:center;gap:10px;margin:6px 0 10px;flex-wrap:wrap}
       .nl2-mb .nl2-mb-top label{display:inline-flex;align-items:center;gap:6px;color:var(--text-muted,#9fb3d1)}
-      .nl2-mb select,.nl2-mb input.nl2-mb-n{background:rgba(12,24,44,.96);color:inherit;border:1px solid rgba(120,200,255,.18);border-radius:4px;font:500 14px Rajdhani,"Exo 2",sans-serif;padding:2px 4px;height:26px;box-sizing:border-box}
+      .nl2-mb select,.nl2-mb input.nl2-mb-n{padding:2px 4px;height:26px;box-sizing:border-box}
       .nl2-mb input.nl2-mb-n{width:72px;text-align:left}
       .nl2-mb .nl2-mb-pill{height:26px;padding:0 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer;text-align:center}
       .nl2-mb .nl2-mb-pill:hover{background:rgba(56,189,248,.22)}
@@ -18324,6 +18440,8 @@
         });
     }
     {
+        NL.frpOutcome = true;
+        const FRP_OUTCOME = { shield_reinforced: "Shielded", sleep_shield: "Shielded", shielded: "Shielded" };
         NL.feature({
             id: "fl-reports",
             set: "Fleet",
@@ -18501,8 +18619,12 @@
                         const oc = x.c.querySelector(".rep-outcome");
                         if (x.kind === "mine")
                             x.res = r.cycleCount != null ? "Cycle " + num(r.cycleCount) : ([...x.c.querySelectorAll(".rep-chip")].map((e) => txt(e)).find((t) => /^Cycle\b/i.test(t)) || "");
-                        else
+                        else {
                             x.res = txt(oc);
+                            const o = r.outcome && String(r.outcome);
+                            if (NL.frpOutcome && o && (FRP_OUTCOME[o] || /^[A-Za-z]+(\.[A-Za-z_]+)+/.test(x.res) || !x.res))
+                                x.res = FRP_OUTCOME[o] || o.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+                        }
                         x.resCls = x.kind === "mine" ? "grey" : /victory|won/i.test(x.res) || /result-victory/.test(x.c.className) ? "win" : /defeat|lost/i.test(x.res) || /result-defeat/.test(x.c.className) ? "loss" : "grey";
                         const chips = [...x.c.querySelectorAll(".rep-meta .rep-chip")].map((e) => txt(e));
                         if (x.kind === "mine") {
@@ -20529,6 +20651,7 @@
     {
         NL.flSpyTable = true;
         NL.flSpyFocus = true;
+        NL.flSpyHide = true;
         NL.feature({
             id: "fl-spy-table",
             set: "Fleet",
@@ -20570,6 +20693,9 @@
       ${D} .spy-report-header .nl2-spt-save:hover{color:#e2e8f0;border-color:rgba(120,200,255,.5)} ${D} .spy-report-header .nl2-spt-save.saved{color:#fbbf24;border-color:rgba(251,191,36,.55)}
       ${D} .spy-report-header .nl2-spt-save svg{width:15px;height:15px} ${D} .spy-report-header .nl2-spt-save.saved svg path{fill:currentColor}
       ${D} .spy-report-header .nl2-spt-save + .spy-report-time{margin-left:0}
+      ${D} .spy-report-header .nl2-spt-hide{margin-right:10px;align-self:center;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;background:none;border:1px solid rgba(120,200,255,.25);border-radius:4px;color:#94a3b8;cursor:pointer}
+      ${D} .spy-report-header .nl2-spt-hide:hover{color:#e2e8f0;border-color:rgba(120,200,255,.5)} ${D} .spy-report-header .nl2-spt-hide.on{color:#2dd4bf;border-color:rgba(45,212,191,.6)}
+      ${D} .spy-report-header .nl2-spt-hide svg{width:15px;height:15px} ${D} .spy-report-header .nl2-spt-hide + .spy-report-time{margin-left:0}
       ${D} .nl2-spt-pill.nl2-spt-p1{color:#60a5fa;border-color:rgba(96,165,250,.55);background:rgba(59,130,246,.10)}` + (NL.flSpyFocus ? `\n      ${D} > .nl2-fsl, ${D} > .nl2-esp-sv{display:none!important}` : ""));
                 const RES = { ore: "Ore", silicates: "Silicates", hydrogen: "Hydrogen", alloys: "Alloys", cryoIce: "Cryo-Ice", plasmaCore: "Plasma Core", bioExtract: "Bio-Extract", quantumDust: "Quantum Dust", darkMatter: "Dark Matter", antimatter: "Antimatter" };
                 const RESEARCH = { adaptive_shields: "Adaptive Shields", advanced_shielding: "Advanced Shielding", assault_tactics: "Assault Tactics", basic_armor: "Basic Armor Plating", battleship_design: "Battleship Design", bomber_wing: "Bomber Wing Doctrine", carrier_operations: "Carrier Operations", composite_armor: "Composite Armor", cruiser_design: "Cruiser Design", dreadnought_design: "Dreadnought Design", fighter_doctrine: "Fighter Doctrine", fleet_auxiliary: "Fleet Auxiliary Systems", fleet_tactics: "Fleet Tactics", fortress_protocols: "Fortress Protocols", heavy_armor: "Heavy Armor", ion_cannons: "Ion Cannons", kinetic_weapons: "Kinetic Weapons", laser_weapons: "Laser Weapons", mine_warfare: "Mine Warfare", missile_systems: "Missile Systems", phase_shields: "Phase Shields", plasma_weapons: "Plasma Weapons", point_defense: "Point Defense Systems", shield_harmonics: "Shield Harmonics", shield_theory: "Shield Theory", torpedo_systems: "Torpedo Systems", weapons_overcharge: "Weapons Overcharge", stealth_technology: "Stealth Technology", titan_design: "Titan Design", ship_mastery: "Ship Mastery" };
@@ -20815,6 +20941,54 @@
                     else if (b.parentNode !== head)
                         head.append(b);
                 }
+                const HIDE_SVG = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.88 9.88a3 3 0 1 0 4.24 4.24\"/><path d=\"M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68\"/><path d=\"M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61\"/><path d=\"m2 2 20 20\"/></svg>";
+                const leftTxt = (ms) => { if (ms === Infinity)
+                    return "indefinitely"; const m = Math.max(1, Math.round(ms / 60000)), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60); return (d ? d + "d " + h + "h" : h ? h + "h " + (m % 60) + "m" : m + "m") + " left"; };
+                function placeHide(det, cur) {
+                    const head = det.querySelector(":scope > .spy-report-header");
+                    let b = head && head.querySelector(".nl2-spt-hide");
+                    const A = NL.ptgHideApi, tid = cur.targetMoonId != null ? cur.targetMoonId : cur.targetPlanetId;
+                    if (!NL.flSpyHide || !head || !A || tid == null) {
+                        if (b)
+                            b.remove();
+                        return;
+                    }
+                    if (!b) {
+                        b = NL.h("button", { type: "button", class: "nl2-spt-hide" });
+                        b.innerHTML = HIDE_SVG;
+                        b.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            const id = b.dataset.tid;
+                            if (NL.ptgHideApi.left(id) != null) {
+                                NL.ptgHideApi.clear(id);
+                                NL._kick();
+                            }
+                            else
+                                NL.ptgHideApi.open(b, id, () => NL._kick());
+                        });
+                    }
+                    const left = A.left(tid), on = left != null && left > 0, cls = "nl2-spt-hide" + (on ? " on" : "");
+                    const tip = on ? "Hidden on PVP, " + leftTxt(left) + " (click to show again)" : "Hide on PVP";
+                    if (b.dataset.tid !== String(tid))
+                        b.dataset.tid = String(tid);
+                    if (b.className !== cls)
+                        b.className = cls;
+                    if (b.dataset.tip !== tip) {
+                        b.dataset.tip = tip;
+                        NL.tip(b, tip);
+                    }
+                    const save = head.querySelector(".nl2-spt-save"), time = head.querySelector(".spy-report-time");
+                    if (save) {
+                        if (save.nextElementSibling !== b)
+                            save.after(b);
+                    }
+                    else if (time) {
+                        if (b.nextElementSibling !== time)
+                            time.before(b);
+                    }
+                    else if (b.parentNode !== head)
+                        head.append(b);
+                }
                 if (typeof NL.onSpySave === "function")
                     NL.onSpySave(() => NL._kick());
                 function clear(det) {
@@ -20844,6 +21018,9 @@
                         const sb = det.querySelector(".nl2-spt-save");
                         if (sb)
                             sb.remove();
+                        const hb = det.querySelector(".nl2-spt-hide");
+                        if (hb)
+                            hb.remove();
                         const b = det.querySelector(":scope > .nl2-spt-bar");
                         if (b)
                             b.remove();
@@ -20852,6 +21029,7 @@
                     placeBox(det);
                     placePill(det, levelOf(cur));
                     placeSave(det, cur);
+                    placeHide(det, cur);
                     if (!isOn()) {
                         clear(det);
                         return;
@@ -20875,6 +21053,7 @@
     {
         NL.flSpyYield = true;
         NL.flSpyDebris = true;
+        NL.flSpyTransports = true;
         NL.feature({
             id: "fl-spy-yield",
             set: "Fleet",
@@ -20902,11 +21081,15 @@
                 }
                 const top = (v) => (v == null ? 0 : typeof v === "number" ? v : Number(v.max != null ? v.max : v.min) || 0);
                 let bulkBusy = false;
-                function bulkCargo() {
+                function bulkCargo(key) {
+                    key = key || "bulk_carrier";
                     const c = NL.cache.latest(/^\/api\/(planets|moons)\/\d+\/fleet$/), f = c && c.data;
-                    const s = f && Array.isArray(f.fleet) ? f.fleet.find((x) => x && x.definition && x.definition.key === "bulk_carrier") : null;
+                    const s = f && Array.isArray(f.fleet) ? f.fleet.find((x) => x && x.definition && x.definition.key === key) : null;
+                    const bonus = (Number(f && f.cargoBonus) || 0) + (key === "transport_shuttle" ? Number(f && f.shuttleCargoBonus) || 0 : 0);
                     if (s && +s.definition.cargoCapacity > 0)
-                        return Math.floor(+s.definition.cargoCapacity * (1 + (Number(f.cargoBonus) || 0)));
+                        return Math.floor(+s.definition.cargoCapacity * (1 + bonus));
+                    if (key !== "bulk_carrier")
+                        return 0;
                     const here = NL.herePlanetId && NL.herePlanetId();
                     if (!bulkBusy && here) {
                         bulkBusy = true;
@@ -20969,8 +21152,10 @@
                             line.remove();
                         return;
                     }
-                    const y = NL.yieldOf(cur), cargo = bulkCargo();
+                    const y = NL.yieldOf(cur), cargo = bulkCargo(), tcargo = NL.flSpyTransports ? bulkCargo("transport_shuttle") : 0;
                     const bulks = y.res != null && cargo > 0 ? Math.ceil(y.res / cargo) : null;
+                    const n = (v, c) => (v != null && c > 0 ? "x" + NL.fmt(Math.ceil(v / c)) : "\u2014");
+                    const two = (what, v) => "To collect " + what + ": Bulk " + n(v, cargo) + " or Transports: " + n(v, tcargo);
                     const txt = y.scouts != null ? NL.fmt(y.scouts) : "\u2014";
                     if (!line || line.dataset.sig !== cur.id + "|" + txt) {
                         const nl = NL.h("div", { class: "nl2-spy-q" }, "Scouts to beat: ", NL.h("b", {}, txt));
@@ -20984,11 +21169,11 @@
                         head.after(line);
                     else if (!head && line.parentNode !== det)
                         det.prepend(line);
-                    const bt = bulks != null ? "Bulks to collect all: " + NL.fmt(bulks) : "";
+                    const bt = NL.flSpyTransports ? (y.res != null ? two("all", y.res) : "") : bulks != null ? "Bulks to collect all: " + NL.fmt(bulks) : "";
                     headNote(det, ".command-intel-resources h5", /^\W*Resources/, bt);
                     if (NL.flSpyDebris) {
                         const hasShips = !!(cur.intel && cur.intel.fleet && Array.isArray(cur.intel.fleet.ships) && cur.intel.fleet.ships.length);
-                        const db = y.debris != null && cargo > 0 ? "Bulks to collect debris: " + NL.fmt(Math.ceil(y.debris / cargo)) : "Bulks to collect debris: \u2014";
+                        const db = NL.flSpyTransports ? two("debris", y.debris) : y.debris != null && cargo > 0 ? "Bulks to collect debris: " + NL.fmt(Math.ceil(y.debris / cargo)) : "Bulks to collect debris: \u2014";
                         headNote(det, ".command-intel-ships h5", /^\W*Ships\b/, hasShips ? db : "");
                     }
                 });
@@ -23845,6 +24030,7 @@
         NL.flAtkStd = true;
         NL.atkFill = true;
         NL.atkRows = true;
+        NL.atkShield = true;
         NL.feature({
             id: "fl-attack",
             set: "Fleet",
@@ -23873,7 +24059,7 @@
       .nl2-atk-x{background:none;border:0;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1}
       .nl2-atk-row{display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:center;padding:4px 0}
       .nl2-atk-row > label{font-family:Rajdhani,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0);font-size:12px}
-      .nl2-atk select,.nl2-atk input[type=number]{background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.25);border-radius:6px;color:var(--text-primary,#f1f6ff);padding:4px 8px;font:500 14px Rajdhani,"Exo 2",sans-serif;max-width:100%}
+      .nl2-atk select,.nl2-atk input[type=number],.nl2-atk input[inputmode=numeric]{background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.25);border-radius:6px;color:var(--text-primary,#f1f6ff);padding:4px 8px;font:500 14px Rajdhani,"Exo 2",sans-serif;max-width:100%}
       .nl2-atk-v{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
       .nl2-atk-note{color:#94a3b8;font-size:13px}.nl2-atk-bad{color:#fca5a5}.nl2-atk-ok{color:#86efac}
       .nl2-atk-zone{display:inline-block;padding:0 7px;border-radius:4px;font-size:12px;font-weight:700;border:1px solid rgba(148,163,184,.5);color:#cbd5e1}
@@ -24136,6 +24322,12 @@
                                     return;
                                 }
                                 st.msg = (x.j && (x.j.error || x.j.message)) || "The game refused the launch (HTTP " + x.status + ").";
+                                if (NL.atkShield && NL.onShieldRefusal && /sleep shield/i.test(st.msg)) {
+                                    try {
+                                        NL.onShieldRefusal(Object.assign(moon ? { moonId: r.id } : { planetId: r.id }, { ownerName: r.owner || null, text: st.msg }));
+                                    }
+                                    catch (_) { }
+                                }
                                 return;
                             }
                             const mid = x.j && ((x.j.mission && x.j.mission.id) || x.j.missionId);
@@ -25863,6 +26055,7 @@
         NL.ptgHide57 = true;
         NL.ptgSpyRefresh = true;
         NL.ptgInactAll = true;
+        NL.ptgShieldAuto = true;
         NL.ptgShare = true;
         const PTG_RANGES = Array.from({ length: 20 }, (_, i) => (i + 1) * 10);
         const PTG_SHIELD_H = 8, PTG_CI_FRESH = 30 * 60000, PTG_SYS_FRESH = 6 * 3600000, PTG_RANK_FRESH = 3600000;
@@ -26112,7 +26305,7 @@
             for (const l of Array.isArray(losses) ? losses : [])
                 if (l && l.key && +l.destroyed > 0)
                     dead[l.key] = (dead[l.key] || 0) + +l.destroyed;
-            const M = NL.scoutModel, W = (M && M.rssPer) || {}, wk = (k) => (M && M.key ? W[M.key(k)] : W[k]) || 0;
+            const M = NL.scoutModel, W = (M && M.rssPer) || {}, C = (M && M.civil) || {}, wk = (k) => { const q = M && M.key ? M.key(k) : k; return C[q] ? 0 : W[q] || 0; };
             const wsum = (o) => Object.entries(o).reduce((a, [k, n]) => a + n * wk(k), 0), rs = wsum(ships);
             if (rs > 0)
                 return Math.min(100, Math.round((wsum(dead) / rs) * 100));
@@ -26131,6 +26324,11 @@
                     out[k] = { id: r.id, t, mid: r.missionId, losses: (r.defenderLosses || []).map((l) => ({ key: l.key, destroyed: +l.destroyed || 0 })) };
             }
             return out;
+        };
+        NL.ptgShieldRefusalAt = (text) => {
+            const m = /sleep shield covers this arrival time \(protected until ([0-9T:.\-]+Z?)\)/i.exec(String(text || ""));
+            const t = m ? Date.parse(/Z$/.test(m[1]) ? m[1] : m[1] + "Z") : NaN;
+            return Number.isFinite(t) ? t : null;
         };
         NL.ptgShieldEndWin = (endMins, now) => (endMins == null ? null : NL.ptgShieldWin((endMins - PTG_SHIELD_H * 60 + 1440) % 1440, now));
         const PTG_FKEYS = ["player", "tag", "mil", "shield", "status", "spy", "dMin", "dMax", "sMin", "sMax", "rMin", "rMax"];
@@ -26229,7 +26427,7 @@
       .nl2-ptg-bar{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin:0 0 8px;min-height:32px}
       .nl2-ptg-n{color:#8aa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:auto}
       .nl2-ptg-bar label{color:#8fb3d9;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
-      .nl2-ptg select,.nl2-ptg input.nl2-ptg-sh{font:15px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7;background:rgb(11,21,37);border:1px solid rgba(120,200,255,.25);border-radius:4px;padding:2px 6px;height:28px;box-sizing:border-box}
+      .nl2-ptg select,.nl2-ptg input.nl2-ptg-sh{padding:2px 6px;height:28px;box-sizing:border-box}      
       .nl2-ptg option.nl2-ptg-none{font-style:italic}
       .nl2-ptg-btn{font:600 14px Rajdhani,"Exo 2",sans-serif;height:28px;padding:0 14px;border-radius:4px;cursor:pointer}
       .nl2-ptg-en{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px}
@@ -26258,7 +26456,7 @@
       .nl2-ptg-g > div.nl2-ptg-xc{padding:2px 4px;display:flex;justify-content:center}
       .nl2-ptg-g input.nl2-ptg-sh{width:100%;height:24px}
       .nl2-ptg-g input.nl2-ptg-bad{border-color:#ef4444}
-      .nl2-ptg-g textarea.nl2-ptg-nt{width:100%;min-height:24px;height:24px;resize:none;overflow:hidden;box-sizing:border-box;font:14px Rajdhani,"Exo 2",sans-serif;line-height:18px;color:#d9e6f7;background:rgb(11,21,37);border:1px solid rgba(120,200,255,.18);border-radius:4px;padding:2px 6px;white-space:pre-wrap;display:block}
+      .nl2-ptg-g textarea.nl2-ptg-nt{width:100%;min-height:24px;height:24px;resize:none;overflow:hidden;box-sizing:border-box;line-height:18px;padding:2px 6px;white-space:pre-wrap;display:block}
       .nl2-ptg-g > div.nl2-ptg-ntc{white-space:normal}
       .nl2-ptg-air{color:#93c5fd;font-variant-numeric:tabular-nums}
       .nl2-ptg-det{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;font-size:12px;font-weight:700;color:#fecaca;background:rgba(239,68,68,.18);border:1px solid rgba(248,113,113,.55)}
@@ -26270,7 +26468,7 @@
       .nl2-ptg-g > div.nl2-ptg-soon,.nl2-ptg-g > div.nl2-ptg-rich{color:#4ade80;font-weight:700}
       .nl2-ptg-g > div.nl2-ptg-est{font-style:italic}
 .nl2-ptg-g.nl2-ptg-h > div.nl2-ptg-mute{color:#64748b}
-      .nl2-ptg-g > div.nl2-ptg-mute input.nl2-ptg-sh{color:#8a94a6;background:rgba(148,163,184,.06);border-color:rgba(148,163,184,.18)}
+      .nl2-ptg-g > div.nl2-ptg-mute input.nl2-ptg-sh{color:#8a94a6;background:rgba(148,163,184,.06);border-color:rgba(148,163,184,.18)}      
       .nl2-ptg-g > div.nl2-ptg-mute input.nl2-ptg-sh:focus{color:#d9e6f7;border-color:rgba(120,200,255,.45)}
       .nl2-ptg-hm{position:fixed;z-index:10050;display:flex;flex-direction:column;gap:2px;padding:6px;min-width:130px;background:rgb(11,21,37);border:1px solid rgba(120,200,255,.35);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:14px Rajdhani,"Exo 2",sans-serif}
       .nl2-ptg-hmt{color:#8fb3d9;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:0 6px 2px}
@@ -26279,13 +26477,14 @@
       .nl2-ptg-ico{display:inline-flex;vertical-align:-2px;margin-left:6px;color:#7dd3fc}
       .nl2-ptg-ico-vac{color:#fbbf24}
       .nl2-ptg-inact{color:#94a3b8}
+      .nl2-ptg-toast{position:fixed;right:16px;bottom:16px;z-index:100000;background:rgba(8,16,32,.96);border:1px solid rgba(45,212,191,.5);color:#e2e8f0;padding:8px 12px;border-radius:8px;font:600 13px Rajdhani,"Exo 2",sans-serif}
       .nl2-ptg-pl.nl2-ptg-pl-inact{color:#94a3b8}
       .nl2-ptg-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 6px;font-size:14px}
       .nl2-ptg select.nl2-ptg-fs{height:26px;font-size:14px;max-width:170px}
       .nl2-ptg .nl2-on{border-color:#7fd4ff}
       .nl2-ptg-fm{display:inline-flex;align-items:center;gap:4px;color:#8aa}
       .nl2-ptg-fl{color:#8fb3d9;font-weight:600}
-      .nl2-ptg input.nl2-ptg-fi{width:58px;height:26px;font:14px Rajdhani,"Exo 2",sans-serif;color:#d9e6f7;background:rgb(11,21,37);border:1px solid rgba(120,200,255,.25);border-radius:4px;padding:2px 6px;box-sizing:border-box}
+      .nl2-ptg input.nl2-ptg-fi{width:58px;height:26px;padding:2px 6px;box-sizing:border-box}
       .nl2-ptg input.nl2-ptg-fi.nl2-ptg-bad{border-color:#ef4444}
       .nl2-ptg-fc{color:#8aa;margin-left:4px}
       a.nl2-ptg-pl{color:inherit;text-decoration:none;cursor:pointer}a.nl2-ptg-pl:hover{color:#7dd3fc;text-decoration:underline}`);
@@ -26308,6 +26507,59 @@
                     } if (gone)
                     st.set("hide", o); return o; };
                 const hideSet = () => new Set(Object.keys(hideMap()));
+                let lastAtk = null;
+                const shDone = new Set();
+                function ownerOfTarget(o) {
+                    if (o.ownerId != null)
+                        return String(o.ownerId);
+                    const cols = D.cols || [];
+                    if (o.planetId != null) {
+                        const c = cols.find((x) => String(x.id) === String(o.planetId));
+                        if (c)
+                            return String(c.ownerId);
+                    }
+                    if (o.moonId != null)
+                        for (const v of Object.values(D.moons || {})) {
+                            const m = (v.m || []).find((x) => String(x.id) === String(o.moonId));
+                            if (m)
+                                return String(m.userId);
+                        }
+                    return null;
+                }
+                function shieldNote(text) {
+                    const n = NL.h("div", { class: "nl2-ptg-toast", role: "status" }, text);
+                    document.body.appendChild(n);
+                    setTimeout(() => n.remove(), 5000);
+                }
+                NL.onShieldRefusal = (o) => {
+                    if (!NL.ptgShieldAuto || !V2 || !o)
+                        return false;
+                    const t = o.until != null ? Date.parse(o.until) : NL.ptgShieldRefusalAt(o.text);
+                    const own = ownerOfTarget(o);
+                    if (!Number.isFinite(t) || own == null)
+                        return false;
+                    const hm = ptgHm(t), dk = own + "@" + t;
+                    if (shDone.has(dk))
+                        return true;
+                    shDone.add(dk);
+                    const all = shields();
+                    all[own] = hm;
+                    st.set("shields", all);
+                    const src = st.get("shSrc", {}) || {};
+                    src[own] = { at: Date.now(), until: t };
+                    st.set("shSrc", src);
+                    const c = (D.cols || []).find((x) => String(x.ownerId) === own);
+                    shieldNote("Shield end for " + (o.ownerName || o.name || (c && c.ownerName) || "that player") + " set to " + hm + " UTC (from the game)");
+                    paint();
+                    return true;
+                };
+                NL.watch(".nl2-fleet-msg", (el) => {
+                    if (!NL.ptgShieldAuto || !lastAtk || Date.now() - lastAtk.at > 30 * 60000)
+                        return;
+                    const t = NL.ptgShieldRefusalAt(el.textContent);
+                    if (t != null)
+                        NL.onShieldRefusal(Object.assign({}, lastAtk, { until: new Date(t).toISOString() }));
+                });
                 const hideFor = (id, days) => { const o = hideMap(); o[id] = days ? Date.now() + days * 86400000 : 1; st.set("hide", o); paint(); };
                 let hideT = 0;
                 const hideTimer = () => {
@@ -26336,6 +26588,12 @@
                     hideMenu.style.left = Math.max(4, Math.min(innerWidth - w - 4, b.right - w)) + "px";
                     hideMenu.style.top = (b.bottom + h + 4 > innerHeight ? b.top - h - 4 : b.bottom + 4) + "px";
                 }
+                NL.ptgHideApi = {
+                    left: (id) => { const v = hideMap()[String(id)]; return v == null ? null : v === 1 ? Infinity : +v - Date.now(); },
+                    open: (btn, id, done) => { openHideMenu(btn, String(id)); if (done && hideMenu)
+                        hideMenu.addEventListener("click", () => setTimeout(done, 0)); },
+                    clear: (id) => { const o = hideMap(); delete o[String(id)]; st.set("hide", o); paint(); },
+                };
                 const flip = (k, id) => { const o = st.get(k, {}) || {}; if (o[id])
                     delete o[id];
                 else
@@ -27092,6 +27350,9 @@
                     inp.addEventListener("change", save);
                     inp.addEventListener("keydown", (e) => { if (e.key === "Enter")
                         inp.blur(); });
+                    const sv = (st.get("shSrc", {}) || {})[k];
+                    if (V2 && sv && shields()[k] === ptgHm(sv.until))
+                        NL.tip(inp, "From the game (launch refused by the sleep shield, " + ptgHm(sv.at) + " UTC): protected until " + new Date(sv.until).toISOString().slice(0, 16).replace("T", " ") + " UTC");
                     return NL.h("div", { class: "nl2-ptg-in" + (V2 ? " nl2-ptg-mute" : "") }, inp);
                 }
                 function noteCell(r) {
@@ -27122,6 +27383,7 @@
                     atk.addEventListener("click", () => {
                         if (sent)
                             return;
+                        lastAtk = { ownerId: r.ownerId, name: r.owner, at: Date.now() };
                         if (V2 && NL.flAttackOpen)
                             NL.flAttackOpen(atk, { kind: r.kind, id: r.id, pid: r.kind === "moon" ? r.parentId : r.id, sid: r.systemId, name: r.name, owner: r.owner, address: r.address, zone: r.zone, scouts: r.scouts != null ? r.scouts : null, loot: r.res != null ? r.res : null }, { near: nearest(r) });
                         else
@@ -28820,7 +29082,6 @@
       .nl2-emr .nl2-emr-tg:hover{border-bottom-color:#38bdf8}
       .nl2-emr-ed{margin:-4px 0 10px;padding:10px 12px;background:rgb(11,21,37);border:.8px solid rgba(56,189,248,.35);border-radius:8px;color:#d9e6f7;font-size:14px;display:flex;flex-direction:column;gap:6px;width:max-content;max-width:100%}
       .nl2-emr-ed .nl2-emr-row{display:flex;gap:8px;align-items:center}
-      .nl2-emr-ed select,.nl2-emr-ed input{background:#0d1b2e;color:#e2eefb;border:1px solid rgba(120,200,255,.3);border-radius:5px;padding:3px 6px;font-size:14px}
       .nl2-emr-ed select{width:220px}.nl2-emr-ed input{width:90px;text-align:right}
       .nl2-emr-ed button{background-color:#0d2b3d;color:#e2eefb;border:1px solid rgba(56,189,248,.5);border-radius:6px;padding:3px 12px;font-size:13px;cursor:pointer}
       .nl2-emr-ed button:disabled{opacity:.5;cursor:default}
@@ -30582,7 +30843,7 @@
                     ".nl2-mthr table{border-collapse:collapse;table-layout:fixed;width:100%;max-width:1140px}",
                     ".nl2-mthr th,.nl2-mthr td{text-align:left;padding:3px 8px;height:30px;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(120,150,190,.15)}",
                     ".nl2-mthr th{font-size:13.5px;color:#9fb0c8;font-weight:600}",
-                    ".nl2-mthr input[type=number]{width:104px;box-sizing:border-box;background:#0b1626;color:#e6eefa;border:1px solid rgba(120,150,190,.35);border-radius:4px;padding:2px 6px;font:inherit;font-size:14px}",
+                    ".nl2-mthr input[type=number]{width:104px;box-sizing:border-box}",
                     ".nl2-mthr input.nl2-bad{border-color:#e06c6c}",
                     ".nl2-mthr .nl2-mthr-msg{color:#e06c6c;font-size:13px}",
                     ".nl2-mthr .nl2-mthr-warn{color:#e6c34a;font-size:13px}",
@@ -31139,7 +31400,6 @@
         border-radius:10px;box-shadow:0 12px 48px rgba(0,0,0,.6);color:var(--text-primary,#dce8f7);font:500 14px Rajdhani,"Exo 2",sans-serif;padding:14px 16px}
       .nl2-ou-pan h3{margin:0 0 10px;font-size:17px;display:flex;justify-content:space-between;align-items:center}
       .nl2-ou-pan h3 button{background:none;border:0;color:inherit;font-size:20px;cursor:pointer}
-      .nl2-ou-pan select{background:rgba(5,10,20,.96);color:inherit;border:1px solid rgba(120,200,255,.12);border-radius:6px;padding:6px 10px;font:inherit}
       .nl2-ou-pan table{width:100%;border-collapse:collapse;margin-top:10px}
       .nl2-ou-pan th{text-align:left;color:var(--text-muted,#8aa3c0);font-weight:600;padding:4px 6px;border-bottom:1px solid rgba(120,200,255,.12)}
       .nl2-ou-pan td{padding:5px 6px;border-bottom:1px solid rgba(120,200,255,.06)}
@@ -31741,7 +32001,7 @@
       .nl2-ga-mt.on{background:rgba(56,189,248,.22);border-color:rgba(56,189,248,.6);color:#fff}
       .nl2-ga-mnum{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;color:#8aa3c0;font-size:13px}
       .nl2-ga-mnum label{display:flex;align-items:center;gap:6px}
-      .nl2-ga-mnum input{width:50px;height:24px;box-sizing:border-box;padding:0 6px;border:1px solid rgb(35,60,81);border-radius:3px;background:#0c182c;color:#fff;font:inherit}
+      .nl2-ga-mnum input{width:50px;height:24px;box-sizing:border-box;padding:0 6px}
       .nl2-ga-mfoot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid rgba(120,200,255,.15);color:#8aa3c0;font-size:13px}
       .nl2-ga-mclear{height:30px;padding:0 10px;border-radius:3px;border:.8px solid rgb(35,60,81);background:rgba(12,24,44,.96);color:#d8e9f4;cursor:pointer;font:600 14px Rajdhani,"Exo 2",sans-serif}
       .nl2-ga-mclear[disabled]{opacity:.45;cursor:default}`);
@@ -41796,6 +42056,7 @@
     {
         NL.tblStd = true;
         NL.secStd = true;
+        NL.inputStd = true;
         NL.feature({
             id: "gl-table-std",
             set: "Global",
@@ -41811,8 +42072,10 @@
                 const RW = "[data-nl2-tstd-r]:not(#nl2-tstd-none)";
                 const RC = [".buildings-page[data-nl2-bt] .building-costs>[data-nl2-bt-c]", ".moon-view[data-nl2-mt] .entity-bcard-costs>[data-nl2-mt-c]", ...[1, 2, 3, 4, 5, 6].map((c) => ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-c=\"" + c + "\"]")].join(",");
                 NL.css("gl-table-std", [
-                    `${S}>thead>tr>th,${S}>tbody>tr>th{font:600 13.6px Rajdhani,"Exo 2",sans-serif!important;text-transform:none!important;letter-spacing:0!important;color:#8fb3d9!important}`,
-                    `${S}>tbody>tr>td{font-size:15px!important;color:#d9e6f7;height:32px;box-sizing:border-box}`,
+                    `${S}>thead>tr>th,${S}>tbody>tr>th:not([class]){font:600 13.6px Rajdhani,"Exo 2",sans-serif!important;text-transform:none!important;letter-spacing:0!important;color:#8fb3d9!important}`,
+                    `${S}>tbody>tr>td{font-size:15px!important;height:32px;box-sizing:border-box}`,
+                    `${S}>tbody>tr>td:not([class]){color:#d9e6f7}`,
+                    `:where(${S}>tbody>tr>td[class]){color:#d9e6f7}`,
                     `${S}>thead>tr>th+th,${S}>tbody>tr>td+td,${S}>tbody>tr>th+td{border-left:1px solid ${LINE}}`,
                     `${S}:not(.nl2-emx table)>tbody>tr:nth-child(even)>td{box-shadow:inset 0 0 0 999px ${ZEB}}`,
                     `:is(${RC}):not(#nl2-tstd-none){display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;justify-self:start!important;gap:0!important;text-align:left!important}`,
@@ -41827,8 +42090,7 @@
                     ".fleet-page .nl2-fat .nl2-fat-ra+.nl2-fat-ri{margin-left:10px!important}",
                     ".moon-view[data-nl2-mt] .moon-power-slider:has(>.nl2-tstd-pw)>input[type=\"range\"]:not(#nl2-tstd-none),.moon-view[data-nl2-mt] .moon-power-slider:has(>.nl2-tstd-pw)>.moon-power-value:not(#nl2-tstd-none){display:none!important}",
                     ".nl2-tstd-pw{display:inline-flex;align-items:center;gap:3px;font-size:15px;color:#d9e6f7}",
-                    ".nl2-tstd-pw>input{width:44px;height:24px;box-sizing:border-box;padding:0 6px;border:1px solid #2a3a52;border-radius:4px;background:rgba(6,14,27,.9);color:#d9e6f7;font:500 15px Rajdhani,\"Exo 2\",sans-serif;text-align:left}",
-                    ".nl2-tstd-pw>input:focus{outline:none;border-color:#60a5fa}",
+                    ".nl2-tstd-pw>input{width:48px;padding:0 6px;text-align:left}",
                     `${S}[data-nl2-tstd-s="1"]>thead>tr>th{cursor:pointer;user-select:none}`,
                     ".nl2-tstd-ar{margin-left:4px;font-size:11px;color:#8fb3d9}",
                     ".fleet-page .nl2-fat:not(.nl2-fat-h){min-height:32px;box-sizing:border-box}",
@@ -42390,6 +42652,16 @@
                 });
                 NL.watch(".nl2-tstd-pw", (box) => { if (!box.closest(".moon-view[data-nl2-mt]"))
                     box.remove(); });
+                if (NL.inputStd !== false) {
+                    const OURS = ":where([class*=\"nl2-\"],[class*=\"nxs-\"],[class*=\"nxt-\"])";
+                    const BOX = `${OURS} input:where([type="text"],[type="number"],[type="search"],:not([type])),${OURS} select,${OURS} textarea,input:where([class*="nl2-"],[class*="nxs-"]):where([type="text"],[type="number"],[type="search"],:not([type])),select:where([class*="nl2-"],[class*="nxs-"])`;
+                    const FOC = BOX.split(",").map((x) => x + ":focus").join(",");
+                    NL.css("gl-input-std", `${BOX}{background:rgba(5,10,20,.96);border:1px solid rgba(120,200,255,.25);border-radius:6px;color:#e2e8f0;font:500 14px Rajdhani,"Exo 2",sans-serif;min-height:26px;padding:0 8px;box-sizing:border-box;color-scheme:dark}
+${FOC}{outline:none;border-color:#60a5fa}
+${OURS} input::placeholder{color:#7890a5}
+${OURS} :where(input,select,textarea):disabled{opacity:.5;cursor:not-allowed}
+${OURS} input:where([type="checkbox"],[type="radio"]){accent-color:#38bdf8}`);
+                }
                 NL.css("gl-combat-teal", `.sy-fleet-cat-header[data-nl2-tstd-cat="combat"],.sy-fleet-cat-header[data-nl2-tstd-cat="combat"] *{color:#2dd4bf!important}`);
                 NL.watch(".sy-fleet-cat-header", (h) => { const c = /^\s*Combat Ships/i.test(h.textContent || "") ? "combat" : ""; if ((h.dataset.nl2TstdCat || "") !== c) {
                     if (c)
