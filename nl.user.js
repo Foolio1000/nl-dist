@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.128
+// @version      0.5.129
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.128", features: [] };
+    const NL = window.__nl2 = { version: "0.5.129", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1717,8 +1717,8 @@
             let r;
             try {
                 r = isGet
-                    ? await fetch(url, { credentials: "include", headers: { Accept: "application/json" }, signal })
-                    : await fetch(url, { method: m, credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(payload.body == null ? {} : payload.body), signal });
+                    ? await fetch(url, { credentials: "include", headers: Object.assign({ Accept: "application/json" }, o.headers), signal })
+                    : await fetch(url, { method: m, credentials: "include", headers: Object.assign({ "Content-Type": "application/json", Accept: "application/json" }, o.headers), body: JSON.stringify(payload.body == null ? {} : payload.body), signal });
             }
             catch (e) {
                 if (o.log)
@@ -1783,8 +1783,8 @@
                 let r;
                 try {
                     r = isGet
-                        ? await fetch(base + "?d=" + encodeURIComponent(JSON.stringify(enc)), { credentials: "include", headers: { Accept: "application/json" }, signal })
-                        : await fetch(base, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(enc), signal });
+                        ? await fetch(base + "?d=" + encodeURIComponent(JSON.stringify(enc)), { credentials: "include", headers: Object.assign({ Accept: "application/json" }, o.headers), signal })
+                        : await fetch(base, { method: "POST", credentials: "include", headers: Object.assign({ "Content-Type": "application/json", Accept: "application/json" }, o.headers), body: JSON.stringify(enc), signal });
                 }
                 catch (e) {
                     if (o.log)
@@ -10764,7 +10764,11 @@
   .nl2-ov-btn{display:inline-flex;align-items:center;box-sizing:border-box;height:32px;margin:0;padding:5px 12px;border-radius:7px;cursor:pointer;
     font:700 13.6px Rajdhani,"Exo 2",sans-serif;letter-spacing:.5px;text-transform:uppercase}
   .nl2-ov-btn[disabled]{cursor:default}
-  .nl2-ov-evac{order:2}.nl2-ov-fire{order:1}`;
+  .nl2-ov-evac,.nl2-ov-evw{order:2}.nl2-ov-fire{order:1}
+  .nl2-ov-evw{position:relative;display:flex}
+  .nl2-ov-evl{position:absolute;top:100%;right:0;margin-top:4px;display:flex;flex-direction:column;align-items:flex-end;gap:1px;
+    font:500 12px Rajdhani,"Exo 2",sans-serif;color:#c0cce0;text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 4px rgba(0,0,0,.85);white-space:nowrap;pointer-events:none}
+  .nl2-ov-evl > .nl2-r{color:#f87171}`;
         function ovBar(hero) {
             NL.css("ov-acts", OV_BAR_CSS);
             let bar = hero.querySelector(":scope > .nl2-ov-acts");
@@ -10778,17 +10782,34 @@
             id: "ov-evacuate",
             set: "Overview",
             name: "Evacuate button",
-            desc: "OV-002: the red Evacuate button (FL-001) in the top right of the planet Overview banner.",
+            desc: "OV-002/OV-020: the red Evacuate button (FL-001) in the top right of the planet Overview banner, with lines under it saying whether the ships can carry every resource and whether there is enough Hydrogen.",
             init() {
                 NL.onData(/^\/api\/planets\/\d+$/, () => NL._kick());
                 NL.watch(".overview-page > section.ov-hero", (hero) => {
                     const bar = ovBar(hero);
-                    let b = bar.querySelector(":scope > .nl2-ov-evac");
+                    let b = bar.querySelector(":scope > .nl2-ov-evw > .nl2-ov-evac");
                     if (!b) {
                         b = NL.h("button", { type: "button", class: "nl2-ov-btn nl2-ov-evac nl2-c-red", title: "Evacuate every ship and the resources from this planet" }, "Evacuate");
                         b.addEventListener("click", () => { if (!b.disabled && NL.evacuate)
                             NL.evacuate(b); });
-                        bar.appendChild(b);
+                        bar.appendChild(NL.h("div", { class: "nl2-ov-evw" }, b));
+                    }
+                    const w = b.parentElement;
+                    if (w && w.classList.contains("nl2-ov-evw")) {
+                        const cap = NL.evacuateCap ? NL.evacuateCap() : null;
+                        const lines = cap ? [cap, cap.h2].filter((x) => x && x.text) : [];
+                        const sig = lines.map((x) => (x.ok ? "+" : "-") + x.text).join("|");
+                        let l = w.querySelector(":scope > .nl2-ov-evl");
+                        if (!lines.length) {
+                            if (l)
+                                l.remove();
+                        }
+                        else if (!l || l.dataset.sig !== sig) {
+                            if (l)
+                                l.remove();
+                            l = NL.h("div", { class: "nl2-ov-evl", "data-sig": sig }, lines.map((x) => NL.h("span", { class: x.ok ? null : "nl2-r" }, String(x.text))));
+                            w.appendChild(l);
+                        }
                     }
                     const off = !NL.evacuate || !(NL.evacuateReady && NL.evacuateReady());
                     if (b.disabled !== off)
@@ -17303,6 +17324,29 @@
                         return { est: ["POST /moons/:id/send-estimate", t.id], go: "/api/moons/" + t.id + "/send", body: { ...base, sourcePlanetId: src } };
                     return { est: ["POST /fleet/fuel-estimate", null], go: "/api/fleet/dispatch", body: { ...base, sourcePlanetId: src, targetPlanetId: Number(t.id) } };
                 }
+                function fleetOf(f) {
+                    const ships = [];
+                    for (const s of flList(f, "fleet", "ships")) {
+                        const d = s && s.definition;
+                        const ok = Math.max(0, flNum(s.quantity)), dmg = Math.max(0, flNum(s.damagedQuantity));
+                        if (!d || flNum(d.speed) <= 0 || ok + dmg <= 0)
+                            continue;
+                        const bonus = flNum(f.cargoBonus) + (d.key === "transport_shuttle" ? flNum(f.shuttleCargoBonus) : 0);
+                        const key = String(d.id != null ? d.id : s.shipDefId), name = d.name || d.key;
+                        if (ok > 0)
+                            ships.push({ key, type: d.key, name, have: ok, qty: ok, cargo: Math.floor(flNum(d.cargoCapacity) * (1 + bonus)) });
+                        if (dmg > 0)
+                            ships.push({ key, type: d.key, name, have: dmg, qty: dmg, cargo: 0, damaged: true });
+                    }
+                    const stock = (f.resourceSnapshot && f.resourceSnapshot.resources) || f.resources || {};
+                    const resources = {};
+                    for (const [k, camel, name] of FL_RES) {
+                        const v = Math.floor(flNum(stock[camel] != null ? stock[camel] : stock[k]));
+                        if (v > 0)
+                            resources[k] = { have: v, amount: v, name };
+                    }
+                    return { ships, resources };
+                }
                 async function evacuate(btn) {
                     const src = planetId();
                     if (!src)
@@ -17329,11 +17373,12 @@
                         fields: ["target", "ships", "resources", "leader", "speed", "eta"],
                         template: false,
                         speed: 10,
-                        hydrogenReserve: 1.2,
+                        hydrogenReserve: 1,
                         sendLabel: "Launch",
                         targets,
                         cargoNote: (state) => {
-                            const left = Object.values(state.resources || {}).reduce((a, r) => a + Math.max(0, flNum(r && r.have) - flNum(r && r.amount)), 0);
+                            const fuel = state.est && state.est.fuel != null ? Math.ceil(flNum(state.est.fuel)) : 0;
+                            const left = Object.entries(state.resources || {}).reduce((a, [k, r]) => a + Math.max(0, flNum(r && r.have) - flNum(r && r.amount) - (k === "hydrogen" ? fuel : 0)), 0);
                             return left > 0 ? Math.round(left).toLocaleString() + " left behind" : "";
                         },
                         sources: async () => [{ id: src, name: pName }],
@@ -17344,26 +17389,7 @@
                             const lead = await get("/api/leadership");
                             const sup = await get("/api/fleet/supply");
                             supplyId = sup && sup.supplyPlanet && sup.supplyPlanet.id != null ? Number(sup.supplyPlanet.id) : null;
-                            const ships = [];
-                            for (const s of flList(f, "fleet", "ships")) {
-                                const d = s && s.definition;
-                                const ok = Math.max(0, flNum(s.quantity)), dmg = Math.max(0, flNum(s.damagedQuantity));
-                                if (!d || flNum(d.speed) <= 0 || ok + dmg <= 0)
-                                    continue;
-                                const bonus = flNum(f.cargoBonus) + (d.key === "transport_shuttle" ? flNum(f.shuttleCargoBonus) : 0);
-                                const key = String(d.id != null ? d.id : s.shipDefId), name = d.name || d.key;
-                                if (ok > 0)
-                                    ships.push({ key, type: d.key, name, have: ok, qty: ok, cargo: Math.floor(flNum(d.cargoCapacity) * (1 + bonus)) });
-                                if (dmg > 0)
-                                    ships.push({ key, type: d.key, name, have: dmg, qty: dmg, cargo: 0, damaged: true });
-                            }
-                            const stock = (f.resourceSnapshot && f.resourceSnapshot.resources) || f.resources || {};
-                            const resources = {};
-                            for (const [k, camel, name] of FL_RES) {
-                                const v = Math.floor(flNum(stock[camel] != null ? stock[camel] : stock[k]));
-                                if (v > 0)
-                                    resources[k] = { have: v, amount: v, name };
-                            }
+                            const { ships, resources } = fleetOf(f);
                             const v = lead && lead.unlocked !== false && lead.vessel;
                             const here = !!(v && v.status === "ready" && !v.assignedMissionId && Number(v.currentPlanetId) === Number(sourceId));
                             const leader = here ? { value: true, available: true } : { value: false, available: false, reason: "not on this planet" };
@@ -17426,6 +17452,91 @@
                     document.body.appendChild(ov);
                     ok.focus();
                 }
+                const capEst = new Map(), capBusy = new Set();
+                const capFleet = (pid) => { const c = NL.cache.latest(new RegExp("^/api/planets/" + pid + "/fleet$")); return c ? c : null; };
+                const bulkPer = (pid) => {
+                    const ids = [pid].concat(flList((NL.cache.latest(/^\/api\/planets$/) || {}).data, "planets").map((p) => Number(p.id)).filter((x) => x !== pid));
+                    for (const id of ids) {
+                        const c = NL.cache.latest(new RegExp("^/api/planets/" + id + "/fleet$")), f = c && c.data;
+                        const b = f && flList(f, "fleet", "ships").find((x) => x && x.definition && x.definition.key === "bulk_carrier");
+                        if (b && flNum(b.definition.cargoCapacity) > 0)
+                            return Math.floor(flNum(b.definition.cargoCapacity) * (1 + flNum(f.cargoBonus)));
+                    }
+                    return 0;
+                };
+                async function capRead(pid) {
+                    if (capBusy.has("f" + pid))
+                        return;
+                    capBusy.add("f" + pid);
+                    try {
+                        await read("/api/planets/" + pid + "/fleet");
+                    }
+                    catch (e) { }
+                    finally {
+                        setTimeout(() => capBusy.delete("f" + pid), 600000);
+                        NL._kick();
+                    }
+                }
+                async function capFuel(pid, ships, key) {
+                    if (capBusy.has(key))
+                        return;
+                    capBusy.add(key);
+                    try {
+                        const ts = await targetsFor(pid), t = ts.find((x) => x.def) || ts[0];
+                        if (!t) {
+                            capEst.set(key, { fuel: null });
+                            return;
+                        }
+                        const rt = route({ target: t, ships, speed: 10, sourceId: pid });
+                        const e = rt.body.ships.length && NL.transportPost ? await NL.transportPost(rt.est[0], rt.est[1], rt.body) : null;
+                        capEst.set(key, { fuel: e && e.fuelCost != null ? flNum(e.fuelCost) : null });
+                    }
+                    catch (e) {
+                        capEst.set(key, { fuel: null });
+                    }
+                    finally {
+                        capBusy.delete(key);
+                        NL._kick();
+                    }
+                }
+                NL.evacuateCap = () => {
+                    const pid = NL.herePlanetId ? Number(NL.herePlanetId()) : null;
+                    if (!pid)
+                        return null;
+                    const c = capFleet(pid);
+                    if (!c || Date.now() - c.at > 60000)
+                        capRead(pid);
+                    if (!c || !c.data)
+                        return null;
+                    const { ships, resources } = fleetOf(c.data);
+                    const pl = fresh(new RegExp("^/api/planets/" + pid + "$")), px = pl && (pl.planet || pl);
+                    const snap = px && ((px.resourceSnapshot && px.resourceSnapshot.resources) || px.resources);
+                    if (snap)
+                        for (const [k, camel] of FL_RES) {
+                            const v = Math.floor(flNum(snap[camel] != null ? snap[camel] : snap[k]));
+                            if (v > 0)
+                                resources[k] = { have: v };
+                            else
+                                delete resources[k];
+                        }
+                    const key = pid + ":" + ships.map((x) => x.key + (x.damaged ? "d" : "") + "x" + x.qty).join(",");
+                    const est = capEst.get(key);
+                    if (!est && ships.length)
+                        capFuel(pid, ships, key);
+                    const fuel = est && est.fuel != null ? Math.ceil(est.fuel) : null;
+                    const h2have = flNum(resources.hydrogen && resources.hydrogen.have);
+                    const load = Object.entries(resources).reduce((a, [k, r]) => a + (k === "hydrogen" ? Math.max(0, flNum(r.have) - (fuel || 0)) : flNum(r.have)), 0);
+                    const room = ships.reduce((a, x) => a + x.qty * x.cargo, 0), short = Math.max(0, load - room);
+                    const per = short > 0 ? bulkPer(pid) : 0, need = short > 0 && per > 0 ? Math.ceil(short / per) : 0;
+                    const ok = short <= 0;
+                    const text = ok ? "Enough ships to evacuate all resources"
+                        : need > 0 ? "Needs " + need.toLocaleString("en-US") + " more Bulk Carrier" + (need === 1 ? "" : "s") + " to evacuate all resources"
+                            : "Not enough ships to evacuate all resources (" + Math.ceil(short).toLocaleString("en-US") + " cargo short)";
+                    const h2 = fuel == null ? null : h2have >= fuel ? { ok: true, short: 0, text: "Enough Hydrogen to evacuate" }
+                        : { ok: false, short: fuel - h2have, text: "Short " + (fuel - h2have).toLocaleString("en-US") + " Hydrogen to evacuate" };
+                    return { ok, need, text, h2 };
+                };
+                NL.onData(/^\/api\/planets\/\d+(\/fleet)?$/, () => NL._kick());
                 NL.evacuate = (btn) => evacuate(btn).catch((e) => ctx.log("evacuate failed", e));
                 NL.evacuateReady = () => !!planetId() && !!NL.fleet;
             },
@@ -29905,7 +30016,7 @@
                     targets: tg,
                     fields: o.fields,
                     speed: o.speed || 100,
-                    hydrogenReserve: 1.2,
+                    hydrogenReserve: 1,
                     cargoNote: o.note,
                     sources: async () => [{ id: Number(id), name }],
                     prepare: async () => {
@@ -30018,7 +30129,11 @@
                     speed: 10,
                     flyOnly: true,
                     leader: true,
-                    note: (state) => { const left = Object.values(state.resources || {}).reduce((a, r) => a + Math.max(0, moN(r && r.have) - moN(r && r.amount)), 0); return left > 0 ? Math.round(left).toLocaleString() + " left behind" : ""; },
+                    note: (state) => {
+                        const fuel = state.est && state.est.fuel != null ? Math.ceil(Number(state.est.fuel)) : 0;
+                        const left = Object.entries(state.resources || {}).reduce((a, [k, r]) => a + Math.max(0, moN(r && r.have) - moN(r && r.amount) - (k === "hydrogen" ? fuel : 0)), 0);
+                        return left > 0 ? Math.round(left).toLocaleString() + " left behind" : "";
+                    },
                 }).catch((e) => ctx.log("moon evacuate failed", e)));
             },
         });
@@ -32460,6 +32575,8 @@
         NL.fl382 = true;
         NL.fl404 = true;
         NL.fl405 = true;
+        NL.fl411 = true;
+        NL.fl412 = true;
         NL.pveQtyDash = true;
         NL.expFast = true;
         NL.css("gl160", ".nxs-tplmsg{margin-left:8px;font-size:13px;white-space:nowrap}.nxs-btn.nxs-tplsure{border-color:#e06c75!important;color:#e06c75!important}");
@@ -32868,7 +32985,7 @@
                     OP_ROUTES[k].key = k;
                 const TCACHE_MS = { [DETAIL_OP]: 600000 };
                 const tcache = new Map();
-                async function transportCall(key, method, payload) {
+                async function transportCall(key, method, payload, xo) {
                     const isRead = method === "GET" && key !== MAP_OP && key !== SYSP_OP;
                     const u = userRead, ck = isRead ? key + "|" + ((payload && payload.id) || "") : null;
                     if (isRead && !u) {
@@ -32878,7 +32995,7 @@
                     }
                     if (method === "GET")
                         await (key === DETAIL_OP && !u ? bulkGate() : soloGate(u));
-                    const d = await transportRaw(key, method, payload);
+                    const d = await transportRaw(key, method, payload, xo);
                     if (method !== "GET" && OP_ROUTES[key] && OP_ROUTES[key].act && NL.fleetChanged)
                         NL.fleetChanged(key);
                     if (NL.fl230 && key === PIRATE_OP && method !== "GET")
@@ -32892,12 +33009,12 @@
                     }
                     return d;
                 }
-                const transportRaw = (key, method, payload) => transportRaw2(key, method, payload);
-                async function transportRaw2(key, method, payload) {
+                const transportRaw = (key, method, payload, xo) => transportRaw2(key, method, payload, xo);
+                async function transportRaw2(key, method, payload, xo) {
                     const sp = OP_ROUTES[key];
                     if (!sp)
                         throw new Error("unknown route " + key);
-                    return NL.transportCall(sp, method, payload, { timeout: READ_TIMEOUT, log: logRead, on429: noteThrottled, pause: false, notFound: sp.act ? "Launch blocked: could not find the game\u2019s " + key + " route (the game may have updated)" : undefined });
+                    return NL.transportCall(sp, method, payload, { timeout: READ_TIMEOUT, log: logRead, on429: noteThrottled, pause: false, ...(xo && xo.headers ? { headers: xo.headers } : {}), notFound: sp.act ? "Launch blocked: could not find the game\u2019s " + key + " route (the game may have updated)" : undefined });
                 }
                 const limiter = { until: 0 };
                 const queue = [];
@@ -36322,7 +36439,7 @@
                     const rows = [];
                     for (const m of Object.values(st.moons)) {
                         const own = mine.has(m.id);
-                        if (m.owner != null && !own)
+                        if (!NL.fl411 && m.owner != null && !own)
                             continue;
                         if (busy.has(m.id) || names.has(m.name) || num(cool[m.id]) > now)
                             continue;
@@ -36404,7 +36521,7 @@
                 async function ruinRecheck(m) {
                     try {
                         const st = await ruinReadSystem({ id: m.sysId, x: m.x, y: m.y, name: m.sysName }, true), now = st.moons[m.id];
-                        if (!now || (now.owner != null && !myMoonIds().has(now.id)))
+                        if (!now || (!NL.fl411 && now.owner != null && !myMoonIds().has(now.id)))
                             toast(m.name + " is no longer open (colonised); it is off the list.");
                         if (S.root || S.ruinRoot)
                             paintRuins();
@@ -39135,6 +39252,45 @@
                     { key: "quantum", label: "Quantum Dust", type: "quantum", miner: "gas_collector" },
                     { key: "dark", label: "Dark Matter", type: "dark", miner: "ice_drill" },
                 ];
+                function humanStore() {
+                    if (S.hcApi && S.hcApi.getState)
+                        return S.hcApi;
+                    const el = document.getElementById("root") || document.body.firstElementChild;
+                    const ck = el && Object.keys(el).find((k) => k.startsWith("__reactContainer$"));
+                    let f0 = ck && el[ck];
+                    f0 = f0 && f0.stateNode && f0.stateNode.current ? f0.stateNode.current : f0;
+                    const isApi = (a) => { try {
+                        const g = a && typeof a === "object" && typeof a.getState === "function" && typeof a.subscribe === "function" && a.getState();
+                        return !!g && typeof g.open_ === "function" && typeof g.complete === "function" && typeof g.cancel === "function" && "challenge" in g;
+                    }
+                    catch (e) {
+                        return false;
+                    } };
+                    const seen = new Set(), stack = f0 ? [f0] : [];
+                    for (let n = 0; stack.length && n < 50000; n++) {
+                        const f = stack.pop();
+                        if (!f || seen.has(f))
+                            continue;
+                        seen.add(f);
+                        if (typeof f.type === "function")
+                            for (let h = f.memoizedState, i = 0; h && typeof h === "object" && "next" in h && i < 40; h = h.next, i++) {
+                                const ms = h.memoizedState, deps = Array.isArray(ms) && Array.isArray(ms[1]) ? ms[1] : null;
+                                if (deps)
+                                    for (const d of deps)
+                                        if (isApi(d)) {
+                                            S.hcApi = d;
+                                            return d;
+                                        }
+                            }
+                        if (f.sibling)
+                            stack.push(f.sibling);
+                        if (f.child)
+                            stack.push(f.child);
+                    }
+                    return null;
+                }
+                NL.humanCheck = async (challenge) => { const api = NL.fl412 && challenge ? humanStore() : null; return api ? api.getState().open_(challenge) : null; };
+                const isHumanCheck = (err) => !!err && num(err.status) === 409 && err.code === "HUMAN_CHALLENGE_REQUIRED";
                 const MINE_REFUSE_MS = 600000;
                 function mineRefusedAdd(set) {
                     if (!NL.fl405 || !S.mineRefused)
@@ -39704,7 +39860,35 @@
                         go.disabled = true;
                         go.textContent = "Launching\u2026";
                         try {
-                            const d = await transportCall(MINE_OP, "POST", { id: null, query: {}, body: { useHighway: true, sourcePlanetId: st.src, targetFieldId: f.id, ships, miningDuration: MINE_SECS, attachLeader: !!st.leader, hangarAssignments: {}, mineUntilFull: true } });
+                            const mp = { id: null, query: {}, body: { useHighway: true, sourcePlanetId: st.src, targetFieldId: f.id, ships, miningDuration: MINE_SECS, attachLeader: !!st.leader, hangarAssignments: {}, mineUntilFull: true } };
+                            let d;
+                            try {
+                                d = await transportCall(MINE_OP, "POST", mp);
+                            }
+                            catch (e1) {
+                                if (!NL.fl412 || !isHumanCheck(e1))
+                                    throw e1;
+                                const ch = e1.body && e1.body.challenge;
+                                if (!ch || !humanStore())
+                                    throw Object.assign(new Error("The game wants a human check. Launch this belt from the game\u2019s own Mine screen to see it."), { status: 409, code: e1.code, hc: true });
+                                ov.classList.remove("nxs-oc");
+                                ov.classList.add("nxs-hc");
+                                go.textContent = "Waiting for the human check\u2026";
+                                let grant;
+                                try {
+                                    grant = await NL.humanCheck(ch);
+                                }
+                                catch (e2) {
+                                    throw Object.assign(new Error("Human check closed; nothing was sent. Press Launch to try again."), { status: 409, code: e1.code, hc: true });
+                                }
+                                finally {
+                                    ov.classList.remove("nxs-hc");
+                                }
+                                if (!grant)
+                                    throw Object.assign(new Error("The game wants a human check. Launch this belt from the game\u2019s own Mine screen to see it."), { status: 409, code: e1.code, hc: true });
+                                go.textContent = "Launching\u2026";
+                                d = await transportCall(MINE_OP, "POST", mp, { headers: { "X-Human-Challenge-Grant": String(grant) } });
+                            }
                             const mission = (d && d.mission) || null, srcName = (srcPlanet() || {}).name || "planet";
                             (S.mineSent = S.mineSent || new Map()).set(+f.id, Date.now());
                             if (S.mineRoot)
@@ -39746,7 +39930,7 @@
                             renderState();
                             msg.innerHTML += "<br><span class=\"nxs-r\">Launch failed: " + esc(err && err.message || err) + "</span>";
                             const sc = num(err && err.status);
-                            if (NL.fl405 && sc >= 400 && sc < 500 && sc !== 429) {
+                            if (NL.fl405 && sc >= 400 && sc < 500 && sc !== 429 && !(err && (err.hc || isHumanCheck(err)))) {
                                 (S.mineRefused = S.mineRefused || new Map()).set(+f.id, Date.now());
                                 msg.innerHTML += "<br><span class=\"nxs-dim\">" + esc(f.name) + " is hidden from the Mining list for 10 minutes (Refresh shows it again).</span>";
                                 if (S.mineRoot)
@@ -39901,6 +40085,7 @@
     .nxs-ut td{cursor:pointer;color:#cfe9ff;font-size:12px;border-top:1px solid rgba(56,189,248,.3)}.nxs-ut:hover td{background:#12264a}
     .nxs-btn:disabled{opacity:.35;cursor:default}
     .nxs-overlay{position:fixed;inset:0;background:rgba(2,6,14,.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px}
+    .nxs-overlay.nxs-hc{visibility:hidden}
     .nxs-overlay.nxs-oc{visibility:hidden;pointer-events:none}
     .nxs-modal{width:min(620px,100%);max-height:92vh;overflow:auto;background:var(--bg-card,rgba(8,16,32,.98));border:1px solid rgba(56,189,248,.3);border-radius:10px;color:var(--text-primary,#f1f6ff);box-shadow:0 12px 48px rgba(0,0,0,.6)}
     .nxs-mh{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(120,144,165,.25);font-size:15px}

@@ -1,5 +1,17 @@
 # Release notes
 
+## v0.5.129 · Nov 17, 2026
+
+**🌙 Moons**
+- Every moon send (Evacuate, Collect, Call Ships) takes exactly the fuel it needs, with no extra margin; "left behind" no longer counts the fuel (MO-053, FL-410)
+- Overview shows how much Evacuate can carry (OV-020)
+
+**🏛 Ruins**
+- Fleet > Ruins lists colonized Ancient moons (FL-411)
+
+**⛏ Mining**
+- When the game asks for its verification puzzle on a Mine launch, our dialog opens the game's own puzzle; you solve it and the launch is sent (FL-412, GL-330)
+
 ## v0.5.128 · Nov 17, 2026
 
 **⛏ Mining**
