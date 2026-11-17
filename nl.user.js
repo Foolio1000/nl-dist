@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.127
+// @version      0.5.128
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.127", features: [] };
+    const NL = window.__nl2 = { version: "0.5.128", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1671,6 +1671,11 @@
                 net.backoff = 0;
         };
         const isLaunch = (route, isGet) => typeof route === "string" && !isGet && /^POST \/(fleet|outposts|stations|moons)\//.test(route) && !/estimate|preview/.test(route);
+        const errOf = (b, status) => {
+            const pick = (v) => (typeof v === "string" && v ? v : null);
+            const msg = (b && (pick(b.error) || pick(b.message) || pick(b.code))) || ("HTTP " + status);
+            return Object.assign(new Error(msg), { status, code: b && b.code != null ? b.code : undefined, body: b || null });
+        };
         const plainLogged = new Set();
         const plainCall = async (route, sp, method, payload, o, pause, what) => {
             const pr = typeof route === "string" ? route : sp.plain;
@@ -1731,8 +1736,10 @@
                 o.on429();
             if (pause)
                 backoffOn(r.status, pr);
-            if (!r.ok)
-                throw fail((j && (j.error || j.message)) || ("HTTP " + r.status), r.status);
+            if (!r.ok) {
+                const e = errOf(j, r.status);
+                throw Object.assign(fail(e.message, r.status), { code: e.code, body: e.body });
+            }
             if (!j)
                 throw fail("empty body");
             if (isLaunch(typeof route === "string" ? route : pr, isGet) && NL.fleetChanged)
@@ -1791,7 +1798,16 @@
                 if (o.log)
                     o.log(what, Date.now() - t0, r.status);
                 const j = await r.json().catch(() => null);
-                if (r.status === 403 && j && j.code === "DYNAMIC_API_REQUIRED") {
+                let jd = j;
+                if (!r.ok && j && typeof j === "object") {
+                    try {
+                        jd = c.codec.decode(j) || j;
+                    }
+                    catch (e) {
+                        jd = j;
+                    }
+                }
+                if (r.status === 403 && ((j && j.code === "DYNAMIC_API_REQUIRED") || (jd && jd.code === "DYNAMIC_API_REQUIRED"))) {
                     tctx = null;
                     continue;
                 }
@@ -1800,7 +1816,7 @@
                 if (pause)
                     backoffOn(r.status, sp.label || what);
                 if (!r.ok)
-                    throw Object.assign(new Error((j && (j.error || j.message)) || ("HTTP " + r.status)), { status: r.status });
+                    throw errOf(jd && (jd.error || jd.message || jd.code) ? jd : j, r.status);
                 if (!j)
                     throw new Error("empty body");
                 if (isLaunch(route, isGet) && NL.fleetChanged)
@@ -10440,21 +10456,19 @@
                 const e = live.get(String(userId));
                 if (!e)
                     return false;
-                let cur = scoreOf(e, "overall");
-                if (cur == null || e.overallScore == null) {
-                    const m = scoreOf(e, "military"), ec = scoreOf(e, "economy"), r = scoreOf(e, "research");
-                    if (m != null && ec != null && r != null)
-                        cur = m + ec + r;
-                }
-                if (cur == null)
+                const m = scoreOf(e, "military"), ec = scoreOf(e, "economy");
+                if (m == null || ec == null)
                     return false;
+                const flat = (now0, old) => (old > 0 ? ((now0 - old) / old) * 100 < 0.05 : now0 <= old);
                 const t = utc(now || Date.now());
                 for (let i = 2; i <= 7; i++) {
                     const d = dayOf(shift(t, -i));
                     const r = d && d.u && d.u[String(userId)];
-                    if (!r || r[0] == null)
+                    if (!r)
                         continue;
-                    return r[0] === cur;
+                    if (r[1] == null || r[2] == null)
+                        return false;
+                    return flat(m, r[1]) && flat(ec, r[2]);
                 }
                 return false;
             };
@@ -28022,11 +28036,12 @@
                 }
                 const tipCut = (tbl) => { for (const td of tbl.querySelectorAll("td[data-nl2-emx-n]"))
                     NL.tip(td, td.scrollWidth > td.clientWidth + 1 ? td.textContent.trim() : ""); };
-                let plOrd = null, plReading = false;
+                let plOrd = null, plReading = false, plList = [];
                 const gotPlanets = (d) => {
                     const list = Array.isArray(d) ? d : (d && d.planets) || [];
                     if (!list.length)
                         return;
+                    plList = list.filter((p) => p && p.id != null && p.name).map((p) => ({ key: "planet:" + p.id, name: String(p.name) }));
                     plOrd = new Map(list.filter((p) => p && p.name).map((p, i) => [String(p.name), [Number(p.sortOrder) || 0, i]])
                         .sort((a, b) => a[1][0] - b[1][0] || a[1][1] - b[1][1]).map(([n], i) => [n, i]));
                 };
@@ -28092,8 +28107,11 @@
                     const has = (k) => sum([((data.locations || []).find((x) => String(x.key) === k) || {}).ships]) + sum(ms.filter((x) => x.key === k).map((x) => x.m.ships)) > 0;
                     const bld = building();
                     for (const k of [...cols.keys()])
-                        if (!has(k) && !bld.has(k))
+                        if (!has(k) && !bld.has(k) && !k.startsWith("planet:"))
                             cols.delete(k);
+                    for (const p of plList)
+                        if (!cols.has(p.key))
+                            cols.set(p.key, p.name);
                     const cmp = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) {
                         const d = (a[i] || 0) - (b[i] || 0);
                         if (d)
@@ -32440,6 +32458,8 @@
         NL.tplInline = true;
         NL.stnFresh = true;
         NL.fl382 = true;
+        NL.fl404 = true;
+        NL.fl405 = true;
         NL.pveQtyDash = true;
         NL.expFast = true;
         NL.css("gl160", ".nxs-tplmsg{margin-left:8px;font-size:13px;white-space:nowrap}.nxs-btn.nxs-tplsure{border-color:#e06c75!important;color:#e06c75!important}");
@@ -34036,6 +34056,7 @@
                 const ACT_COL = { Wormhole: ["#2563eb", "#fff"], "Pirate Camp": ["#e0572b", "#fff"], Mining: ["#d99a12", "#1c1403"], Debris: ["#a8581f", "#fff"], "Station Loot": ["#25a05a", "#fff"], "Moon Loot": ["#9acd32", "#14200a"], "Outpost Collect": ["#d6409f", "#fff"], Investigate: ["#8a5cf0", "#fff"], Survey: ["#44546a", "#e8eef8", "inset 0 0 0 1px #8ea2bd"], Expedition: ["#22c3dd", "#04181c"], Explore: ["#1e3a5f", "#cfe3ff", "inset 0 0 0 1px #5b8fd1"], Deliver: ["#0f766e", "#fff"], _: ["#4b5563", "#fff"] };
                 const RES_ABBR = { ore: ["ORE", "Ore"], gas: ["GAS", "Gas"], plasma: ["PLS", "Plasma"], ice: ["ICE", "Cryo-Ice"], quantum: ["QD", "Quantum Dust"], dark: ["DM", "Dark Matter"] };
                 const MINE_BASE = { miner: { ore: 40, plasma: 15 }, gas_collector: { gas: 15, quantum: 3 }, ice_drill: { ice: 20, dark: 3 } };
+                const EXC_RATE = { ore: 40, gas: 13, plasma: 24, ice: 8 };
                 const MINE_HOLD = { miner: 840, gas_collector: 1120, ice_drill: 840, excavator: 1400 };
                 const CYCLE_MS = 600000, PRED_KEY = "nxsMinePred";
                 const MINE_FLOOR = () => pveNum("mineFloor", 20);
@@ -34049,17 +34070,23 @@
                 } return v == null ? d : v; };
                 const CYC_KEY = "nxsMineCycles", EFF_KEY = "nxsMineEff";
                 function mineYield(fc, ftype, rich) {
-                    let hold = 0, y = 0, exc = false;
+                    let hold = 0, y = 0, exc = false, ey = 0, other = false;
                     for (const x of fc) {
                         const q = num(x.quantity), k = x.shipKey;
                         if (!q)
                             continue;
                         hold += q * (num(x.miningCargoCapacity) || num(x.effectiveMiningCargoCapacity) || MINE_HOLD[k] || 0);
-                        if (k === "excavator")
+                        if (k === "excavator") {
                             exc = true;
-                        else if (MINE_BASE[k] && MINE_BASE[k][ftype])
+                            ey += q * (EXC_RATE[ftype] || 0);
+                        }
+                        else if (MINE_BASE[k] && MINE_BASE[k][ftype]) {
                             y += q * MINE_BASE[k][ftype];
+                            other = true;
+                        }
                     }
+                    if (NL.fl404 && exc && !other)
+                        y = ey;
                     return { hold, y: y * 2 * rich * (exc ? 1.2 : 1) };
                 }
                 NL.mineFieldRem = (id) => { const fld = S.fieldMap && S.fieldMap.get(+id); return fld ? num(fld.f.remaining) : null; };
@@ -38334,8 +38361,12 @@
                 const MT3_ONE = "nl2.mtOne", MT3_MULT = "nl2.mtMult", MT3_SORT = "nl2.mtSort", MT3_MULTS = [1, 2, 4, 8], MT3_EST_MS = 600000, MT3_SHIP_MS = 60000;
                 const mt3One = () => !!NL.fl192 && !!lsGet(MT3_ONE, false);
                 const mt3Mult = () => { const m = +lsGet(MT3_MULT, 1); return mt3One() && MT3_MULTS.includes(m) ? m : 1; };
+                const MT3_EXC = "nl2.mtExc";
+                const mtExc = () => !!NL.fl404 && !!NL.fl194 && !!lsGet(MT3_EXC, false);
+                const exR = (R) => (R && !R.exm && mtExc() && EXC_RATE[R.type] ? Object.assign({}, R, { miner: "excavator", exm: true }) : R);
+                const mRate = (R) => (R.exm ? EXC_RATE[R.type] : (MINE_BASE[R.miner] || {})[R.type]) || 0;
                 function mineFleet(R, f, ships, tpl, mult) {
-                    const miner = ships.find((x) => x.key === R.miner), exc = ships.find((x) => x.key === "excavator");
+                    const miner = ships.find((x) => x.key === R.miner), exc = R.exm ? null : ships.find((x) => x.key === "excavator");
                     if (!miner || !num(miner.mc))
                         return null;
                     const rem = num(f.remaining), excHold = exc ? num(exc.mc) : 0;
@@ -38358,7 +38389,7 @@
                     }
                     let cy = null;
                     if (n > 0) {
-                        const hold = n * num(miner.mc) + (exc ? num(exc.mc) : 0), y = n * ((MINE_BASE[R.miner] || {})[R.type] || 0) * 2 * num(f.richness) * (exc ? 1.2 : 1);
+                        const hold = n * num(miner.mc) + (exc ? num(exc.mc) : 0), y = n * mRate(R) * 2 * num(f.richness) * (exc || R.exm ? 1.2 : 1);
                         cy = y > 0 && hold > 0 ? Math.max(1, Math.ceil(Math.min(hold, rem) / y)) : null;
                     }
                     return { n, target, act, cy };
@@ -38407,7 +38438,7 @@
                         paintMineTab(); });
                     return fx && me.ships === null ? undefined : me.ships;
                 }
-                const mt3Key = (src, R, f) => src + "|" + R.key + "|" + f.id;
+                const mt3Key = (src, R, f) => src + "|" + R.key + (R.exm ? "~x" : "") + "|" + f.id;
                 function mt3Fill(src, R) {
                     if (!NL.fl193 || S.mtQ)
                         return;
@@ -38472,7 +38503,7 @@
                     const m4 = !!NL.flMine4;
                     return "<section class=\"nxs-wrap nxs-mtab nl2-mt3" + (m4 ? " nl2-mt4" : "") + "\"><div class=\"nxs-head\">"
                         + (m4 ? "<span class=\"nl2-mt-chips\">" + chips + "</span>" : "<strong>Mining</strong><span class=\"nxs-info nl2-mt-n\"></span>")
-                        + "<span class=\"nxs-hbtns nl2-ctl\">" + one + (m4 ? "" : "<span class=\"nl2-mt-chips\">" + chips + "</span>")
+                        + "<span class=\"nxs-hbtns nl2-ctl\">" + (NL.fl404 ? "<label class=\"nxs-chk nl2-mt-exc\"><input type=\"checkbox\" data-mtexc> Excavator mode</label>" : "") + one + (m4 ? "" : "<span class=\"nl2-mt-chips\">" + chips + "</span>")
                         + "<span class=\"nxs-dim\">From</span><select class=\"nxs-sel\" data-mtsrc data-nl2-tip=\"Distances are measured from this planet; Mine opens with it\"></select>"
                         + "<span class=\"nxs-dim\">Range</span><span class=\"nl2-mt-rbox\"><input type=\"text\" inputmode=\"numeric\" autocomplete=\"off\" class=\"nxs-in nl2-mt-range\" data-mtrange><span class=\"nl2-mt-ly\">ly</span></span>"
                         + (NL.flMinRich ? "<span class=\"nxs-dim\">Min richness</span><input type=\"text\" inputmode=\"decimal\" autocomplete=\"off\" class=\"nxs-in nl2-mt-rich\" data-mtrich " + NL.tipA + "=\"Hide belts below this richness; empty shows all\">" : "")
@@ -38488,6 +38519,20 @@
                     const ob = sec.querySelector("[data-mtone]"), one = mt3One(), mult = mt3Mult();
                     if (ob && ob.checked !== one)
                         ob.checked = one;
+                    const xb = sec.querySelector("[data-mtexc]");
+                    if (xb) {
+                        const st = mineTabState(), R = MINE_RES.find((r) => r.key === st.res) || MINE_RES[0], can = !!EXC_RATE[R.type], on = !!lsGet(MT3_EXC, false), lb = xb.closest("label");
+                        if (xb.checked !== on)
+                            xb.checked = on;
+                        if (xb.disabled === can)
+                            xb.disabled = !can;
+                        const tip = can ? "Send Excavators as the mining ship instead of " + (R.miner === "miner" ? "Miners" : R.miner === "gas_collector" ? "Gas Collectors" : "Ice Drills") + "; escorts follow the Excavator count" : "Excavators don't mine " + R.label;
+                        if (lb) {
+                            if (lb.getAttribute(NL.tipA) !== tip)
+                                lb.setAttribute(NL.tipA, tip);
+                            lb.classList.toggle("nl2-mt-off", !can);
+                        }
+                    }
                     const box = sec.querySelector("[data-mtmultbox]");
                     if (box) {
                         if (box.hidden === one)
@@ -38520,7 +38565,7 @@
                         return { ms: Infinity, html: dim("\u2014", e.fail ? "The game did not answer the trip estimate; Refresh to try again" : "No travel estimate") };
                     const out = e.t * 1000, mine = fl.cy * CYCLE_MS, ms = out * 2 + mine;
                     const cls = ms > 2 * 3600000 ? " nxs-r" : ms > 3600000 ? " nxs-y" : "";
-                    const tip = fmtCd(out) + " out \u00B7 " + fmtCd(mine) + " mining (" + fl.cy + " cycle" + (fl.cy === 1 ? "" : "s") + ", " + fmt(fl.n) + " miners" + (mult > 1 ? ", " + mult + "x" : "") + ") \u00B7 " + fmtCd(out) + " back. Assumes no pirate raid.";
+                    const tip = fmtCd(out) + " out \u00B7 " + fmtCd(mine) + " mining (" + fl.cy + " cycle" + (fl.cy === 1 ? "" : "s") + ", " + fmt(fl.n) + (R.exm ? " Excavators" : " miners") + (mult > 1 ? ", " + mult + "x" : "") + ") \u00B7 " + fmtCd(out) + " back. Assumes no pirate raid.";
                     return { ms, html: "<span class=\"nxs-est" + cls + "\" " + NL.tipA + "=\"" + esc(tip) + "\">" + fmtCd(ms) + "</span>" };
                 }
                 function mt3Rows(sec, st, belts, R, src) {
@@ -38587,7 +38632,7 @@
                     const root = S.mineRoot, sec = root && root.querySelector(".nxs-mtab");
                     if (!sec)
                         return;
-                    const st = mineTabState(), R = MINE_RES.find((r) => r.key === st.res) || MINE_RES[0];
+                    const st = mineTabState(), R = exR(MINE_RES.find((r) => r.key === st.res) || MINE_RES[0]);
                     if (NL.fl194)
                         mt3Ctl(sec);
                     for (const b of sec.querySelectorAll("[data-mtres]"))
@@ -38621,6 +38666,7 @@
                         if (S.mineSent)
                             for (const fid of S.mineSent.keys())
                                 busy.add(fid);
+                        mineRefusedAdd(busy);
                         for (const sy of S.fieldIdx.systems) {
                             if (sy.fieldType !== R.type || sy.securityZone !== "dead" || !Array.isArray(sy.fields))
                                 continue;
@@ -38678,10 +38724,8 @@
                     if (rf && !rf.disabled) {
                         rf.disabled = true;
                         S.mtShips = null;
-                        if (S.mtEst)
-                            S.mtEst.clear();
-                        S.fieldIdx = S.fieldIdx ? { ...S.fieldIdx, at: 0 } : null;
-                        S.outpSet = S.outpSet ? { ...S.outpSet, at: 0 } : null;
+                        if (S.mineRefused)
+                            S.mineRefused.clear();
                         U(() => Promise.all([loadFieldIndex(), loadMyOutposts(), loadMissions(), NL.flIdleRead ? loadProbes().then(paintIdle) : null])).catch(() => { }).finally(() => { rf.disabled = false; paintIdle(); paintMineTab(); });
                     }
                 }
@@ -38699,6 +38743,10 @@
                     }
                     else if (e.target.hasAttribute("data-mtone")) {
                         lsSet(MT3_ONE, e.target.checked);
+                        paintMineTab();
+                    }
+                    else if (e.target.hasAttribute("data-mtexc")) {
+                        lsSet(MT3_EXC, e.target.checked);
                         paintMineTab();
                     }
                 }
@@ -39087,6 +39135,17 @@
                     { key: "quantum", label: "Quantum Dust", type: "quantum", miner: "gas_collector" },
                     { key: "dark", label: "Dark Matter", type: "dark", miner: "ice_drill" },
                 ];
+                const MINE_REFUSE_MS = 600000;
+                function mineRefusedAdd(set) {
+                    if (!NL.fl405 || !S.mineRefused)
+                        return;
+                    for (const [fid, t] of S.mineRefused) {
+                        if (Date.now() - t < MINE_REFUSE_MS)
+                            set.add(fid);
+                        else
+                            S.mineRefused.delete(fid);
+                    }
+                }
                 const MINE_SHIPS = ["miner", "gas_collector", "ice_drill", "excavator", "probe", "spy_probe"];
                 const FIELDS_OP = "fields", MINE_OP = "mine", FIELD_TTL = 60000, MINE_RANGE_KEY = "nxsMineRange", MINE_LIMIT = 10, MINE_SECS = 600;
                 async function loadFieldIndex() {
@@ -39176,7 +39235,9 @@
                         if (!Array.isArray(fc))
                             continue;
                         const isMiner = (x) => x.shipKey !== "excavator" && (num(x.miningCargoCapacity) > 0 || MINE_BASE[x.shipKey]);
-                        const miners = fc.filter(isMiner).reduce((a, x) => a + num(x.quantity), 0);
+                        let miners = fc.filter(isMiner).reduce((a, x) => a + num(x.quantity), 0);
+                        if (!miners && NL.fl404)
+                            miners = fc.filter((x) => x.shipKey === "excavator").reduce((a, x) => a + num(x.quantity), 0);
                         if (!miners)
                             continue;
                         const ratio = {}, names = {};
@@ -39243,6 +39304,7 @@
                         if (S.mineSent)
                             for (const fid of S.mineSent.keys())
                                 busy.add(fid);
+                        mineRefusedAdd(busy);
                         for (const s of st.systems) {
                             if (s.fieldType !== R.type || s.securityZone !== "dead" || !Array.isArray(s.fields))
                                 continue;
@@ -39356,7 +39418,7 @@
                     function defaultLeader() { st.leader = false; renderLeader(); }
                     function renderFs() { fsEl.innerHTML = slotsHtml(); }
                     function recalc(minersOverride) {
-                        const miner = shipOf(R.miner), exc = shipOf("excavator");
+                        const miner = shipOf(R.miner), exc = R.exm ? null : shipOf("excavator");
                         st.act = {};
                         const notes = [];
                         if (!miner || !num(miner.mc)) {
@@ -39387,7 +39449,8 @@
                         if (n > 0 && n < MINE_FLOOR())
                             notes.push("<span class=\"nxs-y\">\u26A0 Only " + fmt(n) + " mining ships: below the floor of " + MINE_FLOOR() + " (combat with small escorts behaves oddly).</span>");
                         st.act[R.miner] = n;
-                        if (exc)
+                        if (R.exm) { }
+                        else if (exc)
                             st.act.excavator = 1;
                         else
                             notes.push("<span class=\"nxs-r\">\u2716 No Excavator on " + esc((srcPlanet() || {}).name || "this planet") + ": the +20% bonus is lost.</span>");
@@ -39435,11 +39498,11 @@
                         return { html: parts.join("<br>"), bad };
                     }
                     function cyclesNow() {
-                        const miner = shipOf(R.miner), exc = shipOf("excavator"), n = st.act[R.miner] || 0;
+                        const miner = shipOf(R.miner), exc = R.exm ? null : shipOf("excavator"), n = st.act[R.miner] || 0;
                         if (!miner || !n)
                             return null;
                         const hold = n * num(miner.mc) + (st.act.excavator && exc ? num(exc.mc) : 0);
-                        const y = n * (MINE_BASE[R.miner] || {})[R.type] * 2 * num(f.richness) * (st.act.excavator ? 1.2 : 1);
+                        const y = n * mRate(R) * 2 * num(f.richness) * (st.act.excavator ? 1.2 : 1);
                         return y > 0 && hold > 0 ? Math.max(1, Math.ceil(Math.min(hold, num(f.remaining)) / y)) : null;
                     }
                     function renderState() {
@@ -39656,7 +39719,7 @@
                                 lsSet(CYC_KEY, cyc);
                             }
                             if (NL.fl289 && NL.minePlanSave && cyclesNow()) {
-                                const mn = shipOf(R.miner), ex = shipOf("excavator"), n = st.act[R.miner] || 0;
+                                const mn = shipOf(R.miner), ex = R.exm ? null : shipOf("excavator"), n = st.act[R.miner] || 0;
                                 NL.minePlanSave(mission && mission.id != null ? mission.id : null, { c: cyclesNow(), rem: num(f.remaining), hold: n * num(mn && mn.mc) + (st.act.excavator && ex ? num(ex.mc) : 0), field: f.id, type: R.type, ship: R.miner, miners: n, exc: !!st.act.excavator, rich: num(f.richness) });
                             }
                             closeModal();
@@ -39682,6 +39745,13 @@
                             go.textContent = "Launch";
                             renderState();
                             msg.innerHTML += "<br><span class=\"nxs-r\">Launch failed: " + esc(err && err.message || err) + "</span>";
+                            const sc = num(err && err.status);
+                            if (NL.fl405 && sc >= 400 && sc < 500 && sc !== 429) {
+                                (S.mineRefused = S.mineRefused || new Map()).set(+f.id, Date.now());
+                                msg.innerHTML += "<br><span class=\"nxs-dim\">" + esc(f.name) + " is hidden from the Mining list for 10 minutes (Refresh shows it again).</span>";
+                                if (S.mineRoot)
+                                    paintMineTab();
+                            }
                         }
                     });
                     const pLoad = loadSource();
@@ -39845,6 +39915,7 @@
     .nxs-moresum{cursor:pointer;color:#7890a5;font-size:13px;padding:4px 0;user-select:none}
     .nxs-more[open] .nxs-moresum{color:#cfe9ff}
     .nxs-chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+    .nl2-mt-exc.nl2-mt-off{opacity:.45;cursor:default}
     .nxs-tplbar{margin:8px 0 4px;display:flex;gap:8px;align-items:center}
     .nxs-ruinown{color:#38bdf8;font-size:12px}
     .nxs-sel{background:#0b1929;border:1px solid #52738c;border-radius:5px;color:#f1f6ff;font:inherit;padding:2px 6px}

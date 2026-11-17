@@ -1,5 +1,18 @@
 # Release notes
 
+## v0.5.128 · Nov 17, 2026
+
+**⛏ Mining**
+- Excavator mode on Fleet > Mining: send Excavators on their own at their own mining rate, left of One click mode (FL-404)
+- A mining belt the game refuses is hidden for 10 minutes instead of failing again (FL-405)
+- Refused launches now show the game's real reason instead of a bare 409 (GL-320)
+
+**🏠 Command Center**
+- The Fleet tab always lists every planet (EM-035); its input boxes follow the standard look
+
+**🏆 Rankings**
+- Inactive players are flagged (GL-319)
+
 ## v0.5.127 · Nov 16, 2026
 
 **⚔️ PVP and Intel**
