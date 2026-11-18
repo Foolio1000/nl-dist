@@ -1,5 +1,34 @@
 # Release notes
 
+## v0.5.131 · Nov 18, 2026
+
+**⛏ Mining and PVE**
+- PVE launches (Investigate, Pirates, Wormholes, Collect, Survey Ruins, Expeditions, Salvage Patrol) and Mining now use the shared fleet dialog (FL-427, FL-428), with the human check on every PVE launch (FL-419)
+- Salvage Patrol shows Escort, Cargo band and System Depletion for the chosen duration (FL-417)
+- Survey Ruins times and cooldowns come from the game (2h / 24h) (FL-420); a "Dig sites:" line under Ruins (FL-421)
+- Expeditions line shows an open Genesis signal or run (FL-422)
+- Salvage Patrol and Ruin Survey outcomes are recorded (FL-432, FL-433)
+
+**🛰 Fleet**
+- Active table keeps its scroll position on Recall and refresh (FL-435)
+- Gather Fleets Transfer checks you're still on the same planet before sending (SH-045)
+
+**⚔️ PVP and Overview**
+- Scouts to beat on Foreign Fleets rows and in the attack banner, matching each other (OV-022, GL-336)
+
+**🛡 Station Operations and times**
+- Station Operations times, idle-yard "Hidden until" and the banner "Resets at" are in UTC (GL-321, GL-322, GL-334)
+
+**🎨 Look**
+- Market Open Orders on the standard table look (GL-323); new shared input and section standard (GL-324, GL-325, GL-326, GL-327)
+- Tables with a few clickable headers still sort their other columns (EM-036)
+- Shared colour variables for the STYLE colours, and a style check that flags new raw colour codes (GL-093); table check at real screen widths (GL-179)
+
+**🔧 Under the hood**
+- Build runs an ESLint check, warnings only (GL-094); escaping audit found nothing unescaped (GL-092)
+- Message quiet uses the shared game socket feed (GL-310)
+- Tracker sweep (GL-083) and a test update (RE-035)
+
 ## v0.5.130 · Nov 18, 2026
 
 **🛰 Fleet**
