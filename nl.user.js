@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.132
+// @version      0.5.133
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.132", features: [] };
+    const NL = window.__nl2 = { version: "0.5.133", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1003,6 +1003,9 @@
         NL.fleetOnce = true;
         NL.fleetSecBar = true;
         NL.fleetFit = true;
+        NL.fleetAtkKit = true;
+        NL.fleetInstant = true;
+        NL.fleetHw = true;
         NL.fleetHold = true;
         NL.noShipsRed = true;
         const SPEEDS = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10];
@@ -1051,6 +1054,8 @@
     .nl2-fleet-oc{display:none!important}.nl2-fleet-hang{margin-top:8px}.nl2-fleet-note2{color:#94a3b8;font-size:13px;margin:4px 0}.nl2-fleet-chks{margin-top:6px}.nl2-fleet-chk{margin:2px 0}.nl2-fleet-chk.nl2-red{color:#f87171}.nl2-fleet-chk.nl2-yel{color:#fbbf24}
     .nl2-fleet-ask{margin-top:8px;padding:8px 10px;border:1px solid rgba(251,191,36,.45);border-radius:6px;color:#fde68a}.nl2-fleet-askb{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
     .nl2-fleet-msg.nl2-ok{color:#86efac}.nl2-fleet-msg.nl2-fleet-red{color:#f87171}
+    .nl2-fleet-phov{position:fixed;inset:0;background:rgba(2,6,14,.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px}.nl2-fleet-loading{padding:18px 0;color:var(--nl2-dim, #8aa3c0)}
+    .nl2-fleet-warn{color:var(--nl2-bad, #f87171);white-space:nowrap}
     .nl2-fleet-tools{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin:6px 0}
     .nl2-fleet-tools .nl2-fleet-btn{flex:1;white-space:nowrap}
     .nl2-fleet-tt{display:flex;align-items:center;gap:6px;flex:1;min-width:180px}
@@ -1081,7 +1086,7 @@
             return 0;
         };
         function applyPrep(st, prep) {
-            st.ships = (prep.ships || []).map((s) => ({ key: s.key, type: s.type || null, allowedCargo: s.allowedCargo || [], damaged: !!s.damaged, group: s.group ? String(s.group) : null, name: (s.name || label(s.type || s.key)) + (s.damaged ? " (damaged)" : ""), have: Math.max(0, Number(s.have) || 0), qty: Math.max(0, Number(s.qty) || 0), cargo: s.damaged ? 0 : Math.max(0, Number(s.cargo) || 0), hp: Math.max(0, Number(s.hp) || 0) }));
+            st.ships = (prep.ships || []).map((s) => ({ key: s.key, type: s.type || null, allowedCargo: s.allowedCargo || [], damaged: !!s.damaged, group: s.group ? String(s.group) : null, name: (s.name || label(s.type || s.key)) + (s.damaged ? " (damaged)" : ""), have: Math.max(0, Number(s.have) || 0), qty: Math.max(0, Number(s.qty) || 0), cargo: s.damaged ? 0 : Math.max(0, Number(s.cargo) || 0), hp: Math.max(0, Number(s.hp) || 0), groupColor: s.groupColor || null, warn: s.warn || "" }));
             if (NL.gl249)
                 for (let i = 0; i < st.ships.length; i++) {
                     const s = (prep.ships || [])[i] || {};
@@ -1145,6 +1150,7 @@
             ...(st.hangarOn ? { hangar: hangarBody(st) } : {}),
         });
         const WINGS = [["fighter", "fighter", "Fighters"], ["bomber", "bomber", "Bombers"], ["shuttle", "assault_shuttle", "Assault Shuttles"]];
+        const hangShuttles = (st) => (NL.fleetAtkKit && typeof st.hangarOn.shuttles === "function" ? !!st.hangarOn.shuttles() : !!st.hangarOn.shuttles);
         const shipCount = (st, k) => st.ships.reduce((a, s) => a + (String(s.type || s.key) === k ? s.qty : 0), 0);
         function hangPlan(st) {
             const lv = Math.max(0, Math.floor(Number(typeof st.hangarOn.level === "function" ? st.hangarOn.level() : st.hangarOn.level) || 0));
@@ -1152,7 +1158,7 @@
             let left = shipCount(st, "carrier");
             const out = {};
             for (const [g, key] of WINGS) {
-                if (g === "shuttle" && !st.hangarOn.shuttles)
+                if (g === "shuttle" && !hangShuttles(st))
                     continue;
                 const sel = shipCount(st, key), max = Math.min(sel, per[g] * left), want = st.hTouch[g] ? st.hShips[g] : sel, n = Math.max(0, Math.min(want, max)), c = Math.ceil(n / per[g]);
                 out[g] = { n, max, per: per[g], carriers: c, has: st.ships.some((s) => String(s.type || s.key) === key) };
@@ -1168,14 +1174,41 @@
             if (open)
                 return { sent: false };
             const PENDING = {};
-            if (NL.fleetOnce)
+            if (NL.fleetOnce) {
                 open = PENDING;
+                setTimeout(() => { if (open === PENDING)
+                    open = null; }, 30000);
+            }
             const fields = new Set(o.fields || ["source", "target", "ships", "resources"]);
+            if (NL.fleetHw && o.hwChoice)
+                fields.add("highway");
+            let ph = null, phGone = false, phKey = null;
+            if (NL.fleetInstant && !(NL.fleetCombat && o.oneClick)) {
+                css();
+                if (NL.fleetSecBar)
+                    cssBar();
+                if (NL.fleetFit)
+                    cssFit();
+                const phClose = () => { if (phGone || !ph)
+                    return; phGone = true; ph.remove(); document.removeEventListener("keydown", phKey, true); if (open === ph)
+                    open = null; };
+                phKey = (e) => { if (e.key === "Escape") {
+                    e.stopPropagation();
+                    phClose();
+                } };
+                const pnl = NL.h("div", { class: "nl2-fleet" + (NL.fleetCombat && (o.templates || o.wide) ? " nl2-fleet-wide" : ""), role: "dialog", "aria-label": o.title || "Fleet", "aria-busy": "true" }, NL.h("div", { class: "nl2-fleet-head" }, NL.h("h3", null, o.title || "Send fleet"), NL.h("button", { type: "button", class: "nl2-fleet-x", title: "Close", onclick: phClose }, "\u00D7")), NL.h("div", { class: "nl2-fleet-loading" }, "Loading\u2026"));
+                ph = NL.h("div", { class: "nl2-fleet-phov" }, pnl);
+                ph.addEventListener("mousedown", (e) => { if (e.target === ph)
+                    phClose(); });
+                document.addEventListener("keydown", phKey, true);
+                (o.host && o.host.isConnected ? o.host : document.body).appendChild(ph);
+                open = ph;
+            }
             const useTpl = o.template !== false && !!o.kind;
             const btn = o.button || null;
             const collection = o.type === "collection", transfer = o.type === "transfer";
             const targets = Array.isArray(o.targets) && o.targets.length ? o.targets : null;
-            const st = { pin: new Set(), hangarOn: NL.fleetCombat && o.hangar ? o.hangar : null, hShips: {}, hTouch: {}, kind: o.kind, highway: fields.has("highway") ? o.highway !== false : undefined, collection, only: null, short: false, target: targets ? targets.find((t) => t.def) || targets[0] : o.target || null, speed: speedOf(o), sourceId: null, sources: [], ships: [], resources: {}, est: null, estPending: false, sending: false };
+            const st = { pin: new Set(), hangarOn: NL.fleetCombat && o.hangar ? o.hangar : null, hShips: {}, hTouch: {}, kind: o.kind, highway: fields.has("highway") ? (NL.fleetHw && o.hwChoice ? o.highway === true : o.highway !== false) : undefined, collection, only: null, short: false, target: targets ? targets.find((t) => t.def) || targets[0] : o.target || null, speed: speedOf(o), sourceId: null, sources: [], ships: [], resources: {}, est: null, estPending: false, sending: false };
             let fitFn = null;
             const tpl = useTpl ? tpls.get(o.kind, null) : null;
             const wantEst = fields.has("eta") && typeof o.estimate === "function";
@@ -1226,6 +1259,13 @@
                 cssBar();
             if (NL.fleetFit)
                 cssFit();
+            if (ph) {
+                if (phGone)
+                    return { sent: false };
+                phGone = true;
+                document.removeEventListener("keydown", phKey, true);
+                ph.remove();
+            }
             return new Promise((resolve) => {
                 let sent = false, result = null, estTimer = 0, estCtl = null, reprepRef = null;
                 const msg = NL.h("div", { class: "nl2-fleet-msg" }, err);
@@ -1233,7 +1273,7 @@
                 const ask = (q) => new Promise((res) => {
                     reveal();
                     const box = NL.h("div", { class: "nl2-fleet-ask" }, q.title ? NL.h("b", null, q.title) : null, NL.h("div", null, q.text || ""));
-                    const done = (v) => { box.remove(); sendBtn.disabled = !!problem(); res(v); };
+                    const done = (v) => { box.remove(); sendBtn.disabled = !!problem() || (NL.fleetAtkKit && st.sending); res(v); };
                     box.append(NL.h("div", { class: "nl2-fleet-askb" }, NL.h("button", { type: "button", class: "nl2-fleet-btn nl2-sec", onclick: () => done(false) }, "Back"), NL.h("button", { type: "button", class: "nl2-fleet-btn", onclick: () => done(true) }, q.go || "Launch anyway")));
                     sendBtn.disabled = true;
                     msg.before(box);
@@ -1337,7 +1377,7 @@
                     else
                         hb.append(NL.h("div", { class: "nl2-fleet-sec" }, hTitle));
                     if (!carriers) {
-                        hl.append(NL.h("div", { class: "nl2-fleet-note2" }, "Add Carriers above to put fighters and bombers" + (st.hangarOn.shuttles ? " and assault shuttles" : "") + " in their hangars."));
+                        hl.append(NL.h("div", { class: "nl2-fleet-note2" }, "Add Carriers above to put fighters and bombers" + (hangShuttles(st) ? " and assault shuttles" : "") + " in their hangars."));
                         return;
                     }
                     for (const [g, , label] of WINGS) {
@@ -1624,7 +1664,7 @@
                         });
                         body.append(row(o.sourceLabel || "Source", sel));
                     }
-                    if (fields.has("highway")) {
+                    if (fields.has("highway") && !NL.fleetHw) {
                         const hb = NL.h("input", { type: "checkbox" });
                         hb.checked = !!st.highway;
                         hb.addEventListener("change", () => { st.highway = hb.checked; reEstimate(); });
@@ -1665,6 +1705,12 @@
                         ssel.addEventListener("change", () => { st.speed = +ssel.value; reEstimate(); });
                         body.append(row("Speed", ssel));
                     }
+                    if (fields.has("highway") && NL.fleetHw) {
+                        const hb = NL.h("input", { type: "checkbox" });
+                        hb.checked = !!st.highway;
+                        hb.addEventListener("change", () => { st.highway = hb.checked; reEstimate(); });
+                        body.append(row("Galactic Highway", NL.h("label", null, hb)));
+                    }
                     if (!fields.has("ships"))
                         leaderRow();
                     if (fields.has("ships")) {
@@ -1684,13 +1730,31 @@
                         }
                         const list = NL.h("div", { class: "nl2-fleet-list" });
                         leaderRow();
+                        if (NL.fleetAtkKit && o.selectTools && st.ships.length) {
+                            const tb = (text, run) => NL.h("button", { type: "button", class: "nl2-fleet-btn nl2-sec", onclick: () => { run(); draw(); reEstimate(); } }, text);
+                            body.append(NL.h("div", { class: "nl2-fleet-tools" }, tb("Select all", () => { for (const x of st.ships)
+                                if (!x.held)
+                                    x.qty = x.have; }), tb("Clear selection", () => { for (const x of st.ships)
+                                x.qty = 0; st.hShips = {}; st.hTouch = {}; })));
+                        }
                         const groups = [...new Set(st.ships.map((s) => s.group).filter(Boolean))];
                         if (groups.length && st.ships.every((s) => s.group)) {
                             for (const g of groups) {
                                 const gl = NL.h("div", { class: "nl2-fleet-list" });
-                                body.append(...section("ships:" + g, g, gl));
-                                for (const s of st.ships.filter((x) => x.group === g))
-                                    gl.append(qtyRow(s.name, s.have, () => s.qty, (v) => { s.qty = v; }, () => s.have, reEstimate, NL.gl249 ? s.speed : 0, true, s.held));
+                                const sh = section("ships:" + g, g, gl);
+                                body.append(...sh);
+                                const gc = NL.fleetAtkKit && (st.ships.find((x) => x.group === g) || {}).groupColor;
+                                if (gc)
+                                    sh[0].style.color = gc;
+                                for (const s of st.ships.filter((x) => x.group === g)) {
+                                    const rw = qtyRow(s.name, s.have, () => s.qty, (v) => { s.qty = v; }, () => s.have, reEstimate, NL.gl249 ? s.speed : 0, true, s.held);
+                                    if (NL.fleetAtkKit && s.warn) {
+                                        const dd = rw.querySelector(".nl2-fleet-d");
+                                        if (dd)
+                                            dd.append(NL.h("span", { class: "nl2-fleet-warn" }, s.warn));
+                                    }
+                                    gl.append(rw);
+                                }
                             }
                         }
                         else {
@@ -1783,12 +1847,36 @@
                         const lab = ["Fleet slots", "Ships", "Hydrogen", "Travel", "Arrives"].concat(fields.has("home") ? ["Home by"] : []).filter((k) => !(k === "Fleet slots" && o.noSlots));
                         for (const k of lab)
                             g.append(NL.h("span", null, k), NL.h("span", { "data-k": k }, "\u2014"));
+                        if (NL.fleetAtkKit && typeof o.sumExtra === "function") {
+                            let ex = [];
+                            try {
+                                ex = o.sumExtra() || [];
+                            }
+                            catch (e) {
+                                ex = [];
+                            }
+                            for (const [k, v] of ex)
+                                g.append(NL.h("span", null, k), typeof v === "string" ? NL.h("span", null, v) : v);
+                        }
                         body.append(g);
                     }
                     if (wantEst && !sumRows)
                         body.append(NL.h("div", { class: "nl2-fleet-eta" }));
                     if (wantEst && typeof o.etaNote === "function")
                         body.append(NL.h("div", { class: "nl2-fleet-note" }));
+                    if (NL.fleetAtkKit && Array.isArray(o.order)) {
+                        const top = [];
+                        for (const el of body.children) {
+                            if (!el.classList.contains("nl2-fleet-row"))
+                                break;
+                            top.push(el);
+                        }
+                        const at = (el) => { const k = el.querySelector(".nl2-fleet-k"), i = o.order.indexOf(k ? k.textContent.trim() : ""); return i < 0 ? o.order.length : i; };
+                        const sorted = top.map((el, i) => [el, at(el), i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).map((x) => x[0]);
+                        const after = top.length ? top[top.length - 1].nextSibling : body.firstChild;
+                        for (const el of sorted)
+                            body.insertBefore(el, after);
+                    }
                     refresh();
                 };
                 sendBtn.addEventListener("click", async () => {
@@ -1821,6 +1909,8 @@
                         }
                     }
                     const ctl = { hide: () => { ov.style.visibility = "hidden"; }, show: () => { ov.style.visibility = ""; } };
+                    if (NL.fleetAtkKit)
+                        ctl.ask = (q) => ask(q);
                     let r = null;
                     try {
                         r = await o.send(sn0, ctl);
@@ -2124,10 +2214,10 @@
                 }
                 return Object.assign(new Error(msg), status ? { status } : {});
             };
-            let ac = null, to = 0, signal = o.signal;
+            let ac = null, to = 0, signal = o.signal, timedOut = false;
             if (o.timeout) {
                 ac = new AbortController();
-                to = setTimeout(() => ac.abort(), o.timeout);
+                to = setTimeout(() => { timedOut = true; ac.abort(); }, o.timeout);
                 signal = ac.signal;
                 if (o.signal) {
                     if (o.signal.aborted)
@@ -2146,6 +2236,10 @@
             catch (e) {
                 if (o.log)
                     o.log(what, Date.now() - t0, "timeout");
+                if (o.signal && o.signal.aborted && !timedOut)
+                    throw e;
+                if (timedOut)
+                    throw fail("timeout after " + o.timeout + " ms");
                 throw fail(e && e.message ? e.message : "network error");
             }
             finally {
@@ -5731,7 +5825,7 @@
         }
         function dlvRoute(s) {
             const mt = s.mission === "transfer" ? "transfer" : "deliver", tg = s.target || {}, sp = dlvN(s.speed);
-            const base = { useHighway: false, missionType: mt, sourcePlanetId: Number(s.sourceId), ships: (s.ships || []).filter((x) => dlvN(x.qty) > 0).map((x) => ({ shipDefId: Number(x.key), quantity: dlvN(x.qty) })), ...(sp > 0 && sp < 100 ? { speedFactor: sp / 100 } : {}) };
+            const base = { useHighway: !!s.highway, missionType: mt, sourcePlanetId: Number(s.sourceId), ships: (s.ships || []).filter((x) => dlvN(x.qty) > 0).map((x) => ({ shipDefId: Number(x.key), quantity: dlvN(x.qty) })), ...(sp > 0 && sp < 100 ? { speedFactor: sp / 100 } : {}) };
             return tg.kind === "moon" ? { est: ["POST /moons/:id/send-estimate", tg.id], go: "/api/moons/" + tg.id + "/send", body: base }
                 : { est: ["POST /fleet/fuel-estimate", null], go: "/api/fleet/dispatch", body: { ...base, targetPlanetId: Number(tg.id) } };
         }
@@ -5761,6 +5855,7 @@
                     template: false,
                     sendLabel: "Launch",
                     shipTools: true,
+                    hwChoice: true,
                     fields: ["source", "target", "mission", "speed", "ships", "resources", "eta", "arrive"],
                     speed: 100,
                     sourceLabel: "From",
@@ -7182,6 +7277,7 @@
     {
         NL.msgBadge = true;
         NL.msgBadgeClick = true;
+        NL.msgSubTabBadge = true;
         const MB_PATH = "/messages";
         const mbRx = { uc: /^\/api\/messages\/unread-count(\?|$)/, sys: /^\/api\/messages\/system\?(.*&)?page=1(&|$)|^\/api\/messages\/system$/, conv: /^\/api\/messages\/conversations(\?|$)/ };
         const mbLinks = new Map();
@@ -7283,7 +7379,7 @@
             if (moreP > 0)
                 lines.push("Player message: " + moreP + " more");
             const n = uc ? sysN + plN : sys.length + pl;
-            return { n, tip: n > 0 ? lines.join("\n") : "", moreS, moreP };
+            return { n, tip: n > 0 ? lines.join("\n") : "", moreS, moreP, sysN: uc ? sysN : sys.length, plN: uc ? plN : pl };
         }
         NL.msgBadgeBuild = mbBuild;
         function mbTypes() {
@@ -7319,7 +7415,33 @@
                 let sysIds = new Set(), sysAllAt = 0;
                 const st = { uc: null, ucAt: 0, writeAt: 0, sys: null, conv: null, readIds: new Set(), readConv: new Set(), allSysRead: (m) => sysAllAt > 0 && (Date.parse(m.createdAt) || 0) <= sysAllAt };
                 const own = { sys: 0, conv: 0 };
-                let t = 0;
+                let t = 0, last = null;
+                const subTabs = () => {
+                    if (!NL.msgSubTabBadge)
+                        return;
+                    const on = (k) => !NL.badgeOn || NL.badgeOn(k);
+                    for (const b of document.querySelectorAll(".messages-page .msg-tab")) {
+                        const lab = (b.textContent || "").replace(/\d+/g, "").trim();
+                        const n = !last ? 0 : /^players/i.test(lab) ? (on("msg-player") ? last.plN : 0) : /^system/i.test(lab) ? (on("msg-system") ? last.sysN : 0) : 0;
+                        let x = b.querySelector(":scope > .nl2-msgtab-badge");
+                        if (!(n > 0)) {
+                            if (x)
+                                x.remove();
+                            continue;
+                        }
+                        if (!x) {
+                            x = NL.h("span", { class: "nl2-msgtab-badge" });
+                            b.appendChild(x);
+                        }
+                        if (x.textContent !== String(n))
+                            x.textContent = String(n);
+                    }
+                };
+                if (NL.msgSubTabBadge) {
+                    NL.css("gl-msg-subtab", ".messages-page .msg-tab .nl2-msgtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 5px;margin-left:6px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;line-height:1}");
+                    NL.watch(".messages-page .msg-tab", () => subTabs());
+                    ["badge.msg-player", "badge.msg-system"].forEach((k) => NL.onOpt && NL.onOpt(k, () => subTabs()));
+                }
                 const paint = () => {
                     const r = mbBuild(st);
                     NL.navBadges[MB_PATH] = NL.navBadges[MB_PATH] || {};
@@ -7328,6 +7450,8 @@
                         a.classList.toggle("nl2-mb-on", r.n > 0);
                     if (NL.navBadgeChanged)
                         NL.navBadgeChanged(MB_PATH);
+                    last = r;
+                    subTabs();
                     clearTimeout(t);
                     if ((r.moreS > 0 || r.moreP > 0) && !(st.writeAt > st.ucAt))
                         t = setTimeout(() => {
@@ -8004,6 +8128,30 @@
                 out.total = out.ore + out.silicates + out.alloys + Object.values(out.rare).reduce((a, b) => a + b, 0);
                 return out;
             };
+            const MATCHUPS = {
+                scout: { good: [{ key: "dreadnought", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }, { key: "missile_cruiser", s: "crushes" }, { key: "carrier", s: "beats" }, { key: "fighter", s: "beats" }, { key: "interceptor", s: "beats" }], bad: [{ key: "cruiser", s: "loses" }] },
+                fighter: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }], bad: [{ key: "missile_cruiser", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "scout", s: "loses" }] },
+                interceptor: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "beats" }], bad: [{ key: "cruiser", s: "crushed" }, { key: "missile_cruiser", s: "crushed" }, { key: "battleship", s: "crushed" }, { key: "scout", s: "loses" }] },
+                cruiser: { good: [{ key: "interceptor", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "fighter", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "scout", s: "beats" }, { key: "dreadnought", s: "beats" }], bad: [{ key: "battleship", s: "crushed" }] },
+                missile_cruiser: { good: [{ key: "interceptor", s: "crushes" }, { key: "fighter", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }], bad: [{ key: "scout", s: "crushed" }, { key: "battleship", s: "crushed" }] },
+                torpedo_frigate: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "battleship", s: "crushes" }], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "missile_cruiser", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "interceptor", s: "loses" }] },
+                carrier: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }], bad: [{ key: "scout", s: "loses" }] },
+                battleship: { good: [{ key: "interceptor", s: "crushes" }, { key: "cruiser", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "missile_cruiser", s: "crushes" }], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }] },
+                dreadnought: { good: [], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "interceptor", s: "crushed" }, { key: "cruiser", s: "loses" }] },
+                titan: { good: [], bad: [{ key: "scout", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "interceptor", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "missile_cruiser", s: "crushed" }, { key: "battleship", s: "crushed" }] },
+                bomber: null,
+            };
+            for (const k of Object.keys(MATCHUPS)) {
+                const v = MATCHUPS[k];
+                if (v) {
+                    v.good.forEach(Object.freeze);
+                    v.bad.forEach(Object.freeze);
+                    Object.freeze(v.good);
+                    Object.freeze(v.bad);
+                    Object.freeze(v);
+                }
+            }
+            Object.freeze(MATCHUPS);
             const defenseLevels = {};
             for (const k of Object.keys(DEF))
                 defenseLevels[k] = Object.freeze(DEF[k].map((p) => Object.freeze(p.slice())));
@@ -8021,6 +8169,8 @@
                 defenseAt,
                 defenseLevels: Object.freeze(defenseLevels),
                 need,
+                matchups: MATCHUPS,
+                matchupsAsOf: "2026-11-18",
                 debris,
                 debrisRates: { primary: DEB_PRIMARY, rare: DEB_RARE, hydrogen: 0 },
             });
@@ -15754,6 +15904,124 @@
                 ].join(""));
             },
         });
+        NL.shFleetCols = true;
+        NL.feature({
+            id: "sh-fleet-cols",
+            set: "Shipyard",
+            name: "Fleet on Planet columns",
+            desc: "SH-047..SH-050: Fleet on Planet in Table View gets fixed columns: HP, Cargo, Weapon, Armor, Good against and Bad against; ship names open the ship page.",
+            init() {
+                const defs = new Map(), byName = new Map();
+                NL.onData(/^\/api\/planets\/\d+\/shipyard(\?|$)/, (p, d) => {
+                    const l = d && Array.isArray(d.ships) ? d.ships : null;
+                    if (!l)
+                        return;
+                    l.forEach((s) => { if (s && s.key) {
+                        defs.set(String(s.key).toLowerCase(), s);
+                        if (s.name)
+                            byName.set(String(s.name).trim().toLowerCase(), s);
+                    } });
+                    NL._kick();
+                });
+                const pick = (o, ks) => { for (const k of ks)
+                    if (o && o[k] != null && o[k] !== "")
+                        return o[k]; return null; };
+                const F = { hp: ["effectiveHp"], base: ["hp"], sh: ["effectiveShieldHp", "shieldHp"], at: ["effectiveAttack", "attack"], cg: ["effectiveCargoCapacity", "cargoCapacity"], wp: ["weaponType"], ar: ["armorType"] };
+                const num = (v) => (v != null && v !== "" && Number.isFinite(+v) ? Math.round(+v) : null);
+                const fmt = (n) => (n == null ? "\u2014" : n.toLocaleString("en-US"));
+                const word = (s) => (s == null ? "\u2014" : String(s).replace(/[_-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase()));
+                const keyOfRow = (r) => { const i = r.querySelector("img"); return i ? (i.getAttribute("alt") || "").trim().toLowerCase().replace(/\s+/g, "_") : ""; };
+                const nameOf = (k) => { const d = defs.get(k); return (d && d.name) || word(k); };
+                const STRONG = { crushes: 1, crushed: 1 };
+                const P = ".sy-fleet-summary[data-nl2-shl][data-nl2-shf]:not(#nl2-shf)";
+                NL.css("sh-fleet-cols", [
+                    `${P} .sy-fleet-row{grid-template-columns:150px 80px 72px 64px 64px 52px 72px 64px 64px minmax(0,1fr) minmax(0,1fr) 96px auto!important;column-gap:0!important;padding:2px 8px!important}`,
+                    `${P} .sy-fleet-row>*{padding:0 8px!important;box-sizing:border-box;min-width:0}`,
+                    `${P} .sy-fleet-row-info{grid-column:1!important;padding-left:0!important}`,
+                    `${P} .sy-fleet-qty{grid-column:2!important;text-align:left!important}`,
+                    `${P} .sy-fleet-row-stats{display:contents!important}`,
+                    `${P} .sy-fleet-row-stats>*{grid-row:1!important;margin:0!important;padding:0 8px!important;min-width:0}`,
+                    `${P} .sy-fleet-stat:has(.lucide-shield){grid-column:3!important}`,
+                    `${P} .sy-fleet-stat:has(.lucide-swords){grid-column:5!important}`,
+                    `${P} .sy-fleet-row[data-nl2-shf-d] .sy-fleet-stat:has(.lucide-shield),${P} .sy-fleet-row[data-nl2-shf-d] .sy-fleet-stat:has(.lucide-swords){display:none!important}`,
+                    `${P} .sy-fleet-row:not([data-nl2-shf-d])>span[data-nl2-shf="hp"],${P} .sy-fleet-row:not([data-nl2-shf-d])>span[data-nl2-shf="at"]{display:none!important}`,
+                    `${P} .sy-fleet-stat:has(.lucide-gauge){grid-column:6!important}`,
+                    `${P} .sy-fleet-row-stats>[data-nl2-shy],${P} .sy-fleet-row-stats>:has([data-nl2-shy]),${P} .sy-fleet-row-stats[data-nl2-shf]::after{grid-column:12!important;grid-row:1!important;margin:0 8px!important;justify-self:start}`,
+                    `${P} .sy-fleet-row-actions{grid-column:13!important}`,
+                    `${P} .sy-fleet-row>span[data-nl2-shf]{grid-row:1;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}`,
+                    `${P} span[data-nl2-shf="hp"]{grid-column:3}${P} span[data-nl2-shf="sh"]{grid-column:4}${P} span[data-nl2-shf="at"]{grid-column:5}${P} span[data-nl2-shf="cg"]{grid-column:7}${P} span[data-nl2-shf="wp"]{grid-column:8;color:var(--nl2-onart)}${P} span[data-nl2-shf="ar"]{grid-column:9;color:var(--nl2-onart)}`,
+                    `${P} span[data-nl2-shf="hp"][data-nl2-tip]{text-decoration:underline dotted rgba(192,204,224,.5);text-underline-offset:3px;cursor:help}`,
+                    `${P} span[data-nl2-shf="good"],${P} span[data-nl2-shf="bad"]{white-space:normal;overflow:visible;font-size:13px;line-height:1.3;padding-top:2px!important;padding-bottom:2px!important}`,
+                    `${P} span[data-nl2-shf="good"]{grid-column:10;color:var(--nl2-ok)}${P} span[data-nl2-shf="bad"]{grid-column:11;color:var(--nl2-bad)}`,
+                    `${P} span[data-nl2-shf] b{font-weight:700}${P} span[data-nl2-shf] .nl2-shf-none{color:var(--nl2-dim)}`,
+                    `${P} .sy-fleet-ship-name[data-nl2-shf-link]{cursor:pointer}${P} .sy-fleet-ship-name[data-nl2-shf-link]:hover{text-decoration:underline}`,
+                ].join(""));
+                const setAttr = (el, name, v) => { if (v == null) {
+                    if (el.hasAttribute(name))
+                        el.removeAttribute(name);
+                }
+                else if (el.getAttribute(name) !== v)
+                    el.setAttribute(name, v); };
+                const cell = (r, k) => {
+                    let c = r.querySelector(":scope > span[data-nl2-shf=\"" + k + "\"]");
+                    if (!c) {
+                        c = NL.h("span", { "data-nl2-shf": k });
+                        r.appendChild(c);
+                    }
+                    return c;
+                };
+                const put = (c, html, v) => { if (c.innerHTML !== html)
+                    c.innerHTML = html; setAttr(c, "data-nl2-shf-v", v == null ? null : String(v)); };
+                const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[ch]);
+                const list = (arr) => {
+                    if (!Array.isArray(arr))
+                        return "<span class=\"nl2-shf-none\">\u2014</span>";
+                    if (!arr.length)
+                        return "<span class=\"nl2-shf-none\">none</span>";
+                    return arr.map((x) => { const n = esc(nameOf(String(x.key))); return `<span ${NL.tipA}="${esc(word(x.s))}">${STRONG[x.s] ? "<b>" + n + "</b>" : n}</span>`; }).join(", ");
+                };
+                document.addEventListener("click", (e) => {
+                    const n = e.target.closest && e.target.closest(".sy-fleet-ship-name[data-nl2-shf-link]");
+                    if (!n || NL.shFleetCols === false)
+                        return;
+                    const path = "/shipyard/" + encodeURIComponent(n.getAttribute("data-nl2-shf-link"));
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!(NL.routerPush && NL.routerPush(path)))
+                        location.href = path;
+                }, true);
+                NL.watch(".sy-fleet-summary", (sum) => {
+                    const on = NL.shFleetCols !== false;
+                    setAttr(sum, "data-nl2-shf", on ? "" : null);
+                    sum.querySelectorAll(".sy-fleet-row").forEach((r) => {
+                        const nm = r.querySelector(".sy-fleet-ship-name"), alt = keyOfRow(r);
+                        const d = defs.get(alt) || byName.get(alt.replace(/_/g, " ")) || byName.get(((nm && nm.textContent) || "").trim().toLowerCase()) || null;
+                        const k = d ? String(d.key).toLowerCase() : alt;
+                        if (nm)
+                            setAttr(nm, "data-nl2-shf-link", on && k ? k : null);
+                        if (!on) {
+                            r.querySelectorAll(":scope > span[data-nl2-shf]").forEach((c) => c.remove());
+                            setAttr(r, "data-nl2-shf-d", null);
+                            return;
+                        }
+                        setAttr(r, "data-nl2-shf-d", d ? "" : null);
+                        const hp = num(pick(d, F.hp)), base = num(pick(d, F.base));
+                        const hc = cell(r, "hp");
+                        put(hc, fmt(hp != null ? hp : base), hp != null ? hp : base);
+                        NL.tip(hc, base != null ? "Base HP " + fmt(base) + " (also the CP)" : "");
+                        for (const x of ["sh", "at", "cg"]) {
+                            const v = num(pick(d, F[x]));
+                            put(cell(r, x), fmt(v), v);
+                        }
+                        put(cell(r, "wp"), esc(word(pick(d, F.wp))));
+                        put(cell(r, "ar"), esc(word(pick(d, F.ar))));
+                        const mu = NL.scoutModel && NL.scoutModel.matchups, m = mu ? mu[k] : null;
+                        put(cell(r, "good"), list(m && m.good));
+                        put(cell(r, "bad"), list(m && m.bad));
+                    });
+                });
+            },
+        });
     }
     {
         NL.sh045 = true;
@@ -17849,7 +18117,7 @@
                 const speedPart = (state) => { const f = flNum(state.speed) / 100; return f > 0 && f < 1 ? { speedFactor: f } : {}; };
                 function route(state) {
                     const t = state.target || {}, keep = sentinel(t) ? { ...state, ships: (state.ships || []).filter((x) => !capKeys.has(String(x.key))) } : state;
-                    const base = { useHighway: false, missionType: "transfer", ships: shipsBody(keep), ...speedPart(state), ...(state.leader ? { attachLeader: true } : {}) };
+                    const base = { useHighway: !!state.highway, missionType: "transfer", ships: shipsBody(keep), ...speedPart(state), ...(state.leader ? { attachLeader: true } : {}) };
                     const src = Number(state.sourceId);
                     if (t.kind === "moon")
                         return { est: ["POST /moons/:id/send-estimate", t.id], go: "/api/moons/" + t.id + "/send", body: { ...base, sourcePlanetId: src } };
@@ -17939,6 +18207,7 @@
                     }
                     const r = await NL.fleet.open({
                         kind: "evacuate",
+                        hwChoice: true,
                         type: "transfer",
                         title: "Evacuate \u00B7 " + pName,
                         button: btn,
@@ -22344,7 +22613,7 @@
                 const freeHubs = () => hubs().filter((h) => trN(h.hubLevel) - trN(h.routeCount) > 0);
                 const routes = () => { const d = (saved("routes") || {}).d || []; return NL.stnTab && NL.stnTab.withPending ? NL.stnTab.withPending(d) : d; };
                 const isStnRt = (r) => r.routeMode === "collect_station" || r.sourceStationId != null;
-                const tRoutes = () => (NL.fl278 ? routes().filter((r) => !isStnRt(r)) : routes());
+                const tRoutes = () => routes().filter((r) => !isStnRt(r));
                 const rk = (r) => trSnake(r.resourceType) || trSnake(String(r.resourceType || "").toLowerCase().replace(/[\s-]+/g, "_"));
                 const shipsFor = (key, total) => {
                     const l = (st.get("ships", {})[key] || []).filter((s) => s.cargo > 0).sort((a, b) => b.cargo - a.cargo);
@@ -22953,13 +23222,14 @@
                     const shipsBody = (s) => (s.ships || []).filter((x) => trN(x.qty) > 0).map((x) => ({ shipDefId: Number(x.key), quantity: trN(x.qty) }));
                     const route = (s) => {
                         const mt = t.kind === "supply" && s.mission === "transfer" ? "transfer" : t.kind === "supply" ? "deliver" : "transfer";
-                        const tg = s.target || {}, base = { useHighway: false, missionType: mt, ships: shipsBody(s), ...(trN(s.speed) > 0 && trN(s.speed) < 100 ? { speedFactor: trN(s.speed) / 100 } : {}) };
+                        const tg = s.target || {}, base = { useHighway: !!s.highway, missionType: mt, ships: shipsBody(s), ...(trN(s.speed) > 0 && trN(s.speed) < 100 ? { speedFactor: trN(s.speed) / 100 } : {}) };
                         return tg.kind === "moon" ? { est: ["POST /moons/:id/send-estimate", tg.id], go: "/api/moons/" + tg.id + "/send", body: { ...base, sourcePlanetId: Number(s.sourceId) } }
                             : { est: ["POST /fleet/fuel-estimate", null], go: "/api/fleet/dispatch", body: { ...base, sourcePlanetId: Number(s.sourceId), targetPlanetId: Number(tg.id) } };
                     };
                     hubLabel();
                     await NL.fleet.open({
                         kind: "fl-transfer-move",
+                        hwChoice: true,
                         type: "collection",
                         title: t.kind === "supply" ? "Supply \u00B7 " + t.to.name : "Move out \u00B7 " + t.from.name,
                         button: btn,
@@ -23297,7 +23567,7 @@
                     const pName = (id) => (planetById(id) || {}).name || (hubs().find((h) => +h.planetId === +id) || {}).planetName || "Planet " + id;
                     const ou = trList((saved("outposts") || {}).d, "outposts"), ouName = (id) => nm("outposts", id) || (ou.find((o) => +o.id === +id) || {}).name || "Outpost " + id;
                     const from = r.sourceOutpostId != null ? { t: "outpost", id: +r.sourceOutpostId, name: ouName(r.sourceOutpostId) } : r.sourceMoonId != null ? { t: "moon", id: +r.sourceMoonId, name: moonName(r.sourceMoonId) }
-                        : r.sourceStationId != null ? (NL.fl278 ? { t: "station", id: +r.sourceStationId, name: (NL.pve && NL.pve.stationLabel && NL.pve.stationLabel(r.sourceStationId)) || nm("stations", r.sourceStationId) || "Station " + r.sourceStationId } : null) : r.sourcePlanetId != null ? { t: "planet", id: +r.sourcePlanetId, name: pName(r.sourcePlanetId) } : null;
+                        : r.sourceStationId != null ? { t: "station", id: +r.sourceStationId, name: (NL.pve && NL.pve.stationLabel && NL.pve.stationLabel(r.sourceStationId)) || nm("stations", r.sourceStationId) || "Station " + r.sourceStationId } : r.sourcePlanetId != null ? { t: "planet", id: +r.sourcePlanetId, name: pName(r.sourcePlanetId) } : null;
                     const to = r.destinationPlanetId != null ? { t: "planet", id: +r.destinationPlanetId, name: pName(r.destinationPlanetId) } : r.destinationMoonId != null ? { t: "moon", id: +r.destinationMoonId, name: moonName(r.destinationMoonId) }
                         : r.destinationOutpostId != null ? { t: "outpost", id: +r.destinationOutpostId, name: ouName(r.destinationOutpostId) } : null;
                     return { from, to };
@@ -23322,9 +23592,9 @@
                                     box.disabled = false;
                                     box.parentNode.setAttribute("data-nl2-tip", "Not resumed: " + err);
                                 }
-                            } })) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", null, ran != null ? NL.h("span", { "data-nl2-tip": trClock(ran) }, trAgo(ran)) : NL.h("span", { class: "nl2-ftr-d" }, "never run")), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, NL.flPause !== false && !stn ? rtTogBtn(r, paused) : "", NL.fl245 ? NL.h("button", { type: "button", class: "nl2-ftr-hb nl2-ftr-rted", disabled: !!(rtEdit && rtEdit.busy), "data-nl2-tip": "Change this route (To, Resource, Trigger, Send)", onclick: () => rtStart(r) }, "Edit") : "", NL.fl263 ? rtDelBtn(r) : "", stn && NL.fl288 && NL.pve && NL.pve.stnCollectBtn ? NL.pve.stnCollectBtn(r.sourceStationId) : ""), hideBox("rt" + r.id));
+                            } })) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", null, ran != null ? NL.h("span", { "data-nl2-tip": trClock(ran) }, trAgo(ran)) : NL.h("span", { class: "nl2-ftr-d" }, "never run")), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, NL.flPause !== false && !stn ? rtTogBtn(r, paused) : "", NL.fl245 ? NL.h("button", { type: "button", class: "nl2-ftr-hb nl2-ftr-rted", disabled: !!(rtEdit && rtEdit.busy), "data-nl2-tip": "Change this route (To, Resource, Trigger, Send)", onclick: () => rtStart(r) }, "Edit") : "", NL.fl263 ? rtDelBtn(r) : "", stn && NL.pve && NL.pve.stnCollectBtn ? NL.pve.stnCollectBtn(r.sourceStationId) : ""), hideBox("rt" + r.id));
                     });
-                    if (stn && NL.fl291 && NL.pve && NL.pve.stnCells && NL.stnTab) {
+                    if (stn && NL.pve && NL.pve.stnCells && NL.stnTab) {
                         const src = (stn ? routes().filter(isStnRt) : []).filter((r) => isHid("rt" + r.id) === !!wantHid);
                         const items = src.map((r, i) => ({ r, row: rows[i], sc: NL.pve.stnCells(r.sourceStationId) }));
                         items.sort((a, b) => { const fa = a.sc && a.sc.fill, fb = b.sc && b.sc.fill; return fa == null && fb == null ? 0 : fa == null ? 1 : fb == null ? -1 : fb - fa; });
@@ -23337,8 +23607,7 @@
                         ws.splice(7, 1);
                         ws[1] = "";
                         ls.splice(7, 1);
-                        if (NL.fl288)
-                            ws[9] = "370px";
+                        ws[9] = "370px";
                         for (const tr of rows)
                             if (tr.children[7])
                                 tr.children[7].remove();
@@ -23827,7 +24096,7 @@
                     if (bd.textContent !== (n ? String(n) : ""))
                         bd.textContent = n ? String(n) : "";
                     bd.style.display = n ? "" : "none";
-                    if (NL.fl278 && NL.stnTab)
+                    if (NL.stnTab)
                         NL.stnTab.paint(pg);
                     let box = content.querySelector(":scope > .nl2-ftr");
                     if (!box) {
@@ -24942,6 +25211,7 @@
         NL.atkFill = true;
         NL.atkRows = true;
         NL.atkShield = true;
+        NL.atkShared = true;
         NL.feature({
             id: "fl-attack",
             set: "Fleet",
@@ -24992,6 +25262,7 @@
       .nl2-atk-cf{margin-top:8px;padding:8px;border:1px solid rgba(239,68,68,.5);border-radius:6px;background:rgba(239,68,68,.08);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
       .nl2-atk-raid{display:flex;flex-wrap:wrap;gap:4px 10px}.nl2-atk-raid label{display:inline-flex;gap:4px;align-items:center;font-size:13px}
       .nl2-gclock{margin-left:6px}
+      .nl2-fleet .nl2-fleet-d>.nl2-atk-v2{flex:1 1 0;min-width:0;flex-wrap:wrap;gap:4px 8px}.nl2-fleet .nl2-atk-v2>select{flex:0 1 auto}
       .nl2-atk-spd{color:#94a3b8;font-weight:500}
       .nl2-atk-hang{margin-top:8px;border-top:1px solid rgba(120,200,255,.12);padding-top:8px}
       .nl2-atk-hang h4{margin:0 0 4px;font:600 13.6px Rajdhani,"Exo 2",sans-serif;color:#8fb3d9}
@@ -25035,8 +25306,225 @@
                     ? NL.h("div", null, NL.h("b", null, d.name || d.key), spdOf(d) ? NL.h("span", { class: "nl2-atk-spd" }, " \u00B7 " + fmt(spdOf(d)) + " speed") : null, extra || null)
                     : null;
                 const slots = (lv) => ({ fighter: 16 + lv, bomber: 4 + (lv >= 5 ? 1 : 0), shuttle: 4 + (lv >= 3 ? 1 : 0) });
+                async function openShared(btn, r, o) {
+                    const near = ((o && o.near) || []).map((m) => +m.id), moon = r.kind === "moon";
+                    if (btn)
+                        btn.disabled = true;
+                    let zone = r.zone || null, pl = null;
+                    try {
+                        if (!zone && NL.transportGet) {
+                            const z = await NL.transportGet("GET /fleet/zone/:id", moon ? r.pid : r.id, {}).catch(() => null);
+                            zone = z && z.zone ? String(z.zone) : null;
+                        }
+                        if (!NL.cache.latest(/^\/api\/planets$/))
+                            pl = await get("/api/planets");
+                    }
+                    finally {
+                        if (btn)
+                            btn.disabled = false;
+                    }
+                    const planets = myPlanets(pl);
+                    if (!planets.length)
+                        return;
+                    const defSrc = near.find((id) => planets.some((p) => p.id === id)) || planets[0].id, sentinel = zone === "sentinel";
+                    const A = { src: null, fleet: [], fans: null, cargoBonus: 0, short: {}, mission: moon ? "attack_moon" : "attack", retreat: "fight", combined: false, scoutPri: "", alc: false, raidPri: [], raidTime: "", convoy: null, est: null, snap: null, api: null, scouts: false, amEl: null, cvEl: null };
+                    const defKey = (k) => A.fleet.find((s) => s.definition.key === k);
+                    const cntK = (snap, k) => ((snap && snap.ships) || []).reduce((a, x) => a + (x.key === k ? x.qty : 0), 0);
+                    const grpOf = (d) => GROUPS.find((x) => x[0] === d.shipClass) || GROUPS[1];
+                    const title = () => (A.mission === "raid" ? "Raid" : "Attack") + " \u00B7 " + r.name;
+                    const hwOf = (snap) => (NL.fleetHw ? !!snap.highway : true);
+                    function body(snap, extra) {
+                        const ships = snap.ships.map((x) => { const s = defKey(x.key); return s ? { shipDefId: +s.definition.id, quantity: x.qty } : null; }).filter(Boolean);
+                        const spd = snap.speed < 100 ? snap.speed / 100 : undefined, hang = snap.hangar && Object.keys(snap.hangar).length ? snap.hangar : undefined;
+                        if (moon)
+                            return { useHighway: hwOf(snap), sourcePlanetId: snap.sourceId, missionType: "attack_moon", ships, cargo: {}, ...(snap.leader ? { attachLeader: true } : {}), ...(spd ? { speedFactor: spd } : {}), ...(extra || {}) };
+                        const raid = snap.mission === "raid" ? { priorityResources: A.raidPri.slice(), ...(n0(A.raidTime) > 0 ? { timeLimit: n0(A.raidTime) } : {}) } : undefined;
+                        return { useHighway: hwOf(snap), sourcePlanetId: snap.sourceId, targetPlanetId: r.id, missionType: snap.mission, ships, cargo: {}, ...(raid ? { raidParams: raid } : {}), ...(A.alc ? { alcubierre: true } : {}), ...(spd ? { speedFactor: spd } : {}), ...(A.combined ? { isCombinedAssault: true } : {}), ...(hang ? { hangarAssignments: hang } : {}), ...(A.retreat !== "fight" ? { retreatThreshold: +A.retreat } : {}), ...(A.scoutPri && cntK(snap, "scout") > 0 ? { scoutPriorityTarget: A.scoutPri } : {}), ...(snap.leader ? { attachLeader: true } : {}), ...(extra || {}) };
+                    }
+                    const amText = () => (A.est && A.est.antimatterCost != null ? "Antimatter: " + fmt(A.est.antimatterCost) + " (have " + fmt(A.est.antimatterAvailable) + ")" : "2\u00D7 fleet speed \u00B7 ship types and counts hidden");
+                    const cvText = () => (!A.combined ? "Alliance members can join \u00B7 convoy arrives at the slowest fleet speed" : A.convoy === null ? "Checking convoys\u2026"
+                        : A.convoy ? "Convoy arrives in " + dur((Date.parse(A.convoy.convoyArrivesAt || A.convoy.arrivesAt) - Date.now()) / 1000) + (A.est && A.est.travelTime != null ? " \u00B7 your travel " + dur(A.est.travelTime) : "")
+                            : "No convoy yet \u00B7 you start one");
+                    const live = () => { if (A.amEl)
+                        A.amEl.textContent = amText(); if (A.cvEl)
+                        A.cvEl.textContent = cvText(); };
+                    const sel = (opts, val, on) => { const s = NL.h("select", null, opts.map(([v, l]) => NL.h("option", { value: String(v), selected: String(v) === String(val) }, l))); s.addEventListener("change", () => on(s.value)); return s; };
+                    const cb = (val, on) => { const c = NL.h("input", { type: "checkbox" }); c.checked = !!val; c.addEventListener("change", () => on(c.checked)); return c; };
+                    const note = (t, bad) => NL.h("span", { class: "nl2-atk-note" + (bad ? " nl2-atk-bad" : "") }, t);
+                    const box = (...k) => NL.h("div", { class: "nl2-atk-v nl2-atk-v2" }, ...k);
+                    const o2 = {
+                        kind: "attack",
+                        template: false,
+                        title: title(),
+                        sourceLabel: "From",
+                        speed: 100,
+                        hwChoice: true,
+                        reprepareOnMission: !moon,
+                        selectTools: true,
+                        fields: ["source", "mission", "speed", "leader", "ships", "eta", "arrive"],
+                        order: ["Mission", "Priority resources", "Time limit (seconds)", "From", "Target", "Retreat", "Combined Assault", "Leader", "Scout priority", "Speed", "Galactic Highway", "Alcubierre"],
+                        target: { kind: r.kind, type: moon ? "moon" : "planet", id: r.id, pid: r.pid, owner: r.owner || null, ownerName: r.owner || null, ...(moon ? { moonId: r.id } : { planetId: r.id }), label: r.name },
+                        hangar: moon ? null : { level: carrierLevel, shuttles: () => A.mission === "raid" },
+                        sources: async () => planets.map((p) => ({ id: p.id, name: p.name, def: p.id === defSrc })),
+                        prepare: async (srcId, tpl, mv) => {
+                            const same = A.src === srcId, prev = same && A.snap ? Object.fromEntries(A.snap.ships.map((x) => [x.key, x.qty])) : null;
+                            if (mv)
+                                A.mission = mv;
+                            if (!same) {
+                                const f = await get("/api/planets/" + srcId + "/fleet");
+                                if (!f)
+                                    return null;
+                                A.fleet = (Array.isArray(f.fleet) ? f.fleet : []).filter((s) => s && s.definition && +s.definition.id > 0 && n0(s.quantity) > 0);
+                                A.cargoBonus = n0(f.cargoBonus);
+                                A.fans = f;
+                                A.src = srcId;
+                                A.snap = null;
+                            }
+                            const qty = prev || {};
+                            if (!prev) {
+                                A.short = {};
+                                const put = (key, want) => { if (!(want > 0))
+                                    return; const s = defKey(key), have = s ? n0(s.quantity) : 0; if (have > 0)
+                                    qty[key] = Math.min(want, have); if (want > have)
+                                    A.short[key] = want - have; };
+                                if (NL.atkFill) {
+                                    put("scout", Math.ceil(n0(r.scouts)));
+                                    const b = defKey("bulk_carrier"), per = b ? cgo(A, b.definition) : 0;
+                                    if (n0(r.loot) > 0 && per > 0)
+                                        put("bulk_carrier", Math.ceil(n0(r.loot) / per));
+                                }
+                            }
+                            if (A.mission === "raid" && NL.atkFill)
+                                for (const [key, n] of [["carrier", 6], ["assault_shuttle", 24]]) {
+                                    const s = defKey(key);
+                                    if (!(qty[key] > 0) && s)
+                                        qty[key] = Math.min(n, n0(s.quantity));
+                                }
+                            const L = await get("/api/leadership"), v = L && L.enabled !== false && L.unlocked !== false && L.vessel;
+                            const lok = !!(v && v.status === "ready" && !v.assignedMissionId && n0(v.currentPlanetId) === n0(srcId));
+                            if (mv)
+                                setTimeout(() => { const h = document.querySelector(".nl2-fleet-head h3"); if (h)
+                                    h.textContent = title(); }, 0);
+                            const ships = A.fleet.slice().sort((a, b) => GROUPS.indexOf(grpOf(a.definition)) - GROUPS.indexOf(grpOf(b.definition))).map((s) => {
+                                const d = s.definition, g = grpOf(d);
+                                return { key: d.key, type: d.key, name: d.name || d.key, have: n0(s.quantity), qty: qty[d.key] || 0, speed: spdOf(d), cargo: cgo(A, d), group: g[1], groupColor: g[2], warn: NL.atkFill && A.short[d.key] > 0 ? "short " + fmt(A.short[d.key]) : "" };
+                            });
+                            return { ships, leader: { value: false, available: lok, reason: "Not ready on this planet" }, mission: moon ? { value: "attack_moon", label: "Attack" } : { value: A.mission, options: [{ value: "attack", label: "Attack" }, { value: "raid", label: "Raid" }] } };
+                        },
+                        estimate: async (snap, signal) => {
+                            A.snap = snap;
+                            if (!snap.ships.length) {
+                                A.est = null;
+                                live();
+                                return null;
+                            }
+                            const b = body(snap);
+                            delete b.cargo;
+                            delete b.raidParams;
+                            delete b.isCombinedAssault;
+                            delete b.hangarAssignments;
+                            delete b.retreatThreshold;
+                            delete b.scoutPriorityTarget;
+                            let e = null;
+                            try {
+                                e = moon ? await NL.transportPost("POST /moons/:id/send-estimate", r.id, b, signal) : await NL.transportPost("POST /fleet/fuel-estimate", null, b, signal);
+                            }
+                            catch (err) {
+                                e = null;
+                            }
+                            A.est = e;
+                            live();
+                            return e ? { fuel: n0(e.fuelCost), travelSec: n0(e.travelTime), hydrogenAvailable: e.hydrogenAvailable } : null;
+                        },
+                        check: (snap) => {
+                            A.snap = snap;
+                            const sc = cntK(snap, "scout") > 0;
+                            if (!moon && sc !== A.scouts) {
+                                A.scouts = sc;
+                                setTimeout(() => A.api && A.api.redraw && A.api.redraw(), 0);
+                            }
+                            const out = [];
+                            if (sentinel)
+                                out.push({ text: "Attacks are forbidden in Sentinel Space.", level: "red" });
+                            if (A.est && A.est.inRange === false)
+                                out.push({ text: "Out of range.", level: "red" });
+                            if (snap.mission === "raid" && !(cntK(snap, "carrier") > 0 && cntK(snap, "assault_shuttle") > 0))
+                                out.push({ text: "Raids require a Carrier (cargo extraction) and Assault Shuttles (ground combat). Hacker Ships speed up storage cracking.", level: "red" });
+                            return out;
+                        },
+                        infoRows: (snap) => {
+                            const rows = [];
+                            if (!moon && snap.mission === "raid") {
+                                rows.push(["Priority resources", NL.h("div", { class: "nl2-atk-raid" }, RES.map(([k, l]) => NL.h("label", null, cb(A.raidPri.includes(k), (v) => { A.raidPri = v ? [...A.raidPri, k] : A.raidPri.filter((x) => x !== k); }), l)))]);
+                                const tl = NL.h("input", { type: "text", inputmode: "numeric", value: A.raidTime, placeholder: "seconds" });
+                                tl.addEventListener("change", () => { A.raidTime = String(tl.value).replace(/[^\d]/g, ""); });
+                                rows.push(["Time limit (seconds)", tl]);
+                            }
+                            rows.push(["Target", box(NL.h("span", null, r.name + (moon ? " (moon)" : "") + (r.owner ? " \u00B7 " + r.owner : "")), zone ? NL.h("span", { class: "nl2-atk-zone nl2-z-" + zone }, ZONES[zone] || zone) : null)]);
+                            if (!moon) {
+                                const rn = note("Fleet will fight until destroyed, no retreat.", true);
+                                rn.style.display = A.retreat === "fight" ? "" : "none";
+                                rows.push(["Retreat", box(sel([["fight", "Fight to death"], ["0.3", "Retreat at 30% HP loss"], ["0.4", "Retreat at 40% HP loss"], ["0.5", "Retreat at 50% HP loss"], ["0.6", "Retreat at 60% HP loss"], ["0.7", "Retreat at 70% HP loss"]], A.retreat, (v) => { A.retreat = v; rn.style.display = v === "fight" ? "" : "none"; }), rn)]);
+                                A.cvEl = note(cvText());
+                                rows.push(["Combined Assault", box(cb(A.combined, (v) => { A.combined = v; live(); }), A.cvEl)]);
+                                if (cntK(snap, "scout") > 0) {
+                                    const sn = note(""), put = () => { const t = SCOUT_PRI.find((x) => x[0] === A.scoutPri); sn.textContent = A.scoutPri ? fmt(cntK(A.snap || snap, "scout")) + " scouts will fire first at " + (t ? t[1] : A.scoutPri) : ""; };
+                                    put();
+                                    rows.push(["Scout priority", box(sel(SCOUT_PRI, A.scoutPri, (v) => { A.scoutPri = v; put(); }), sn)]);
+                                }
+                                A.amEl = note(amText());
+                                rows.push(["Alcubierre", box(cb(A.alc, (v) => { A.alc = v; if (A.api)
+                                        A.api.reEstimate(); }), A.amEl)]);
+                            }
+                            return rows;
+                        },
+                        sumExtra: () => [["Now", NL.h("span", { "data-nl2-atk-now": "" }, utc(Date.now()) + " UTC")]],
+                        send: async (snap, ctl) => {
+                            let extra = {};
+                            for (let i = 0; i < 4; i++) {
+                                const b = body(snap, extra);
+                                let x;
+                                try {
+                                    x = await post(moon ? "/api/moons/" + r.id + "/send" : "/api/fleet/dispatch", b);
+                                }
+                                catch (e) {
+                                    return { ok: false, message: "Could not reach the game: " + ((e && e.message) || e) };
+                                }
+                                if (x.ok) {
+                                    const mid = x.j && ((x.j.mission && x.j.mission.id) || x.j.missionId);
+                                    if (mid != null && NL.ptgMissionType)
+                                        NL.ptgMissionType(mid, b.missionType);
+                                    setTimeout(() => { get("/api/fleet/missions"); }, 1000);
+                                    return { ok: true, message: (x.j && x.j.message) || "Fleet launched.", missionId: mid };
+                                }
+                                const c = x.j && CONFIRM[x.j.code];
+                                if (x.status === 409 && c && ctl && ctl.ask) {
+                                    if (!(await ctl.ask({ text: x.j.error || x.j.message || c[1], go: "Attack anyway" })))
+                                        return { ok: false, message: "Not sent." };
+                                    extra = { ...extra, [c[0]]: true };
+                                    continue;
+                                }
+                                return { ok: false, message: (x.j && (x.j.error || x.j.message)) || "The game refused the launch (HTTP " + x.status + ")." };
+                            }
+                            return { ok: false, message: "The game kept asking; not sent." };
+                        },
+                        ready: (api) => { A.api = api; },
+                    };
+                    if (!moon)
+                        get("/api/fleet/combined-assaults").then((d) => { A.convoy = (d && Array.isArray(d.assaults) ? d.assaults.find((x) => x && String(x.targetPlanetId) === String(r.id)) : null) || false; live(); }).catch(() => { A.convoy = false; live(); });
+                    const tick = setInterval(() => { const n = document.querySelector("[data-nl2-atk-now]"); if (n)
+                        n.textContent = utc(Date.now()) + " UTC"; }, 1000);
+                    try {
+                        await NL.fleet.open(o2);
+                    }
+                    finally {
+                        clearInterval(tick);
+                    }
+                }
                 let openDlg = null;
                 NL.flAttackOpen = async (btn, r, o) => {
+                    if (NL.atkShared && NL.fleet && NL.fleetAtkKit)
+                        return openShared(btn, r, o);
                     if (openDlg)
                         return;
                     const near = ((o && o.near) || []).map((m) => +m.id);
@@ -30684,7 +31172,7 @@
                 }
                 return [...by.values()].filter((e) => e.quantity > 0 || e.damagedQuantity > 0);
             };
-            const body = (state) => ({ missionType: "transfer", useHighway: false, targetPlanetId: Number((state.target || {}).id), ordinaryMoonTravel: true, ships: shipsBody(state), attachLeader: !!state.leader, ...(moN(state.speed) > 0 && moN(state.speed) < 100 ? { speedFactor: moN(state.speed) / 100 } : {}) });
+            const body = (state) => ({ missionType: "transfer", useHighway: !!state.highway, targetPlanetId: Number((state.target || {}).id), ordinaryMoonTravel: true, ships: shipsBody(state), attachLeader: !!state.leader, ...(moN(state.speed) > 0 && moN(state.speed) < 100 ? { speedFactor: moN(state.speed) / 100 } : {}) });
             function moonLoad(md, o, id) {
                 const kp = typeof o.keep === "function" ? o.keep(id) : (o.keep || {});
                 const stock = (md && md.resourceSnapshot && md.resourceSnapshot.resources) || (md && md.moon) || {}, resources = {};
@@ -30698,6 +31186,46 @@
                 return resources;
             }
             const moonShips = (sy, o) => ships(sy, o.flyOnly).filter((s) => o.flyOnly || (s.cargo > 0 && !s.damaged));
+            const MO_ZONE = "nl2.mo.zone", moZoneBusy = new Map();
+            const moZoneAll = () => { try {
+                return JSON.parse(localStorage.getItem(MO_ZONE) || "{}") || {};
+            }
+            catch (e) {
+                return {};
+            } };
+            async function moZone(pid) {
+                pid = Number(pid);
+                if (!pid || !NL.transportGet)
+                    return null;
+                const z = moZoneAll()[pid];
+                if (z && Date.now() - z.at < 7 * 86400000)
+                    return z.z;
+                if (!moZoneBusy.has(pid))
+                    moZoneBusy.set(pid, (async () => {
+                        let d = null;
+                        try {
+                            d = await NL.transportGet("GET /fleet/zone/:id", pid, {});
+                        }
+                        catch (e) {
+                            d = null;
+                        }
+                        const v = d && d.zone ? String(d.zone).toLowerCase() : null;
+                        if (v) {
+                            const all = moZoneAll();
+                            all[pid] = { at: Date.now(), z: v };
+                            try {
+                                localStorage.setItem(MO_ZONE, JSON.stringify(all));
+                            }
+                            catch (e) { }
+                        }
+                        moZoneBusy.delete(pid);
+                        return v;
+                    })());
+                return moZoneBusy.get(pid);
+            }
+            if (NL.moCaps === undefined)
+                NL.moCaps = true;
+            const moCapRule = async (pid) => (NL.moCaps !== false && (await moZone(pid)) === "sentinel" ? "Capitals can't enter Sentinel space" : null);
             const called = {};
             const arriving = (id) => {
                 let t = called[id] && called[id] > Date.now() ? called[id] : 0;
@@ -30725,7 +31253,7 @@
                     return;
                 }
                 const target = { id: Number(id), label: name + " (moon)" };
-                const body = (state) => ({ useHighway: false, missionType: "transfer", sourcePlanetId: Number(state.sourceId), ships: shipsBody(state), ...(moN(state.speed) > 0 && moN(state.speed) < 100 ? { speedFactor: moN(state.speed) / 100 } : {}) });
+                const body = (state) => ({ useHighway: !!state.highway, missionType: "transfer", sourcePlanetId: Number(state.sourceId), ships: shipsBody(state), ...(moN(state.speed) > 0 && moN(state.speed) < 100 ? { speedFactor: moN(state.speed) / 100 } : {}) });
                 return NL.fleet.open({
                     kind: "mo-call",
                     type: "collection",
@@ -30736,6 +31264,8 @@
                     target,
                     fields: ["source", "target", "mission", "speed", "ships", "eta"],
                     speed: 100,
+                    hwChoice: true,
+                    capitalRule: () => moCapRule(m.planetId),
                     sourceLabel: "From",
                     missionLabel: "For",
                     reprepareOnMission: true,
@@ -30826,6 +31356,8 @@
                     fields: o.fields,
                     speed: o.speed || 100,
                     hydrogenReserve: 1,
+                    hwChoice: true,
+                    ...(o.flyOnly ? { capitalRule: (t) => moCapRule(t && t.id) } : {}),
                     cargoNote: o.note,
                     sources: async () => [{ id: Number(id), name }],
                     prepare: async () => {
@@ -33388,6 +33920,9 @@
         NL.fl428 = true;
         NL.mineSlotKeep = true;
         NL.expRecent = true;
+        NL.patReadout = true;
+        NL.pveHw = true;
+        NL.btnKeep = true;
         NL.pveQtyDash = true;
         NL.expFast = true;
         NL.css("gl160", ".nxs-tplmsg{margin-left:8px;font-size:13px;white-space:nowrap}.nxs-btn.nxs-tplsure{border-color:#e06c75!important;color:#e06c75!important}");
@@ -36665,6 +37200,8 @@
                     const sync = (sn) => { if (sn) {
                         st.src = sn.sourceId;
                         st.leader = !!sn.leader;
+                        if (sn.highway !== undefined)
+                            st.hw = !!sn.highway;
                         st.act = {};
                         for (const x of sn.ships || [])
                             st.act[x.key] = num(x.qty);
@@ -36749,7 +37286,7 @@
                     };
                     const ctxOf = (sn) => {
                         sync(sn);
-                        return { hangar: (sn && sn.hangar) || {}, src: st.src, srcName: srcName(), ships: shipsOf(), leader: st.leader, est: st.est, tplKey, tpl: cfg.noTpl ? {} : tplClean(tplZone()), capacity: cfg.capInfo ? cfg.capInfo(st).cap : undefined };
+                        return { highway: (cfg.hw && NL.pveHw && NL.fleetHw) ? !!st.hw : undefined, hangar: (sn && sn.hangar) || {}, src: st.src, srcName: srcName(), ships: shipsOf(), leader: st.leader, est: st.est, tplKey, tpl: cfg.noTpl ? {} : tplClean(tplZone()), capacity: cfg.capInfo ? cfg.capInfo(st).cap : undefined };
                     };
                     let last = null;
                     const o = {
@@ -36803,7 +37340,7 @@
                             }
                             let e = null;
                             try {
-                                e = await transportCall(ESTIMATE_OP, "POST", { id: null, query: {}, body: { ...(cfg.estExtra || {}), sourcePlanetId: st.src, ...cfg.target, ships, missionType: cfg.missionType, ...(st.leader ? { attachLeader: true } : {}) } });
+                                e = await transportCall(ESTIMATE_OP, "POST", { id: null, query: {}, body: { ...(cfg.estExtra || {}), ...((cfg.hw && NL.pveHw && NL.fleetHw) ? { useHighway: !!st.hw } : {}), sourcePlanetId: st.src, ...cfg.target, ships, missionType: cfg.missionType, ...(st.leader ? { attachLeader: true } : {}) } });
                             }
                             catch (err) {
                                 e = null;
@@ -36868,6 +37405,13 @@
                                 out.push({ level: "red", text: "Not enough hydrogen for fuel." });
                             return out;
                         },
+                        ...((cfg.hw && NL.pveHw && NL.fleetHw) ? { hwChoice: true } : {}),
+                        ...(cfg.estAbove ? { etaAbove: (el) => { try {
+                                cfg.estAbove(el, st);
+                            }
+                            catch (e) {
+                                el.innerHTML = "";
+                            } } } : {}),
                         etaNote: cfg.noTpl && !cfg.estNote ? undefined : () => [cfg.noTpl ? "" : htmlText(lossNote(tplKey, tplZone())), cfg.estNote ? cfg.estNote(st) || "" : ""].filter(Boolean).join(" \u00B7 "),
                         preLaunch: (sn) => {
                             sync(sn);
@@ -37361,13 +37905,14 @@
                             const r = await fetch("/api/fleet/patrol/bands", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ ships, sourcePlanetId: st.src, attachLeader: false }) });
                             return r.ok ? r.json().catch(() => null) : null;
                         } : undefined,
-                        estNote: NL.fl417 ? (st) => {
+                        estAbove: NL.fl417 && NL.patReadout && NL.fleetCombat ? (el, st) => { el.innerHTML = patReadoutHtml(st.more, L.hours); } : undefined,
+                        estNote: NL.fl417 && !(NL.patReadout && NL.fleetCombat && NL.fl427) ? (st) => {
                             const b = st.more, sv = b && b.salvage, d = sv && Array.isArray(sv.durations) ? sv.durations.find((x) => num(x.hours) === L.hours) : null;
                             if (!b)
                                 return "";
                             return [d && d.escort ? "Escort: " + d.escort : "", b.cargo ? "Cargo: " + fmt(num(b.cargo.total)) + (b.cargo.band ? " (" + b.cargo.band + ")" : "") : "", d && d.depletion ? "System Depletion (" + L.hours + "h): " + d.depletion : ""].filter(Boolean).join(" \u00B7 ");
                         } : undefined,
-                        notes: NL.fl417 ? (st) => {
+                        notes: NL.fl417 && !(NL.patReadout && NL.fleetCombat && NL.fl427) ? (st) => {
                             const b = st.more, sv = b && b.salvage, d = sv && Array.isArray(sv.durations) ? sv.durations.find((x) => num(x.hours) === L.hours) : null;
                             return d && d.escort === "weak" && sv.zone && sv.zone !== "sentinel" ? "<span class=\"nxs-y\">\u26A0 The escort is weak for " + esc(sv.zone) + " space: pirates may intercept this patrol.</span>" : "";
                         } : undefined,
@@ -37430,8 +37975,15 @@
                 }
                 function openExpedition(zone, depth, src) {
                     const Z = EXP_ZONES[zone];
-                    if (!Z || !S.planets.length)
+                    if (!Z)
                         return;
+                    if (!S.planets.length) {
+                        if (NL.btnKeep) {
+                            toast("Still loading planets\u2026 try again in a moment.");
+                            movePlanets().catch(() => { });
+                        }
+                        return;
+                    }
                     lsSet(EXP_LAST_KEY, { zone, depth });
                     const md = expMedian(expKey(zone, depth));
                     const cfg = {
@@ -37517,6 +38069,36 @@
                         cfg.onOpen = (ov) => { cfg.ov = ov; oo(ov); };
                     }
                     fleetDialog(cfg);
+                }
+                const PAT_DEPL = { fresh: ["Untouched", "Nearby systems are untouched: finds are full-sized.", "ok"], thinned: ["Thinned", "Your salvage crews have already combed these systems today: finds will be smaller.", "amber"], worked: ["Thinned", "Your salvage crews have already combed these systems today: finds will be smaller.", "amber"], depleted: ["Depleted", "Your crews have stripped these systems bare today: finds will be much smaller.", "bad"] };
+                const PAT_ESC = { none: ["No combat escort selected", "If pirates intercept the fleet, it gives up the holds without a fight.", "bad"], weak: ["The escort may not be enough", "A strong pirate band could take both the haul and the ships.", "amber"], ordinary: ["The escort looks solid", "Pirates vary; there are no guarantees.", "plain"] };
+                const patBand = (b) => { const k = String(b || "").toLowerCase(); return /none|^$/.test(k) ? [0, "bad"] : /weak|low|thin/.test(k) ? [33, "amber"] : /strong|high|heavy|max/.test(k) ? [100, "ok"] : [66, "info"]; };
+                function patReadoutHtml(b, hours) {
+                    if (!b)
+                        return "<div class=\"nl2-pro\"><div class=\"nl2-pro-h\">Capability Readout</div><div class=\"nl2-pro-hint\">Working out the readout\u2026</div></div>";
+                    const sv = b.salvage || {}, ds = Array.isArray(sv.durations) ? sv.durations : [], cur = ds.find((x) => num(x.hours) === num(hours)) || null;
+                    const bar = (label, band, val) => { const [w, c] = patBand(band); return "<div class=\"nl2-pro-r\"><span class=\"nl2-pro-k\">" + label + "</span><span class=\"nl2-pro-bar\"><i class=\"nl2-pro-" + c + "\" style=\"width:" + w + "%\"></i></span><span class=\"nl2-pro-v\">" + esc(val) + "</span></div>"; };
+                    const cap = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : "\u2014");
+                    const escBand = cur && cur.escort ? cur.escort : (b.security && b.security.band) || "";
+                    let h = "<div class=\"nl2-pro\"><div class=\"nl2-pro-h\">Capability Readout</div>";
+                    if (b.cargo)
+                        h += bar("Cargo", b.cargo.band, fmt(num(b.cargo.total)) + (b.cargo.band ? " \u00B7 " + cap(b.cargo.band) : ""));
+                    h += bar("Escort Strength", escBand, cap(escBand));
+                    if (ds.length) {
+                        h += "<div class=\"nl2-pro-r nl2-pro-top\"><span class=\"nl2-pro-k\">System depletion</span><div class=\"nl2-pro-dw\"><div class=\"nl2-pro-d\">" + ds.map((x) => {
+                            const D = PAT_DEPL[String(x.depletion || "").toLowerCase()] || [cap(x.depletion), "", "plain"];
+                            return "<span class=\"nl2-pro-dc" + (cur === x ? " nl2-pro-sel" : "") + "\"><b>" + num(x.hours) + "h</b><span class=\"nl2-pro-" + D[2] + "t\">" + esc(D[0]) + "</span></span>";
+                        }).join("") + "</div>";
+                        const D = cur && PAT_DEPL[String(cur.depletion || "").toLowerCase()];
+                        if (D)
+                            h += "<div class=\"nl2-pro-hint\">" + num(hours) + "h: " + esc(D[1]) + "</div>";
+                        h += "</div></div>";
+                    }
+                    h += "</div>";
+                    const ek = !escBand || /none/i.test(escBand) || !(num(b.security && b.security.power) > 0) ? "none" : /weak|low/i.test(escBand) ? "weak" : "ordinary";
+                    const E = PAT_ESC[ek];
+                    h += "<div class=\"nl2-pro-esc nl2-pro-esc-" + E[2] + "\"><b>" + E[0] + "</b><div class=\"nl2-pro-hint\">" + E[1] + " A rough estimate of the selected escort, not a battle forecast.</div></div>";
+                    return h;
                 }
                 const RUIN_RANGE = 100, RUIN_ROWS = 10, RUIN_GAP = window.__nxsTestGap != null ? 1000 : 6000, RUIN_WEEK_MS = 7 * 24 * 3600000;
                 let RUIN_COOL_MS = NL.fl420 ? 24 * 3600000 : 48 * 3600000, RUIN_WORK_MS = NL.fl420 ? 2 * 3600000 : 4 * 3600000;
@@ -38417,7 +38999,7 @@
                                 for (const q of ss.stations) {
                                     if (q == null || q.id == null || !S.stations.some((x) => x.id === +q.id))
                                         continue;
-                                    S.reading.set(+q.id, { at: now, station: Object.assign({}, q, { inventoryVisible: NL.stnWd ? true : q.canWithdrawResources !== false, noWd: q.canWithdrawResources === false }) });
+                                    S.reading.set(+q.id, { at: now, station: Object.assign({}, q, { inventoryVisible: true, noWd: q.canWithdrawResources === false }) });
                                 }
                                 saveReadings();
                             }
@@ -38550,37 +39132,30 @@
                         return false;
                     return true;
                 }
+                function stnRowTest(x, o) {
+                    const st = stationOf(x.id), top = fillOf(st), row = { s: x, st, top, fill: top ? top.p : null, near: nearestPlanet(x.x, x.y, S.planets) };
+                    const why = o.routed && o.routed.has(x.id) ? "rt" : o.hid && o.hid[x.id] ? "hid" : o.sup && o.sup[x.id] ? "sup" : stationBusy(x.id) ? "busy"
+                        : S.sRefill && !st ? "unread" : o.f && sFilterCount(o.f) && !sPasses(row, o.f) ? "filt" : "";
+                    return { why, row };
+                }
                 function stationRows() {
-                    const sup = suppressedMap(), f = sFilters(), hm = stnHideOn() ? stnHidMap() : null, hidRows = [];
+                    const hidRows = [], rows = [];
                     let nSup = 0, nBusy = 0, nFilt = 0, nRt = 0;
-                    const rows = [], routed = NL.fl288 && S.stnRoot && NL.stnRouted ? NL.stnRouted() : null;
+                    const o = { sup: suppressedMap(), hid: stnHideOn() ? stnHidMap() : null, routed: S.stnRoot && NL.stnRouted ? NL.stnRouted() : null, f: sFilters() };
                     for (const x of S.stations) {
-                        if (routed && routed.has(x.id)) {
+                        const { why, row } = stnRowTest(x, o);
+                        if (why === "rt")
                             nRt++;
-                            continue;
-                        }
-                        if (hm && hm[x.id]) {
-                            const st0 = stationOf(x.id), t0 = fillOf(st0);
-                            hidRows.push({ s: x, st: st0, top: t0, fill: t0 ? t0.p : null, near: nearestPlanet(x.x, x.y, S.planets) });
-                            continue;
-                        }
-                        if (sup[x.id]) {
+                        else if (why === "hid")
+                            hidRows.push(row);
+                        else if (why === "sup")
                             nSup++;
-                            continue;
-                        }
-                        if (stationBusy(x.id)) {
+                        else if (why === "busy")
                             nBusy++;
-                            continue;
-                        }
-                        const st = stationOf(x.id), top = fillOf(st);
-                        if (S.sRefill && !st)
-                            continue;
-                        const row = { s: x, st, top, fill: top ? top.p : null, near: nearestPlanet(x.x, x.y, S.planets) };
-                        if (sFilterCount(f) && !sPasses(row, f)) {
+                        else if (why === "filt")
                             nFilt++;
-                            continue;
-                        }
-                        rows.push(row);
+                        else if (!why)
+                            rows.push(row);
                     }
                     rows.sort((a, b) => {
                         const wa = stnNoWd(a.st), wb = stnNoWd(b.st);
@@ -38621,13 +39196,13 @@
                     const el = link && link.querySelector(".nxs-attn");
                     if (!el)
                         return;
-                    const sup = stnSupMap();
+                    const o = { sup: stnSupMap() };
                     let n = 0;
                     for (const x of S.stations) {
-                        if (sup[x.id] || stationBusy(x.id) || stnNoWd(stationOf(x.id)))
+                        const { why, row } = stnRowTest(x, o);
+                        if (why || stnNoWd(row.st))
                             continue;
-                        const f = fillOf(stationOf(x.id));
-                        if (f && f.p >= WARN_PCT())
+                        if (row.top && row.top.p >= WARN_PCT())
                             n++;
                     }
                     const ef = Math.max(0, expFree()), pf = patCanLaunch() ? Math.max(0, patFree()) : 0, xi = xpIdle() ? 1 : 0;
@@ -38639,8 +39214,6 @@
                     NL.tip(el, tip);
                 }
                 function stnRouteBtn(x, src) {
-                    if (!NL.fl254)
-                        return "";
                     const nwSt = stationOf(x.id);
                     const why = stnNoWd(nwSt) ? STN_NOWD_TIP(nwSt) : !NL.stnRouteDialog ? "Turn on the Transfer tab to make routes here" : src && !src.has(+x.id) ? "The game doesn\u2019t offer this station as a Logistics route source" : "";
                     return "<button type=\"button\" class=\"nxs-btn nl2-c-blue nxs-sroute\" data-sroute=\"" + x.id + "\"" + (why ? " disabled " + NL.tipA + "=\"" + esc(why) + "\"" : " " + NL.tipA + "=\"Make a Logistics route from " + esc(x.name) + "\"") + ">Route</button> ";
@@ -38670,7 +39243,7 @@
                     if (sec.hidden)
                         return;
                     const loaded = S.stations.filter((x) => S.reading.has(x.id)).length;
-                    const info = sec.querySelector(".nxs-info"), s9 = NL.fl279 && sec.classList.contains("nl2-stn9");
+                    const info = sec.querySelector(".nxs-info"), s9 = sec.classList.contains("nl2-stn9");
                     const txt = s9 ? [S.sStatus, S.sLoading ? "reading " + loaded + "/" + S.stations.length : "", under.length ? under.length + " under way" : "", nRt ? nRt + " on routes (below)" : "", nFilt ? nFilt + " filtered out" : "", nSup ? nSup + " suppressed" : ""].filter(Boolean).map((x) => "\u00B7 " + x).join(" ")
                         : S.sStatus || (rows.length + (total > rows.length ? " of " + total : "") + " shown"
                             + (S.sLoading ? " \u00B7 reading " + loaded + "/" + S.stations.length : "")
@@ -38691,7 +39264,7 @@
                         ob.checked = stnOne();
                     const sysLink = (id, name) => id ? "<a class=\"nxs-sys\" href=\"/galaxy?system=" + id + "\" data-nav>" + esc(name || "\u2014") + "</a>" : esc(name || "\u2014");
                     const bulksAt = (near) => { const f = near && S.fleets.get(near.p.id); return f ? fmt(num(f.bulk_carrier)) : "<span class=\"nxs-dim\">\u2014</span>"; };
-                    const rtSrc = NL.fl254 && NL.stnRouteSources ? NL.stnRouteSources() : null;
+                    const rtSrc = NL.stnRouteSources ? NL.stnRouteSources() : null;
                     const rowHtml = ({ s: x, st, top, near }) => {
                         const loadedOne = !!st, hidden = st && st.inventoryVisible === false;
                         const canCollect = loadedOne && !hidden && !stnNoWd(st) && stationTotal(st) > 0 && !!near, nwTip = stnNoWd(st) ? " " + NL.tipA + "=\"" + esc(STN_NOWD_TIP(st)) + "\"" : "";
@@ -38706,7 +39279,7 @@
                                 + "<td>" + (near ? planetLink(near.p) : "<span class=\"nl2-ftr-d\">\u2014</span>") + "</td>"
                                 + "<td>" + bulksAt(near) + "</td>"
                                 + "<td>" + (near ? "<span class=\"" + distCls(near.dist) + "\">" + Math.round(near.dist) + " ly</span>" : "<span class=\"nl2-ftr-d\">\u2014</span>") + "</td>"
-                                + "<td class=\"nl2-ftr-acts nl2-ftr-tr\">" + (NL.fl254 ? stnRouteBtn(x, rtSrc).replace("nxs-btn nl2-c-blue", "nl2-c-blue").trim() : "<span class=\"nl2-ftr-gap\"></span>")
+                                + "<td class=\"nl2-ftr-acts nl2-ftr-tr\">" + stnRouteBtn(x, rtSrc).replace("nxs-btn nl2-c-blue", "nl2-c-blue").trim()
                                 + "<button type=\"button\" class=\"nl2-c-green\" data-scollect=\"" + x.id + "\"" + (canCollect ? "" : " disabled") + nwTip + ">Collect</button></td>"
                                 + "<td class=\"nl2-ftr-hide\">" + sup + "</td></tr>";
                         return "<tr><td>" + sysLink(x.systemId, x.systemName) + "</td>"
@@ -38763,8 +39336,8 @@
                             htb.__html = hh;
                         }
                     }
-                    if (NL.fl288 && S.stnRoot && NL._kick) {
-                        const cs = NL.pve.stnCollectSig() + (NL.fl291 ? "|" + NL.pve.stnInfoSig() : "");
+                    if (S.stnRoot && NL._kick) {
+                        const cs = NL.pve.stnCollectSig() + "|" + NL.pve.stnInfoSig();
                         if (cs !== S.stnCs) {
                             S.stnCs = cs;
                             NL._kick();
@@ -38833,7 +39406,7 @@
                                 method: "POST",
                                 credentials: "include",
                                 headers: { "Content-Type": "application/json", Accept: "application/json", ...hcHead() },
-                                body: JSON.stringify({ useHighway: USE_HIGHWAY, sourcePlanetId: c.src, missionType: "collect_station", ships: c.ships, collectCargo: allocateCargo(st, c.capacity), ...(c.leader ? { attachLeader: true } : {}) }),
+                                body: JSON.stringify({ useHighway: c.highway !== undefined ? c.highway : USE_HIGHWAY, sourcePlanetId: c.src, missionType: "collect_station", ships: c.ships, collectCargo: allocateCargo(st, c.capacity), ...(c.leader ? { attachLeader: true } : {}) }),
                             });
                             const j = await r.json().catch(() => null);
                             if (!r.ok)
@@ -39020,7 +39593,7 @@
                     };
                     return { bc: pick("bulk_carrier"), sh: pick("transport_shuttle") };
                 }
-                async function estimateCollect(planetId, target, bc, sh, fleet, leader) {
+                async function estimateCollect(planetId, target, bc, sh, fleet, leader, hw) {
                     const ships = [];
                     if (sh > 0 && fleet.sh.id != null)
                         ships.push({ shipDefId: fleet.sh.id, quantity: sh });
@@ -39029,14 +39602,14 @@
                     if (!ships.length)
                         return null;
                     try {
-                        const d = await transportCall(ESTIMATE_OP, "POST", { id: null, query: {}, body: { useHighway: USE_HIGHWAY, sourcePlanetId: planetId, ...target.body, ships, missionType: target.missionType, ...(leader ? { attachLeader: true } : {}) } });
+                        const d = await transportCall(ESTIMATE_OP, "POST", { id: null, query: {}, body: { useHighway: hw !== undefined && NL.pveHw && NL.fleetHw && NL.fl427 ? !!hw : USE_HIGHWAY, sourcePlanetId: planetId, ...target.body, ships, missionType: target.missionType, ...(leader ? { attachLeader: true } : {}) } });
                         if (d && typeof d.fuelCost === "number" && typeof d.travelTime === "number")
                             return d;
                     }
                     catch (e) { }
                     return null;
                 }
-                async function chooseCollectFleet(planetId, target, total, fleet, leader) {
+                async function chooseCollectFleet(planetId, target, total, fleet, leader, hw) {
                     const BC = fleet.bc.cap, SH = fleet.sh.cap;
                     const cands = new Map();
                     const add = (b, s) => { if (b >= 0 && s >= 0 && b <= fleet.bc.qty && s <= fleet.sh.qty && b + s > 0 && b * BC + s * SH >= total)
@@ -39058,7 +39631,7 @@
                             cands.set(b + "|" + s, { bc: b, sh: s });
                     }
                     let best = null;
-                    const priced = await Promise.all([...cands.values()].map(async (c) => ({ c, est: await estimateCollect(planetId, target, c.bc, c.sh, fleet, leader) })));
+                    const priced = await Promise.all([...cands.values()].map(async (c) => ({ c, est: await estimateCollect(planetId, target, c.bc, c.sh, fleet, leader, hw) })));
                     for (const { c, est } of priced) {
                         const fuel = est ? est.fuelCost : Infinity;
                         if (!best || fuel < best.fuel || (fuel === best.fuel && c.bc + c.sh < best.bc + best.sh))
@@ -39101,11 +39674,12 @@
                         missionType: cfg.target.missionType,
                         target: cfg.target.body,
                         estExtra: { useHighway: USE_HIGHWAY },
+                        hw: true,
                         plan: async (st) => {
                             const fleet = fleetOf(st);
                             if (fleet.bc.id == null && fleet.sh.id == null)
                                 return { act: {}, est: null, shortage: true };
-                            const pl = await chooseCollectFleet(st.src, cfg.target, total, fleet, st.leader);
+                            const pl = await chooseCollectFleet(st.src, cfg.target, total, fleet, st.leader, st.hw);
                             return { act: { bulk_carrier: pl.bc, transport_shuttle: pl.sh }, est: pl.est, shortage: pl.shortage };
                         },
                         work: (st) => { const ms = loadMs(Math.min(total, carried(st))); return ms != null ? { ms, est: true } : null; },
@@ -39247,7 +39821,7 @@
                         distTo: dOf,
                         target: { missionType: "collect_debris", body: { targetSystemId: p.systemId } },
                         send: async (c) => {
-                            const d = await transportCall(COLLECT_OP, "POST", { id: null, query: {}, body: { useHighway: USE_HIGHWAY, sourcePlanetId: c.src, debrisId: p.id, ships: c.ships, ...(c.leader ? { attachLeader: true } : {}) } });
+                            const d = await transportCall(COLLECT_OP, "POST", { id: null, query: {}, body: { useHighway: c.highway !== undefined ? c.highway : USE_HIGHWAY, sourcePlanetId: c.src, debrisId: p.id, ships: c.ships, ...(c.leader ? { attachLeader: true } : {}) } });
                             return (d && d.mission) || { status: "outbound", missionType: "collect_debris", targetSystemId: p.systemId, targetSystemName: p.systemName, sourcePlanetId: c.src, arrivesAt: c.est && c.est.travelTime ? new Date(Date.now() + c.est.travelTime * 1000).toISOString() : null };
                         },
                         done: (c, mission) => {
@@ -39691,17 +40265,13 @@
                 function pveMove() { return !!(NL.pveMoveOn && NL.pveMoveOn()); }
                 function stnSec() { return (S.stnRoot && S.stnRoot.querySelector(".nxs-stn")) || (S.root && S.root.querySelector(".nxs-stn")) || null; }
                 function stnBadgeRows() {
-                    const sup = stnSupMap(), out = [], wd = !!NL.stnWd, f9 = wd ? sFilters() : null, fn = f9 && sFilterCount(f9);
+                    const o = { sup: stnSupMap(), f: sFilters() }, out = [];
                     for (const x of S.stations) {
-                        if (sup[x.id] || stationBusy(x.id))
+                        const { why, row } = stnRowTest(x, o);
+                        if (why || stnNoWd(row.st))
                             continue;
-                        const st = stationOf(x.id), f = fillOf(st);
-                        if (wd && stnNoWd(st))
-                            continue;
-                        if (fn && !sPasses({ top: f, near: nearestPlanet(x.x, x.y, S.planets) }, f9))
-                            continue;
-                        if (f && f.p >= WARN_PCT())
-                            out.push({ x, f });
+                        if (row.top && row.top.p >= WARN_PCT())
+                            out.push({ x, f: row.top });
                     }
                     return out.sort((a, b) => b.f.p - a.f.p);
                 }
@@ -39736,6 +40306,56 @@
                     }
                     catch (e) { }
                 }
+                function patchKeepButtons(el, h) {
+                    const t = document.createElement("div");
+                    t.innerHTML = h;
+                    const skip = (n) => /^(disabled|title|class|style|aria-)/.test(n) || n === NL.tipA;
+                    const key = (b) => [...b.attributes].filter((a) => !skip(a.name)).map((a) => a.name + "=" + a.value).sort().join("&") + "|" + b.tagName;
+                    const olds = new Map();
+                    for (const b of el.querySelectorAll("button"))
+                        if (!olds.has(key(b)))
+                            olds.set(key(b), b);
+                    const keep = [];
+                    for (const nb of t.querySelectorAll("button")) {
+                        const k = key(nb), ob = olds.get(k);
+                        if (!ob)
+                            continue;
+                        olds.delete(k);
+                        for (const a of [...ob.attributes])
+                            if (!nb.hasAttribute(a.name))
+                                ob.removeAttribute(a.name);
+                        for (const a of [...nb.attributes])
+                            if (ob.getAttribute(a.name) !== a.value)
+                                ob.setAttribute(a.name, a.value);
+                        if (ob.innerHTML !== nb.innerHTML)
+                            ob.innerHTML = nb.innerHTML;
+                        ob.disabled = nb.disabled;
+                        keep.push([nb, ob]);
+                    }
+                    const top = (b) => b.parentNode;
+                    if (!keep.length || keep.some(([nb, ob]) => top(nb) !== t || top(ob) !== el)) {
+                        el.innerHTML = h;
+                        return;
+                    }
+                    const oldOrder = [...el.childNodes].filter((n) => keep.some(([, ob]) => ob === n));
+                    if (oldOrder.some((n, i) => n !== keep[i][1])) {
+                        el.innerHTML = h;
+                        return;
+                    }
+                    for (const n of [...el.childNodes])
+                        if (!keep.some(([, ob]) => ob === n))
+                            n.remove();
+                    let prev = null;
+                    for (const n of [...t.childNodes]) {
+                        const kb = keep.find(([nb]) => nb === n);
+                        if (kb) {
+                            prev = kb[1];
+                            continue;
+                        }
+                        el.insertBefore(n, prev ? prev.nextSibling : el.firstChild);
+                        prev = n;
+                    }
+                }
                 function paintRows() {
                     const els = S.rowEls || {};
                     for (const k of ["exp", "pat"]) {
@@ -39754,7 +40374,10 @@
                         if (el.__html === h)
                             continue;
                         el.__html = h;
-                        el.innerHTML = h;
+                        if (NL.btnKeep)
+                            patchKeepButtons(el, h);
+                        else
+                            el.innerHTML = h;
                     }
                 }
                 const PLANETS_STALE = 5 * 60000;
@@ -40257,7 +40880,7 @@
                         paintIdle();
                     }
                 }
-                NL._pv = { stations: () => S.stations, planets: () => S.planets, stnRoot: () => S.stnRoot, fmt: { esc, planetLink, distCls }, lsGet, lsSet, suppressedMap, sFilters, sFilterCount, sPasses, stationOf, fillOf, stationTotal, nearestPlanet, stationBusy, pveMove, URGENT_PCT, WARN_PCT, paintStations, STN_BTNS };
+                NL._pv = { stations: () => S.stations, planets: () => S.planets, stnRoot: () => S.stnRoot, fmt: { esc, planetLink, distCls }, lsGet, lsSet, suppressedMap, sFilters, sFilterCount, sPasses, stnRowTest, stationOf, fillOf, stationTotal, nearestPlanet, stationBusy, pveMove, URGENT_PCT, WARN_PCT, paintStations, STN_BTNS };
                 NL.pve = {
                     tpl: { load: () => loadTemplates(), save: (t) => lsSet(TEMPLATE_KEY, t), cur: (t, k) => tplCur(t, k), sel: (t, k) => tplSel(t, k), names: (t) => (t && t.names) || {}, lossNote: (k, t) => lossNote(k, t), badFor: (k, t) => badFor(k, t) },
                     mountMining(el) {
@@ -40330,13 +40953,12 @@
                     mountStations(el) {
                         if (S.stnRoot === el && el.querySelector(".nxs-stn"))
                             return;
-                        el.innerHTML = NL.fl279 ? NL.stn9.html() : STN_HTML;
+                        el.innerHTML = NL.stn9.html();
                         if (!el.__nlStn) {
                             el.__nlStn = true;
                             el.addEventListener("change", rootChange);
                             el.addEventListener("click", rootClick);
-                            if (NL.fl279)
-                                el.addEventListener("click", NL.stn9.toggle);
+                            el.addEventListener("click", NL.stn9.toggle);
                         }
                         S.stnRoot = el;
                         restoreReadings();
@@ -40501,7 +41123,7 @@
                         try {
                             const n = stnBadgeRows().length + stnNoWdRows().length + stnRtPaused().length;
                             const nb = ((NL.navBadges || {})["/fleet"] || {}).pveStations;
-                            if (NL.stnWd && pveMove() && !S.stnCountFix && (!nb || nb.n !== n)) {
+                            if (pveMove() && !S.stnCountFix && (!nb || nb.n !== n)) {
                                 S.stnCountFix = true;
                                 try {
                                     moveBadges();
@@ -41078,6 +41700,7 @@
                         fields: ["source", "mission", "ships", "eta", "home", "leader"],
                         missionLabel: "Mining ships",
                         reprepareOnMission: true,
+                        ...(NL.pveHw && NL.fleetHw ? { hwChoice: true } : {}),
                         sources: () => NL.pickList(srcs).map((p) => ({ id: p.id, name: p.name, note: dOf(p).toFixed(1) + " ly", def: p.id === st.src })),
                         prepare: async (sid, _t, mv) => {
                             if (prepared && sid !== st.src) {
@@ -41115,6 +41738,7 @@
                                 return st.est;
                             }
                             st.leader = !!sn.leader;
+                            st.hw = !!sn.highway;
                             st.act = {};
                             for (const x of sn.ships)
                                 st.act[x.key] = num(x.qty);
@@ -41123,7 +41747,7 @@
                                 return null;
                             let e = null;
                             try {
-                                e = await transportCall(ESTIMATE_OP, "POST", { id: null, query: {}, body: { sourcePlanetId: st.src, targetSystemId: sys.systemId, targetFieldId: f.id, ships, missionType: "mining", ...(st.leader ? { attachLeader: true } : {}) } });
+                                e = await transportCall(ESTIMATE_OP, "POST", { id: null, query: {}, body: { ...(NL.pveHw && NL.fleetHw ? { useHighway: !!st.hw } : {}), sourcePlanetId: st.src, targetSystemId: sys.systemId, targetFieldId: f.id, ships, missionType: "mining", ...(st.leader ? { attachLeader: true } : {}) } });
                             }
                             catch (err) {
                                 e = null;
@@ -41158,7 +41782,7 @@
                         oneClick: !!(opts && opts.oneClick),
                         send: async (sn, ctl) => {
                             const ships = st.ships.filter((x) => st.act[x.key] > 0 && x.id != null).map((x) => ({ shipDefId: x.id, quantity: st.act[x.key] }));
-                            const mp = { id: null, query: {}, body: { useHighway: true, sourcePlanetId: st.src, targetFieldId: f.id, ships, miningDuration: MINE_SECS, attachLeader: !!st.leader, hangarAssignments: {}, mineUntilFull: true } };
+                            const mp = { id: null, query: {}, body: { useHighway: NL.pveHw && NL.fleetHw ? !!(sn && sn.highway) : true, sourcePlanetId: st.src, targetFieldId: f.id, ships, miningDuration: MINE_SECS, attachLeader: !!st.leader, hangarAssignments: {}, mineUntilFull: true } };
                             try {
                                 let d;
                                 try {
@@ -41742,7 +42366,7 @@
     .sidebar-badge.nxs-attn:empty{display:none!important}
     .nxs-hdronly .nxs-head{margin-bottom:0}
     .nxs-capped td{opacity:.45}
-    .nxs-xdig{margin:4px 0 6px;font-size:12px}.nl2-mt2-rr{display:inline-flex;align-items:center;gap:6px}.nl2-mt2-r{width:64px;text-align:right}.nl2-mt2-tpl{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}.nxs-gcore{margin-left:8px}
+    .nxs-xdig{margin:4px 0 6px;font-size:12px}.nl2-pro{margin:8px 0 10px;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(255,255,255,.03);font-size:13px}.nl2-pro-h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--nl2-head);margin-bottom:8px;font-weight:600}.nl2-pro-r{display:grid;grid-template-columns:120px 1fr 110px;align-items:center;gap:10px;margin:6px 0}.nl2-pro-top{align-items:start}.nl2-pro-k{color:var(--nl2-dim)}.nl2-pro-v{text-align:right;color:var(--nl2-text)}.nl2-pro-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}.nl2-pro-bar i{display:block;height:100%}.nl2-pro-ok{background:var(--nl2-ok)}.nl2-pro-amber{background:var(--nl2-amber)}.nl2-pro-bad{background:var(--nl2-bad)}.nl2-pro-info{background:var(--nl2-info)}.nl2-pro-dw{grid-column:2 / 4}.nl2-pro-d{display:grid;grid-template-columns:repeat(auto-fit,minmax(60px,1fr));gap:6px}.nl2-pro-dc{border:1px solid rgba(255,255,255,.10);border-radius:4px;padding:5px 6px;text-align:center;font-size:12px}.nl2-pro-dc b{display:block;color:var(--nl2-text);font-weight:600}.nl2-pro-dc.nl2-pro-sel{border-color:var(--nl2-info)}.nl2-pro-okt{color:var(--nl2-ok)}.nl2-pro-ambert{color:var(--nl2-amber)}.nl2-pro-badt{color:var(--nl2-bad)}.nl2-pro-plaint{color:var(--nl2-text)}.nl2-pro-hint{color:var(--nl2-dim);font-size:12px;margin-top:4px}.nl2-pro-esc{margin:0 0 10px;padding:8px 12px;border-left:3px solid var(--nl2-dim);border-radius:4px;background:rgba(255,255,255,.03);font-size:13px}.nl2-pro-esc-amber{border-left-color:var(--nl2-amber)}.nl2-pro-esc-amber b{color:var(--nl2-amber)}.nl2-pro-esc-bad{border-left-color:var(--nl2-bad)}.nl2-pro-esc-bad b{color:var(--nl2-bad)}.nl2-fleet-above .nl2-pro{border:0;padding:0;background:none;margin:0 0 10px}.nl2-fleet-above .nl2-pro-esc{margin:0}@media (max-width:520px){.nl2-pro-r{grid-template-columns:90px 1fr 80px}}.nl2-mt2-rr{display:inline-flex;align-items:center;gap:6px}.nl2-mt2-r{width:64px;text-align:right}.nl2-mt2-tpl{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}.nxs-gcore{margin-left:8px}
     .nxs-xpick{display:flex;gap:6px;flex-wrap:wrap}.nxs-xpick .nxs-btn{height:26px;line-height:24px;padding:0 12px;font-size:12px}.nxs-xpick .nxs-btn.nxs-on{background:rgba(34,195,221,.4);border-color:#22c3dd;color:#fff}
     .nxs-minebar{position:sticky;top:0;z-index:4;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#0c2033;border:1px solid #2f4d66;border-radius:8px}
     .nxs-minebar .nxs-btn{flex:1 1 30%}
@@ -41854,11 +42478,6 @@
         }
     }
     {
-        NL.fl254 = true;
-        NL.fl278 = true;
-        NL.fl288 = true;
-        NL.fl292 = true;
-        NL.fl305 = true;
         {
             const T = () => NL._tr;
             const saved = (k) => T().saved(k), routes = () => T().routes(), hubs = () => T().hubs(), isStnRt = (r) => T().isStnRt(r), rtEnds = (r) => T().rtEnds(r);
@@ -41876,7 +42495,7 @@
                 const st = kids[8].querySelector(".nl2-ftr-st");
                 if (st)
                     st.setAttribute("data-nl2-tip", tip);
-                if (NL.fl305 && (r.nlPend || stnLost(r))) {
+                if (r.nlPend || stnLost(r)) {
                     kids[8].replaceChildren(NL.h("span", { class: "nl2-ftr-st " + (r.nlPend ? "nl2-ftr-trav" : "nl2-ftr-lost"), "data-nl2-tip": r.nlPend ? "Creating this route in the game\u2026" : "Station no longer owned by your alliance: delete this route" }, r.nlPend ? "creating" : "lost"));
                     if (r.nlPend)
                         for (const b of kids[10].querySelectorAll("button"))
@@ -41900,18 +42519,18 @@
                     T().dlg.close();
                 const hubOf = (id) => hubs().find((h) => +h.planetId === +id) || null, hubsKnown = !!saved("hubs");
                 let pl0 = (s.planets || []).filter((p) => p && p.id != null);
-                if (NL.fl292 && hubsKnown && pl0.some((p) => trN((hubOf(p.id) || {}).hubLevel) > 0))
+                if (hubsKnown && pl0.some((p) => trN((hubOf(p.id) || {}).hubLevel) > 0))
                     pl0 = pl0.filter((p) => trN((hubOf(p.id) || {}).hubLevel) > 0);
                 if (!pl0.length)
                     return;
                 const nearOf = (list) => list.reduce((a, b) => (b.dist != null && (a.dist == null || b.dist < a.dist) ? b : a), list[0]);
-                const freeHere = NL.fl292 && hubsKnown ? pl0.filter((p) => { const h = hubOf(p.id); return h && trN(h.hubLevel) - trN(h.routeCount) > 0; }) : [];
+                const freeHere = hubsKnown ? pl0.filter((p) => { const h = hubOf(p.id); return h && trN(h.hubLevel) - trN(h.routeCount) > 0; }) : [];
                 const near = freeHere.length ? nearOf(freeHere) : nearOf(pl0);
                 const pl = NL.pickList ? NL.pickList(pl0) : pl0;
                 const slot = (p) => { const h = hubOf(p.id); return h ? { used: trN(h.routeCount), max: trN(h.hubLevel), free: trN(h.hubLevel) - trN(h.routeCount) } : { used: 0, max: 0, free: 0 }; };
-                const mine = routes().filter((r) => r.routeMode === "collect_station" && +r.sourceStationId === +s.id);
+                const mine = routes().filter((r) => isStnRt(r) && +r.sourceStationId === +s.id);
                 const allDone = mine.find((r) => String(r.resourceType) === "all");
-                let pi = Math.max(0, pl.indexOf(near)), busy = false, trig = STN_DEF, send = STN_DEF, gates = false;
+                let pi = Math.max(0, pl.indexOf(near)), trig = STN_DEF, send = STN_DEF, gates = false;
                 const msg = NL.h("div", { class: "nl2-ftr-dmsg" }), note = NL.h("div", { class: "nl2-ftr-dnote" });
                 const create = NL.h("button", { type: "button", class: "nl2-c-blue" }, "Create route");
                 const sel = NL.h("select", { onchange: () => { pi = +sel.value; refresh(); } }, ...pl.map((p, i) => {
@@ -41931,86 +42550,43 @@
                     const bad = allDone ? "A route already collects All Resources from " + s.name + "."
                         : hubsKnown && k.free <= 0 ? "No free route slot at " + p.name + " (" + k.used + "/" + k.max + "). Pick another planet."
                             : !(send >= 1) ? (NL.fl274 ? "Collect" : "Send") + " must be at least 1." : !(trig >= 0) ? "Trigger can't be below 0." : "";
-                    create.disabled = busy || !!bad;
+                    create.disabled = !!bad;
                     note.textContent = "Uses 1 of " + p.name + "'s route slots" + (hubsKnown ? " (" + Math.max(0, k.free) + " free)" : "") + ". Routes run every 5 minutes with " + p.name + "'s cargo ships and hydrogen.";
-                    if (!busy) {
-                        msg.className = "nl2-ftr-dmsg nl2-ftr-bad";
-                        msg.textContent = bad;
-                    }
+                    msg.className = "nl2-ftr-dmsg nl2-ftr-bad";
+                    msg.textContent = bad;
                 }
                 create.addEventListener("click", async () => {
                     const p = pl[pi];
-                    if (NL.fl305) {
-                        const sid = +s.id, body = { routeMode: "collect_station", destinationPlanetId: +p.id, sourceStationId: sid, resourceType: "all", threshold: trig, amount: send, useJumpGates: gates };
-                        stnPend.set(sid, Object.assign({ id: "new" + sid, nlPend: true, isActive: true }, body));
-                        close();
-                        let err = "";
-                        try {
-                            const res = await NL.rawFetch("/api/logistics/routes", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });
-                            const j = await res.json().catch(() => null);
-                            if (!res.ok)
-                                err = (j && (j.error || j.message)) || "the game refused it (HTTP " + res.status + ")";
-                        }
-                        catch (e) {
-                            err = "could not reach the game: " + e.message;
-                        }
-                        if (err) {
-                            stnPend.delete(sid);
-                            changed();
-                            trToast("Route not created for " + s.name + ": " + err);
-                            return;
-                        }
-                        try {
-                            await T().getJson("/api/logistics/routes");
-                        }
-                        catch (e) { }
-                        stnPend.delete(sid);
-                        changed();
-                        await trSleep(1000);
-                        try {
-                            await T().getJson("/api/logistics/hub-levels");
-                        }
-                        catch (e) { }
-                        return;
-                    }
-                    busy = true;
-                    refresh();
-                    msg.className = "nl2-ftr-dmsg";
-                    msg.textContent = "Creating\u2026";
-                    let ok = false;
+                    const sid = +s.id, body = { routeMode: "collect_station", destinationPlanetId: +p.id, sourceStationId: sid, resourceType: "all", threshold: trig, amount: send, useJumpGates: gates };
+                    stnPend.set(sid, Object.assign({ id: "new" + sid, nlPend: true, isActive: true }, body));
+                    close();
+                    let err = "";
                     try {
-                        const res = await NL.rawFetch("/api/logistics/routes", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ routeMode: "collect_station", destinationPlanetId: +p.id, sourceStationId: +s.id, resourceType: "all", threshold: trig, amount: send, useJumpGates: gates }) });
+                        const res = await NL.rawFetch("/api/logistics/routes", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });
                         const j = await res.json().catch(() => null);
-                        if (!res.ok) {
-                            msg.className = "nl2-ftr-dmsg nl2-ftr-bad";
-                            msg.textContent = (j && (j.error || j.message)) || "The game refused it (HTTP " + res.status + ").";
-                        }
-                        else
-                            ok = true;
+                        if (!res.ok)
+                            err = (j && (j.error || j.message)) || "the game refused it (HTTP " + res.status + ")";
                     }
                     catch (e) {
-                        msg.className = "nl2-ftr-dmsg nl2-ftr-bad";
-                        msg.textContent = "Could not reach the game: " + e.message;
+                        err = "could not reach the game: " + e.message;
                     }
-                    busy = false;
-                    if (ok) {
-                        msg.className = "nl2-ftr-dmsg nl2-ftr-ok";
-                        msg.textContent = "Created: " + s.name + " \u2192 " + p.name + ", All Resources.";
-                        create.disabled = true;
-                        await trSleep(1000);
-                        try {
-                            await T().getJson("/api/logistics/routes");
-                        }
-                        catch (e) { }
-                        await trSleep(1000);
-                        try {
-                            await T().getJson("/api/logistics/hub-levels");
-                        }
-                        catch (e) { }
-                        setTimeout(close, 1200);
+                    if (err) {
+                        stnPend.delete(sid);
+                        changed();
+                        trToast("Route not created for " + s.name + ": " + err);
+                        return;
                     }
-                    else
-                        refresh();
+                    try {
+                        await T().getJson("/api/logistics/routes");
+                    }
+                    catch (e) { }
+                    stnPend.delete(sid);
+                    changed();
+                    await trSleep(1000);
+                    try {
+                        await T().getJson("/api/logistics/hub-levels");
+                    }
+                    catch (e) { }
                 });
                 const onKey = (e) => { if (e.key === "Escape") {
                     e.stopPropagation();
@@ -42025,24 +42601,20 @@
                 T().dlg = { close };
                 refresh();
             }
-            const stnLost = (r) => !!(NL.fl305 && !r.nlPend && NL.pve && NL.pve.stnOwned && NL.pve.stnOwned(r.sourceStationId) === false);
+            const stnLost = (r) => !!(!r.nlPend && NL.pve && NL.pve.stnOwned && NL.pve.stnOwned(r.sourceStationId) === false);
             function start() {
-                if (NL.fl254) {
-                    NL.stnRouteDialog = stnRouteDialog;
-                    NL.stnRouteSources = () => { const d = (saved("sources") || {}).d; return d && Array.isArray(d.stations) ? new Set(d.stations.map((x) => +x.id)) : null; };
-                }
-                if (NL.fl305)
-                    NL.stnRtPausedLines = () => {
-                        if (!NL.fl222 || (NL.fl233 && NL.opt && NL.opt("fl-transfer.routebadge") === false) || !saved("routes"))
-                            return [];
-                        const l = routes().filter((r) => isStnRt(r) && !r.nlPend && rtPaused(r) && !isHid("rt" + r.id)).map((r) => {
-                            const { from, to } = rtEnds(r);
-                            return "Station: route " + (stnLost(r) ? "to delete (station lost)" : "paused") + ": " + (from ? from.name : "Station " + r.sourceStationId) + " \u2192 " + (to ? to.name : "?");
-                        });
-                        return NL.fl233 && l.length > 1 ? ["Station: routes paused: " + l.length] : l;
-                    };
-                if (NL.fl288)
-                    NL.stnRouted = () => (saved("routes") ? new Set(routes().filter(isStnRt).map((r) => +r.sourceStationId)) : null);
+                NL.stnRouteDialog = stnRouteDialog;
+                NL.stnRouteSources = () => { const d = (saved("sources") || {}).d; return d && Array.isArray(d.stations) ? new Set(d.stations.map((x) => +x.id)) : null; };
+                NL.stnRtPausedLines = () => {
+                    if (!NL.fl222 || (NL.fl233 && NL.opt && NL.opt("fl-transfer.routebadge") === false) || !saved("routes"))
+                        return [];
+                    const l = routes().filter((r) => isStnRt(r) && !r.nlPend && rtPaused(r) && !isHid("rt" + r.id)).map((r) => {
+                        const { from, to } = rtEnds(r);
+                        return "Station: route " + (stnLost(r) ? "to delete (station lost)" : "paused") + ": " + (from ? from.name : "Station " + r.sourceStationId) + " \u2192 " + (to ? to.name : "?");
+                    });
+                    return NL.fl233 && l.length > 1 ? ["Station: routes paused: " + l.length] : l;
+                };
+                NL.stnRouted = () => (saved("routes") ? new Set(routes().filter(isStnRt).map((r) => +r.sourceStationId)) : null);
             }
             function stnPanel() {
                 const all = routes().filter(isStnRt), at = (saved("routes") || {}).at;
@@ -42087,14 +42659,14 @@
                     host.__nlRead = true;
                     stnRead();
                 }
-                if (NL.fl288 && NL.stnRouted && NL.pve && NL.pve.stnRepaint) {
+                if (NL.pve && NL.pve.stnRepaint) {
                     const rt = NL.stnRouted(), k = rt ? [...rt].sort().join(",") : "-";
                     if (k !== host.__nlRt) {
                         host.__nlRt = k;
                         NL.pve.stnRepaint();
                     }
                 }
-                const s = JSON.stringify([T().gen, NL.fl288 && NL.pve && NL.pve.stnCollectSig ? NL.pve.stnCollectSig() : "", NL.fl291 && NL.pve && NL.pve.stnInfoSig ? NL.pve.stnInfoSig() : "", routes().filter(isStnRt).map((r) => [r.id, r.threshold, r.amount, r.lastExecuted, rtPaused(r), r.destinationPlanetId]), (saved("routes") || {}).at, (saved("hubs") || {}).at, T().store.get("hide", {}), T().store.get("collapsed", {}), T().rtEdit ? "edit" : Math.floor(Date.now() / 60000)]);
+                const s = JSON.stringify([T().gen, NL.pve && NL.pve.stnCollectSig ? NL.pve.stnCollectSig() : "", NL.pve && NL.pve.stnInfoSig ? NL.pve.stnInfoSig() : "", routes().filter(isStnRt).map((r) => [r.id, r.threshold, r.amount, r.lastExecuted, rtPaused(r), r.destinationPlanetId]), (saved("routes") || {}).at, (saved("hubs") || {}).at, T().store.get("hide", {}), T().store.get("collapsed", {}), T().rtEdit ? "edit" : Math.floor(Date.now() / 60000)]);
                 if (s === host.__nlSig && host.firstChild)
                     return;
                 host.__nlSig = s;
@@ -42103,7 +42675,7 @@
             function withPending(d) {
                 if (!stnPend.size)
                     return d;
-                const have = new Set(d.filter((r) => r.routeMode === "collect_station" || r.sourceStationId != null).map((r) => +r.sourceStationId));
+                const have = new Set(d.filter(isStnRt).map((r) => +r.sourceStationId));
                 for (const sid of [...stnPend.keys()])
                     if (have.has(sid))
                         stnPend.delete(sid);
@@ -42111,12 +42683,7 @@
             }
             NL.stnTab = { routeRow: stnRouteRow, paint: stnPaint, withPending, start };
         }
-        NL.fl279 = true;
-        NL.fl291 = true;
-        NL.stnWd = true;
-        NL.stnHide = true;
-        if (NL.fl279)
-            NL.css("fl-279", `
+        NL.css("fl-279", `
   .nl2-fstn .nxs-wrap.nl2-stn9{background:none;border:0;border-radius:0;padding:0;margin:0;font-size:15px}
   .nl2-fstn .nl2-stn9 .nxs-head.nl2-stn9-h{margin-bottom:0;gap:8px;min-height:30px}
   .nl2-fstn .nl2-stn9 .nl2-stn9-h .nxs-info{flex:1 1 auto;font-size:12.5px;font-weight:500;color:#7f93a8}
@@ -42128,20 +42695,19 @@
   .nl2-stn9-box td.nl2-ftr-hide input{cursor:pointer;margin:0}
   .nl2-fstn .nl2-stn9 .nl2-stn9-hb{margin-top:18px;cursor:pointer}
   .nl2-stn9-hb[hidden]{display:none!important}`
-                + (NL.fl291 ? "\n  .nl2-ftr.nl2-ftr-x td.nl2-ftr-acts.nl2-ftr-tr button,.nl2-ftr.nl2-ftr-x td.nl2-ftr-acts.nl2-ftr-tr .nl2-ftr-gap{width:80px}" : ""));
+            + "\n  .nl2-ftr.nl2-ftr-x td.nl2-ftr-acts.nl2-ftr-tr button,.nl2-ftr.nl2-ftr-x td.nl2-ftr-acts.nl2-ftr-tr .nl2-ftr-gap{width:80px}");
         {
             const P = () => NL._pv;
             const lsGet = (k, d) => P().lsGet(k, d), lsSet = (k, v) => P().lsSet(k, v), suppressedMap = () => P().suppressedMap(), sFilters = () => P().sFilters();
-            const sFilterCount = (f) => P().sFilterCount(f), sPasses = (r, f) => P().sPasses(r, f), stationOf = (id) => P().stationOf(id), fillOf = (st) => P().fillOf(st);
+            const stationOf = (id) => P().stationOf(id), fillOf = (st) => P().fillOf(st);
             const stationTotal = (st) => P().stationTotal(st), nearestPlanet = (x, y, l) => P().nearestPlanet(x, y, l), stationBusy = (id) => P().stationBusy(id);
             const pveMove = () => P().pveMove(), esc = (t) => P().fmt.esc(t), planetLink = (p) => P().fmt.planetLink(p), distCls = (d) => P().fmt.distCls(d);
             const URGENT_PCT = () => P().URGENT_PCT(), WARN_PCT = () => P().WARN_PCT(), paintStations = () => P().paintStations();
             const STN_HIDE_KEY = "nl2.stn.hide", STN_HOPEN = "nl2.stn.hidOpen";
-            const stnHideOn = () => !!(NL.stnHide && NL.fl279 && P().stnRoot());
-            function stnHidMap() { const m = NL.stnHide ? lsGet(STN_HIDE_KEY, {}) : {}; return m && typeof m === "object" ? m : {}; }
-            function stnSupMap() { const m = Object.assign({}, suppressedMap()); if (NL.stnHide)
-                for (const k of Object.keys(stnHidMap()))
-                    m[k] = -1; return m; }
+            const stnHideOn = () => !!P().stnRoot();
+            function stnHidMap() { const m = lsGet(STN_HIDE_KEY, {}); return m && typeof m === "object" ? m : {}; }
+            function stnSupMap() { const m = Object.assign({}, suppressedMap()); for (const k of Object.keys(stnHidMap()))
+                m[k] = -1; return m; }
             function stnCollectWhy(id) {
                 const x = P().stations().find((q) => q.id === id);
                 if (!x)
@@ -42162,17 +42728,17 @@
                 return "";
             }
             const STN_SHUT = "nl2.stn.shut";
-            const STN9_COLS = [["System", "110px"], ["Name", ""], ["Resource", "140px"], ["Capacity", "110px"], ["Nearest planet", "150px"], ["Bulks available", "140px"], ["Distance", "110px"], ["", NL.fl291 ? "180px" : "250px"], ["Suppress", "80px"]];
+            const STN9_COLS = [["System", "110px"], ["Name", ""], ["Resource", "140px"], ["Capacity", "110px"], ["Nearest planet", "150px"], ["Bulks available", "140px"], ["Distance", "110px"], ["", "180px"], ["Hide", "80px"]];
             const STN9_HTML = () => {
                 const shut = !!lsGet(STN_SHUT, false);
                 return "<section class=\"nxs-wrap nxs-stn nl2-stn9\" hidden><div class=\"nxs-head nl2-ftr-sec nl2-stn9-h\"><span class=\"nl2-ftr-ar\">" + (shut ? "\u25B8" : "\u25BE") + "</span><span>Stations</span><span class=\"nl2-ftr-n nl2-stn9-n\"></span><span class=\"nxs-info nl2-ftr-sub\"></span><span class=\"nxs-hbtns\">" + P().STN_BTNS + "</span></div>"
                     + "<div class=\"nl2-ftr nl2-ftr-x nl2-ftr-box nl2-stn9-box\"" + (shut ? " hidden" : "") + "><table><colgroup>" + STN9_COLS.map(([, w]) => "<col" + (w ? " style=\"width:" + w + "\"" : "") + ">").join("") + "</colgroup>"
-                    + "<thead><tr>" + STN9_COLS.map(([l], i) => "<th class=\"nl2-ftr-nos" + (i === STN9_COLS.length - 1 ? " nl2-ftr-hide" : "") + "\">" + (l === "Suppress" && NL.stnHide ? "Hide" : l) + "</th>").join("") + "</tr></thead><tbody class=\"nxs-tbody\"></tbody></table></div>"
-                    + (NL.stnHide ? "<div class=\"nl2-ftr-sec nl2-stn9-hb\" hidden><span class=\"nl2-ftr-ar\">\u25B8</span><span>Hidden</span><span class=\"nl2-ftr-n\">(0)</span></div>"
-                        + "<div class=\"nl2-ftr nl2-ftr-x nl2-ftr-box nl2-stn9-box nl2-stn9-hbox\" hidden><table><colgroup>" + STN9_COLS.map(([, w]) => "<col" + (w ? " style=\"width:" + w + "\"" : "") + ">").join("") + "</colgroup>"
-                        + "<thead><tr>" + STN9_COLS.map(([l], i) => "<th class=\"nl2-ftr-nos" + (i === STN9_COLS.length - 1 ? " nl2-ftr-hide" : "") + "\">" + (l === "Suppress" && NL.stnHide ? "Hide" : l) + "</th>").join("") + "</tr></thead><tbody></tbody></table></div>" : "")
+                    + "<thead><tr>" + STN9_COLS.map(([l], i) => "<th class=\"nl2-ftr-nos" + (i === STN9_COLS.length - 1 ? " nl2-ftr-hide" : "") + "\">" + l + "</th>").join("") + "</tr></thead><tbody class=\"nxs-tbody\"></tbody></table></div>"
+                    + "<div class=\"nl2-ftr-sec nl2-stn9-hb\" hidden><span class=\"nl2-ftr-ar\">\u25B8</span><span>Hidden</span><span class=\"nl2-ftr-n\">(0)</span></div>"
+                    + "<div class=\"nl2-ftr nl2-ftr-x nl2-ftr-box nl2-stn9-box nl2-stn9-hbox\" hidden><table><colgroup>" + STN9_COLS.map(([, w]) => "<col" + (w ? " style=\"width:" + w + "\"" : "") + ">").join("") + "</colgroup>"
+                    + "<thead><tr>" + STN9_COLS.map(([l], i) => "<th class=\"nl2-ftr-nos" + (i === STN9_COLS.length - 1 ? " nl2-ftr-hide" : "") + "\">" + l + "</th>").join("") + "</tr></thead><tbody></tbody></table></div>"
                     + "</section>"
-                    + (NL.fl278 ? "<div class=\"nl2-ftr nl2-ftr-x nl2-stnrt\"></div>" : "");
+                    + "<div class=\"nl2-ftr nl2-ftr-x nl2-stnrt\"></div>";
             };
             function stn9Toggle(e) {
                 if (e.target.closest && e.target.closest(".nl2-stn9-hb")) {
@@ -42190,10 +42756,9 @@
                     box.hidden = shut;
                 if (ar)
                     ar.textContent = shut ? "\u25B8" : "\u25BE";
-                if (NL.stnHide)
-                    paintStations();
+                paintStations();
             }
-            function stnNoWd(st) { return !!(NL.stnWd && st && st.noWd); }
+            function stnNoWd(st) { return !!(st && st.noWd); }
             function STN_NOWD_TIP(st) { return "You can\u2019t withdraw from this station" + (st && st.withdrawAccessRole ? " (" + String(st.withdrawAccessRole) + " only)" : "") + ": grant access in Alliance > Station Storage"; }
             function stnRtPaused() { try {
                 return pveMove() && NL.stnRtPausedLines ? NL.stnRtPausedLines() : [];
@@ -42202,16 +42767,11 @@
                 return [];
             } }
             function stnNoWdRows() {
-                if (!NL.stnWd)
-                    return [];
-                const sup = stnSupMap(), f9 = sFilters(), fn = sFilterCount(f9), routed = NL.fl288 && NL.stnRouted ? NL.stnRouted() : null, out = [];
+                const o = { sup: stnSupMap(), routed: NL.stnRouted ? NL.stnRouted() : null, f: sFilters() }, out = [];
                 for (const x of P().stations()) {
-                    const st = stationOf(x.id);
-                    if (!stnNoWd(st) || sup[x.id] || stationBusy(x.id) || (routed && routed.has(x.id)))
-                        continue;
-                    if (fn && !sPasses({ top: fillOf(st), near: nearestPlanet(x.x, x.y, P().planets()) }, f9))
-                        continue;
-                    out.push({ x, st });
+                    const { why, row } = P().stnRowTest(x, o);
+                    if (!why && stnNoWd(row.st))
+                        out.push({ x, st: row.st });
                 }
                 return out;
             }
@@ -44269,7 +44829,7 @@
                 NL.watch(".fleet-page .nl2-fat-h", (h) => { if (h.dataset.nl2TstdS !== "1")
                     h.dataset.nl2TstdS = "1"; sortActive(h); });
                 const iconOf = (alt) => { const i = document.querySelector("img.game-resource-icon[alt=\"" + alt + "\" i]"); return i ? i.cloneNode(false) : null; };
-                const at = (sel) => (row) => { const e = sel && row.querySelector(sel); return e ? (e.getAttribute("data-nl2-bt-v") || e.getAttribute("data-nl2-shl-v") || e.getAttribute("data-nl2-mt-v") || e.getAttribute("data-nl2-bt-lv") || txt(e)) : ""; };
+                const at = (sel) => (row) => { const e = sel && row.querySelector(sel); return e ? (e.getAttribute("data-nl2-bt-v") || e.getAttribute("data-nl2-shf-v") || e.getAttribute("data-nl2-shl-v") || e.getAttribute("data-nl2-mt-v") || e.getAttribute("data-nl2-bt-lv") || txt(e)) : ""; };
                 const R = (alt, sel) => ({ icon: alt, key: at(sel) });
                 const GRIDS = [
                     { k: "bu", page: ".buildings-page[data-nl2-bt]", box: ".buildings-grid", row: ".building-card", cols: [
@@ -44302,7 +44862,22 @@
                             {},
                             {}
                         ] },
-                    { k: "shf", page: ".sy-fleet-summary[data-nl2-shl]", box: ".sy-fleet-rows", row: ".sy-fleet-row", cols: [
+                    { k: "shf2", page: ".sy-fleet-summary[data-nl2-shl][data-nl2-shf]", box: ".sy-fleet-rows", row: ".sy-fleet-row", cols: [
+                            { l: "Ship", key: at(".sy-fleet-ship-name") },
+                            { l: "Count", key: at(".sy-fleet-qty") },
+                            { l: "HP", key: (r) => at("span[data-nl2-shf=\"hp\"]")(r) || at(".sy-fleet-stat:has(.lucide-shield)")(r) },
+                            { l: "Shield", key: at("span[data-nl2-shf=\"sh\"]") },
+                            { l: "Attack", key: (r) => at("span[data-nl2-shf=\"at\"]")(r) || at(".sy-fleet-stat:has(.lucide-swords)")(r) },
+                            { l: "Speed", key: at(".sy-fleet-stat:has(.lucide-gauge)") },
+                            { l: "Cargo", key: at("span[data-nl2-shf=\"cg\"]") },
+                            { l: "Weapon", key: at("span[data-nl2-shf=\"wp\"]") },
+                            { l: "Armor", key: at("span[data-nl2-shf=\"ar\"]") },
+                            { l: "Good against", key: at("span[data-nl2-shf=\"good\"]") },
+                            { l: "Bad against", key: at("span[data-nl2-shf=\"bad\"]") },
+                            { l: "Built at", key: (r) => { const st = r.querySelector(".sy-fleet-row-stats"); return (st && st.getAttribute("data-nl2-shf")) || at("[data-nl2-shy]")(r); } },
+                            {}
+                        ] },
+                    { k: "shf", page: ".sy-fleet-summary[data-nl2-shl]:not([data-nl2-shf])", box: ".sy-fleet-rows", row: ".sy-fleet-row", cols: [
                             { l: "Ship", key: at(".sy-fleet-ship-name") },
                             { l: "Count", key: at(".sy-fleet-qty") },
                             { sub: ".sy-fleet-row-stats", cols: [{ l: "Shield", key: at(".sy-fleet-stat:has(.lucide-shield)") }, { l: "Attack", key: at(".sy-fleet-stat:has(.lucide-swords)") }, { l: "Speed", key: at(".sy-fleet-stat:has(.lucide-gauge)") }, { l: "Built at" }] },
