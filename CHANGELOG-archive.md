@@ -1,5 +1,23 @@
 # Release notes archive
 
+## v0.5.125 · Nov 15, 2026
+
+**⚔️ PVP**
+- PVP has its own address (/fleet?nl=pvp): Back, Forward and reload work, Ctrl-click opens it in a new tab (GL-296)
+- Badge clicks close PVP and go where the badge points (GL-297)
+- Attack dialog follows the dialog standard (FL-376); fleet speeds listed 100% down to 10% (FL-377)
+
+**🛰 Fleet**
+- Pirates and Surveys: empty report boxes are hidden (FL-375)
+
+**🪐 Planets**
+- Shipyard ship list is a plain table with fixed columns; rare costs from 1,000 in short form (SH-040)
+- Buildings: a building underway no longer shows its time twice (GL-298)
+
+**📊 Tables**
+- Resource cells line up the same way in every table (GL-299)
+- Fleet on Planet rows and Shipyard row dividers fixed (SH-038, SH-039); Command Center table fix (EM-034)
+
 ## v0.5.124 · Nov 15, 2026
 
 **📊 Tables**

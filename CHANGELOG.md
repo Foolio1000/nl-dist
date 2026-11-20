@@ -2,6 +2,15 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.145 · Nov 20, 2026
+
+**🪐 Planets**
+- Overview Evacuate lines show what you have against what you need ("Cargo 1.3M / 1.21M"), with exact values on hover (FL-521)
+- Outpost detail header buttons have solid backgrounds, so the image behind them no longer shows through (OU-017)
+
+**🛰 Fleet**
+- Routes buttons on Transfer and Stations: Edit green, Pause blue, Resume orange, Delete red (FL-520)
+
 ## v0.5.144 · Nov 20, 2026
 
 **🛰 Fleet dialogs**
@@ -355,21 +364,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🌐 S0 server**
 - Features work on S0 when the game's transport layer is off (GL-311, FL-386, GL-312)
-
-## v0.5.125 · Nov 15, 2026
-
-**⚔️ PVP**
-- PVP has its own address (/fleet?nl=pvp): Back, Forward and reload work, Ctrl-click opens it in a new tab (GL-296)
-- Badge clicks close PVP and go where the badge points (GL-297)
-- Attack dialog follows the dialog standard (FL-376); fleet speeds listed 100% down to 10% (FL-377)
-
-**🛰 Fleet**
-- Pirates and Surveys: empty report boxes are hidden (FL-375)
-
-**🪐 Planets**
-- Shipyard ship list is a plain table with fixed columns; rare costs from 1,000 in short form (SH-040)
-- Buildings: a building underway no longer shows its time twice (GL-298)
-
-**📊 Tables**
-- Resource cells line up the same way in every table (GL-299)
-- Fleet on Planet rows and Shipyard row dividers fixed (SH-038, SH-039); Command Center table fix (EM-034)

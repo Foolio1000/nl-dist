@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.144
+// @version      0.5.145
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.144", features: [] };
+    const NL = window.__nl2 = { version: "0.5.145", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -542,6 +542,10 @@
     NL.css("btn-amber", ".nl2-c-amber{background:rgba(251,146,60,.12)!important;border:1px solid rgba(251,146,60,.55)!important;color:#fb923c!important;box-shadow:none!important;text-shadow:none!important}"
         + ".nl2-c-amber:hover:not([disabled]):not(.disabled){background:rgba(251,146,60,.2)!important}"
         + ".nl2-c-amber[disabled],.nl2-c-amber.disabled{background:rgba(120,130,150,.12)!important;border-color:#2a3446!important;color:#6b7686!important;opacity:1!important}");
+    NL.css("btn-solid", [["green", "74,222,128"], ["ok", "74,222,128"], ["red", "248,113,113"], ["blue", "56,189,248"], ["purple", "168,85,247"], ["amber", "251,146,60"]].map(([k, rgb]) => {
+        const c = ".nl2-c-solid.nl2-c-" + k, over = (a) => `linear-gradient(rgba(${a}),rgba(${a})),var(--bg-card,rgb(8,16,32))!important`;
+        return `${c}{background:${over(rgb + ",.12")}}${c}:hover:not([disabled]):not(.disabled){background:${over(rgb + ",.2")}}` + `${c}[disabled],${c}.disabled{background:${over("120,130,150,.12")}}`;
+    }).join("\n"));
     {
         const KEY = "nl2.em-tabs.todo", MAX = 255, UNDO_MS = 86400000, subs = [];
         const all = () => { try {
@@ -11861,7 +11865,7 @@
                     if (w && w.classList.contains("nl2-ov-evw")) {
                         const cap = NL.evacuateCap ? NL.evacuateCap() : null;
                         const lines = cap ? [cap, cap.h2].filter((x) => x && x.text) : [];
-                        const sig = lines.map((x) => (x.ok ? "+" : "-") + x.text).join("|");
+                        const sig = lines.map((x) => (x.ok ? "+" : "-") + x.text + "~" + (x.tip || "")).join("|");
                         let l = w.querySelector(":scope > .nl2-ov-evl");
                         if (!lines.length) {
                             if (l)
@@ -11870,7 +11874,8 @@
                         else if (!l || l.dataset.sig !== sig) {
                             if (l)
                                 l.remove();
-                            l = NL.h("div", { class: "nl2-ov-evl", "data-sig": sig }, lines.map((x) => NL.h("span", { class: x.ok ? null : "nl2-r" }, String(x.text))));
+                            l = NL.h("div", { class: "nl2-ov-evl", "data-sig": sig }, lines.map((x) => { const sp = NL.h("span", { class: x.ok ? null : "nl2-r" }, String(x.text)); if (x.tip && NL.tip)
+                                NL.tip(sp, String(x.tip)); return sp; }));
                             w.appendChild(l);
                         }
                     }
@@ -19599,6 +19604,7 @@
                         NL._kick();
                     }
                 }
+                NL.fl521 = true;
                 NL.evacuateCap = () => {
                     const pid = NL.herePlanetId ? Number(NL.herePlanetId()) : null;
                     if (!pid)
@@ -19635,6 +19641,17 @@
                             : "Not enough ships to evacuate all resources (" + Math.ceil(short).toLocaleString("en-US") + " cargo short)";
                     const h2 = fuel == null ? null : h2have >= fuel ? { ok: true, short: 0, text: "Enough Hydrogen to evacuate" }
                         : { ok: false, short: fuel - h2have, text: "Short " + (fuel - h2have).toLocaleString("en-US") + " Hydrogen to evacuate" };
+                    if (NL.fl521) {
+                        const f = (v) => NL.fmt(v, true), x = (v) => NL.fmt(v);
+                        const cT = " \u00B7 Cargo " + f(room) + " / " + f(load), cTip = "Cargo space " + x(room) + " / resources to carry " + x(load);
+                        if (h2) {
+                            h2.text += " \u00B7 " + f(h2have) + " / " + f(fuel);
+                            h2.tip = "Hydrogen " + x(h2have) + " / fuel needed " + x(fuel);
+                            h2.have = h2have;
+                            h2.fuel = fuel;
+                        }
+                        return { ok, need, text: text + cT, tip: cTip, room, load, h2 };
+                    }
                     return { ok, need, text, h2 };
                 };
                 NL.onData(/^\/api\/planets\/\d+(\/fleet)?$/, () => NL._kick());
@@ -25458,7 +25475,7 @@
                                     box.disabled = false;
                                     box.parentNode.setAttribute("data-nl2-tip", "Not resumed: " + err);
                                 }
-                            } })) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", null, ran != null ? NL.h("span", { "data-nl2-tip": trClock(ran) }, trAgo(ran)) : NL.h("span", { class: "nl2-ftr-d" }, "never run")), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, NL.flPause !== false && !stn ? rtTogBtn(r, paused) : "", NL.fl245 ? NL.h("button", { type: "button", class: "nl2-ftr-hb nl2-c-blue nl2-ftr-rted", disabled: !!(rtEdit && rtEdit.busy), "data-nl2-tip": "Change this route (To, Resource, Trigger, Send)", onclick: () => rtStart(r) }, "Edit") : "", NL.fl263 ? rtDelBtn(r) : "", stn && NL.pve && NL.pve.stnCollectBtn ? NL.pve.stnCollectBtn(r.sourceStationId) : ""), hideBox("rt" + r.id));
+                            } })) : NL.h("span", { class: "nl2-ftr-st nl2-ftr-in" }, "active")), NL.h("td", null, ran != null ? NL.h("span", { "data-nl2-tip": trClock(ran) }, trAgo(ran)) : NL.h("span", { class: "nl2-ftr-d" }, "never run")), NL.h("td", { class: "nl2-ftr-acts" + (NL.tableRules !== false ? " nl2-ftr-tr" : "") }, NL.flPause !== false && !stn ? rtTogBtn(r, paused) : "", NL.fl245 ? NL.h("button", { type: "button", class: "nl2-ftr-hb nl2-c-ok nl2-ftr-rted", disabled: !!(rtEdit && rtEdit.busy), "data-nl2-tip": "Change this route (To, Resource, Trigger, Send)", onclick: () => rtStart(r) }, "Edit") : "", NL.fl263 ? rtDelBtn(r) : "", stn && NL.pve && NL.pve.stnCollectBtn ? NL.pve.stnCollectBtn(r.sourceStationId) : ""), hideBox("rt" + r.id));
                     });
                     if (stn && NL.pve && NL.pve.stnCells && NL.stnTab) {
                         const src = (stn ? routes().filter(isStnRt) : []).filter((r) => isHid("rt" + r.id) === !!wantHid);
@@ -25582,7 +25599,7 @@
                 }
                 function rtTogBtn(r, paused) {
                     const busy = rtTog && rtTog.id === r.id;
-                    return NL.h("button", { type: "button", class: "nl2-ftr-hb nl2-c-amber nl2-ftr-rtpause", disabled: !!(rtTog || (rtEdit && rtEdit.busy) || (rtDel && rtDel.busy)), onclick: () => rtToggle(r, paused) }, busy ? (paused ? "Resuming\u2026" : "Pausing\u2026") : paused ? "Resume" : "Pause");
+                    return NL.h("button", { type: "button", class: "nl2-ftr-hb " + (paused ? "nl2-c-amber" : "nl2-c-blue") + " nl2-ftr-rtpause", disabled: !!(rtTog || (rtEdit && rtEdit.busy) || (rtDel && rtDel.busy)), onclick: () => rtToggle(r, paused) }, busy ? (paused ? "Resuming\u2026" : "Pausing\u2026") : paused ? "Resume" : "Pause");
                 }
                 async function rtPause(id) { if (id == null)
                     return false; await trSleep(1000); return (await rtCall("/api/logistics/routes/" + id, "PATCH", { isActive: false })).ok; }
@@ -25964,8 +25981,8 @@
                 const delArmed = (r) => !!(rtDel && rtDel.id === r.id && (rtDel.busy || Date.now() - rtDel.at < RT_DEL_ARM));
                 function routeActions(extra, stn) {
                     return [
-                        ...(stn ? [] : [{ k: "pause", show: () => NL.flPause !== false, enabled: (row) => !row.off && !rtTog && !rtBusy(), label: (row) => { const p = rtPaused(row.r); return rtTog && rtTog.id === row.r.id ? (p ? "Resuming\u2026" : "Pausing\u2026") : p ? "Resume" : "Pause"; }, cls: "nl2-t-b-amber", run: (row) => rtToggle(row.r, rtPaused(row.r)) }]),
-                        { k: "edit", show: () => !!NL.fl245, enabled: (row) => !row.off && !(rtEdit && rtEdit.busy), cls: "nl2-t-b-info", label: "Edit", tip: () => "Change this route (To, Resource, Trigger, Send)", run: (row) => rtStart(row.r) },
+                        ...(stn ? [] : [{ k: "pause", show: () => NL.flPause !== false, enabled: (row) => !row.off && !rtTog && !rtBusy(), label: (row) => { const p = rtPaused(row.r); return rtTog && rtTog.id === row.r.id ? (p ? "Resuming\u2026" : "Pausing\u2026") : p ? "Resume" : "Pause"; }, cls: (row) => (rtPaused(row.r) ? "nl2-t-b-amber" : "nl2-t-b-info"), run: (row) => rtToggle(row.r, rtPaused(row.r)) }]),
+                        { k: "edit", show: () => !!NL.fl245, enabled: (row) => !row.off && !(rtEdit && rtEdit.busy), cls: "nl2-t-b-ok", label: "Edit", tip: () => "Change this route (To, Resource, Trigger, Send)", run: (row) => rtStart(row.r) },
                         { k: "del", show: () => !!NL.fl263, enabled: (row) => !row.off && !rtBusy(), cls: "nl2-t-b-bad", label: (row) => (delArmed(row.r) && rtDel.busy ? "Deleting\u2026" : delArmed(row.r) ? "Confirm delete" : "Delete"), tip: (row) => (delArmed(row.r) ? "Click again to delete " + rtDesc(row.r) + " in the game. It can't be undone." : "Delete this route (asks to confirm)"), run: (row) => rtDelete(row.r) },
                         ...(extra || [])
                     ];
@@ -35153,7 +35170,10 @@
       .nl2-ou-why{font:600 13.26px Rajdhani,"Exo 2",sans-serif;color:#f5c45a;text-shadow:0 1px 3px rgba(0,0,0,.8)}
       .nl2-ou-collect{display:inline-flex;align-items:center;gap:6px;margin:0;padding:4px 10px;border-radius:6px;cursor:pointer;
         font:600 13.26px Rajdhani,"Exo 2",sans-serif;letter-spacing:.5px;text-transform:uppercase}     
-      .nl2-ou-collect[disabled]{cursor:default}`);
+      .nl2-ou-collect[disabled]{cursor:default}
+      
+      .outpost-detail > .entity-hero button:not([class*="nl2-"]){position:relative;isolation:isolate}
+      .outpost-detail > .entity-hero button:not([class*="nl2-"])::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--bg-card,rgb(8,16,32))}`);
                 let outposts = [], planets = [], missions = [];
                 NL.onData(/^\/api\/outposts$/, (p, d) => { outposts = ouList(d, "outposts"); });
                 NL.onData(/^\/api\/fleet\/missions$/, (p, d) => { missions = ouList(d, "missions"); NL._kick(); });
@@ -35329,7 +35349,7 @@
                         hero.insertBefore(bar, hero.firstChild);
                     }
                     if (!bar.querySelector(".nl2-ou-collect")) {
-                        const nb = NL.h("button", { type: "button", class: "nl2-ou-collect nl2-c-green" }, "Collect");
+                        const nb = NL.h("button", { type: "button", class: "nl2-ou-collect nl2-c-green nl2-c-solid" }, "Collect");
                         nb.addEventListener("click", () => { const o = currentOutpost(hero); if (o && !nb.disabled && NL.fleet)
                             collect(nb, o).catch((e) => ctx.log("collect failed", e)); });
                         bar.prepend(nb);
@@ -35488,7 +35508,7 @@
                     }
                     let b = bar.querySelector(".nl2-ou-upsend");
                     if (!b) {
-                        b = NL.h("button", { type: "button", class: "nl2-ou-collect nl2-ou-upsend nl2-c-blue" }, "Send for upgrade");
+                        b = NL.h("button", { type: "button", class: "nl2-ou-collect nl2-ou-upsend nl2-c-blue nl2-c-solid" }, "Send for upgrade");
                         b.addEventListener("click", () => { const o = ouCurrent(hero, outposts); if (o && !b.disabled && NL.taskData && NL.taskData.upgradeDialog)
                             NL.taskData.upgradeDialog(o.id); });
                         const c = bar.querySelector(".nl2-ou-collect:not(.nl2-ou-upsend)");
@@ -35705,7 +35725,7 @@
                     }
                     let b = bar.querySelector(".nl2-ou-reloc");
                     if (!b) {
-                        b = NL.h("button", { type: "button", class: "nl2-ou-reloc nl2-c-blue" }, "Relocate");
+                        b = NL.h("button", { type: "button", class: "nl2-ou-reloc nl2-c-blue nl2-c-solid" }, "Relocate");
                         b.addEventListener("click", () => { const o = ouCurrent(hero, outposts); if (o && !b.disabled)
                             picker(o); });
                         const c = bar.querySelector(".nl2-ou-collect");
