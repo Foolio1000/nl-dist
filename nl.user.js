@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.136
+// @version      0.5.137
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.136", features: [] };
+    const NL = window.__nl2 = { version: "0.5.137", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1073,7 +1073,7 @@
     .nl2-fleet-sum{display:grid;grid-template-columns:1fr 2fr;gap:2px 10px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(120,200,255,.12)}
     .nl2-fleet-sum > span:nth-child(odd){font-family:Rajdhani,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0);font-size:12px}
     .nl2-fleet-sum > span:nth-child(even){font-variant-numeric:tabular-nums}.nl2-fleet-sum .nl2-bad{color:#f87171}
-    .nl2-fleet-sum > span.nl2-fleet-keyk:nth-child(odd){color:#fff}.nl2-fleet-sum .nl2-fleet-key{font-size:17px;font-weight:700;color:var(--nl2-info, #38bdf8)}
+    .nl2-fleet-sum > span.nl2-fleet-keyk:nth-child(odd){color:#fff}.nl2-fleet-sum .nl2-fleet-key{font-size:14px;font-weight:700;color:var(--nl2-info, #38bdf8)}
     .nl2-fleet-sum .nl2-fleet-key.nl2-bad{color:var(--nl2-bad, #f87171)}.nl2-fleet-sum .nl2-fleet-rem{font-size:13px;color:var(--nl2-dim, #8aa3c0)}
     .nl2-fleet-sum{align-items:baseline}
     .nl2-fleet-tplq{margin-right:26px}.nl2-fleet-cols{display:flex;justify-content:flex-end;gap:60px;padding:0 70px 2px 0;font:600 12px Rajdhani,sans-serif;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0)}.nl2-fleet-cols>span:first-child{margin-right:auto}
@@ -4871,7 +4871,8 @@
       .topbar .nl2-rank.nl2-fslots[data-nl2click]{cursor:pointer}
       .topbar .nl2-rank.nl2-fslots.nl2-pill-busy{opacity:.55;transition:opacity .15s}
       .nxs-bl1, .nxt-slots, .nxs-slots{display:none!important}
-      .nl2-fstop{display:flex;justify-content:center;align-items:baseline;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(120,144,165,.25);background:rgba(56,189,248,.06);font:700 18px Rajdhani,"Exo 2",system-ui,sans-serif;letter-spacing:.3px;color:#e6edf7}
+      
+      .nl2-fstop{display:flex;justify-content:center;align-items:baseline;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(120,144,165,.25);background:rgba(56,189,248,.06);font:700 14px Rajdhani,"Exo 2",system-ui,sans-serif;letter-spacing:.3px;color:#e6edf7}
       .nl2-fstop .nl2-fstop-k{color:#9fb3c8}
       .nl2-fstop > :not(.nl2-fstop-k){color:inherit;font:inherit}
       .nl2-fstop.nl2-fstop-full .nl2-fs-n{color:#f87171}
@@ -12381,15 +12382,29 @@
     {
         const SEASON = [
             { name: "Game default", hex: "" },
-            { name: "Forest", hex: "#0c2416" },
-            { name: "Midnight", hex: "#0b132b" },
-            { name: "Violet", hex: "#1a0b2e" },
-            { name: "Oxblood", hex: "#240a12" },
-            { name: "Deep Teal", hex: "#0a2422" },
-            { name: "Bronze", hex: "#241306" },
-            { name: "Slate", hex: "#10161f" },
+            { name: "Navy", hex: "#011026" },
+            { name: "Crimson", hex: "#260101" },
+            { name: "Forest", hex: "#01260d" },
+            { name: "Royal Purple", hex: "#160126" },
+            { name: "Amber", hex: "#261601" },
         ];
-        const OLD_PRESET = { "#14532d": "#0c2416", "#172554": "#0b132b", "#3b0764": "#1a0b2e", "#4c0519": "#240a12", "#134e4a": "#0a2422", "#451a03": "#241306", "#1e293b": "#10161f" };
+        const NEW_OF = { forest: "#01260d", midnight: "#011026", violet: "#160126", oxblood: "#260101", teal: "#01260d", bronze: "#261601", slate: "#011026" };
+        const OLD_PRESET = {
+            "#14532d": NEW_OF.forest,
+            "#172554": NEW_OF.midnight,
+            "#3b0764": NEW_OF.violet,
+            "#4c0519": NEW_OF.oxblood,
+            "#134e4a": NEW_OF.teal,
+            "#451a03": NEW_OF.bronze,
+            "#1e293b": NEW_OF.slate,
+            "#0c2416": NEW_OF.forest,
+            "#0b132b": NEW_OF.midnight,
+            "#1a0b2e": NEW_OF.violet,
+            "#240a12": NEW_OF.oxblood,
+            "#0a2422": NEW_OF.teal,
+            "#241306": NEW_OF.bronze,
+            "#10161f": NEW_OF.slate,
+        };
         const norm = (v) => { const h = parseColour(v); return h ? (OLD_PRESET[h] || h) : null; };
         const GAME_BG = "#05060b";
         const OPT_KEY = "gl-season.color";
@@ -13073,7 +13088,7 @@
             name: "Building ROI",
             desc: "Break-even time (days and hours) on Resources upgrade cards and a last ROI column in each building's level table.",
             init(ctx) {
-                NL.css("bu-roi", ".buildings-page[data-nl2-bt] .nl2-roi-l{display:none}.nl2-roi{display:block;margin:0 0 4px;padding:0 10px;font-size:16px;font-weight:700;color:#7fd6a0}.nl2-roi.nl2-y,td.nl2-roi-c.nl2-y{color:#e6c34a}.nl2-roi.nl2-r,td.nl2-roi-c.nl2-r{color:#e06c6c}.nl2-roi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-roi-h,td.nl2-roi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-roi-c.nl2-dim{opacity:.5;color:#8a96a6}.nl2-demolish{margin-left:12px;padding:6px 14px;border-radius:6px;border:1px solid #b34a4a;background:transparent;color:#e08a8a;cursor:pointer}.nl2-demolish:hover{background:#3a1a1a}");
+                NL.css("bu-roi", ".buildings-page[data-nl2-bt] .nl2-roi-l{display:none}.nl2-roi{display:block;margin:0 0 4px;padding:0 10px;font-size:inherit;font-weight:700;color:#7fd6a0}.nl2-roi.nl2-y,td.nl2-roi-c.nl2-y{color:#e6c34a}.nl2-roi.nl2-r,td.nl2-roi-c.nl2-r{color:#e06c6c}.nl2-roi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-roi-h,td.nl2-roi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-roi-c.nl2-dim{opacity:.5;color:#8a96a6}.nl2-demolish{margin-left:12px;padding:6px 14px;border-radius:6px;border:1px solid #b34a4a;background:transparent;color:#e08a8a;cursor:pointer}.nl2-demolish:hover{background:#3a1a1a}");
                 const { ensureRates, roiClass, roiSeconds, ageTxt, hasRates } = NL.buRoi;
                 NL.buRoi.onChange(() => decorateAll());
                 const onScreen = () => {
@@ -13607,7 +13622,7 @@
                     P + ".building-card>*," + P + ".building-card-header>*," + P + ".building-header-text>*," + P + ".building-header-text>div:first-child>*," + P + ".building-action-area>*," + P + ".building-costs>*," + P + ".building-upgrading>*," + P + ".building-upgrading-main>*," + P + ".building-upgrading-line>*," + P + ".qol-completion>*," + P + ".qol-completion>span>*{grid-row:1!important;margin:0!important;min-height:0!important;min-width:0}",
                     P + ".building-card-header," + P + ".building-header-text," + P + ".building-header-text>div:first-child," + P + ".building-action-area," + P + ".building-costs," + P + ".building-upgrading," + P + ".building-upgrading-main," + P + ".building-upgrading-line," + P + ".qol-completion," + P + ".qol-completion>span{display:contents!important}",
                     P + ".building-card .entity-image," + P + ".building-card .building-desc," + P + ".building-card img:not(.game-resource-icon){display:none!important}",
-                    P + "h4.building-name{" + col(COLS.name) + ";margin:0!important;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+                    P + "h4.building-name{" + col(COLS.name) + ";margin:0!important;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
                     P + ".building-category{" + col(COLS.type) + ";justify-self:start;font-size:12px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}",
                     P + ".building-level{" + col(COLS.level) + ";white-space:nowrap;overflow:hidden;font-size:14px!important;font-family:inherit}",
                     P + ".building-level[data-nl2-bt-lv]{font-size:0!important}",
@@ -13945,6 +13960,9 @@
                             h.click(); } };
                     if (st)
                         row.span = { from: "ore", to: "rare", cell: () => pill(st.t, st.cls, st.tip) }, sig._span = st.t + st.cls;
+                    const busy = card.querySelector(".building-upgrading-line");
+                    if (busy)
+                        row.cls = /queued/i.test(txt(busy)) ? "nl2-t-row-info" : "nl2-t-row-ok";
                     const det = detailOf(card, key);
                     if (det) {
                         row.detail = det;
@@ -13986,7 +14004,7 @@
                 }
                 function mount(page, grid) {
                     host = NL.h("div", { class: "nl2-btt-host" });
-                    grid.before(host);
+                    grid.after(host);
                     t = NL.table.mount(host, {
                         id: "bu",
                         cols: [
@@ -14056,8 +14074,8 @@
                         drop(null);
                         mount(page, grid);
                     }
-                    else if (host.nextElementSibling !== grid)
-                        grid.before(host);
+                    else if (host.previousElementSibling !== grid)
+                        grid.after(host);
                     const act = page.querySelector("nav.bld-tabs .bld-tab.active"), tab = act ? txt(act) : "";
                     const secOn = NL.btSections !== false && (tab === "All" || tab === "Defense");
                     const groups = SECS.map(() => []), plain = [], hid = [];
@@ -14736,7 +14754,7 @@
             name: "Research ROI",
             desc: "RE-006: break-even time on production researches (card line and a level-table column), valued like Building ROI.",
             init() {
-                NL.css("re-roi", ".nl2-reroi{display:block;margin:0 0 4px;padding:0 10px;font-size:16px;font-weight:700;color:#7fd6a0}.nl2-reroi.nl2-y,td.nl2-reroi-c.nl2-y{color:#e6c34a}.nl2-reroi.nl2-r,td.nl2-reroi-c.nl2-r{color:#e06c6c}.nl2-reroi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-reroi-h,td.nl2-reroi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-reroi-c.nl2-dim{opacity:.5;color:#8a96a6}");
+                NL.css("re-roi", ".nl2-reroi{display:block;margin:0 0 4px;padding:0 10px;font-size:inherit;font-weight:700;color:#7fd6a0}.nl2-reroi.nl2-y,td.nl2-reroi-c.nl2-y{color:#e6c34a}.nl2-reroi.nl2-r,td.nl2-reroi-c.nl2-r{color:#e06c6c}.nl2-reroi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-reroi-h,td.nl2-reroi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-reroi-c.nl2-dim{opacity:.5;color:#8a96a6}");
                 const R = () => NL.buRoi;
                 const camel = (k) => String(k).replace(/_([a-z])/g, (m, c) => c.toUpperCase());
                 const items = () => { const l = NL.cache.latest(/^\/api\/research(\?|$)/); const r = l && l.data && l.data.research; return r ? Object.values(r) : []; };
@@ -15146,8 +15164,10 @@
                     ".nl2-retb .nl2-retb-hide{display:flex;align-items:center;justify-content:center;cursor:pointer}.nl2-retb .nl2-retb-hide input{margin:0;cursor:pointer}",
                     ".nl2-retb tr.nl2-retb-bar td{cursor:pointer;font-weight:600;color:#c9d4e3;user-select:none}.nl2-retb tr.nl2-retb-bar:hover td{background:#13213a}",
                     ".nl2-retb tr.nl2-retb-hid td{opacity:.6}",
-                    ".nl2-t[data-nl2-t=\"re\"] tbody[data-sec=\"hid\"]>tr.nl2-t-sec>td{border-top:18px solid transparent;background-clip:padding-box}",
+                    ".nl2-t[data-nl2-t=\"re\"] tbody[data-sec=\"hid\"]>tr.nl2-t-sec>td{padding-top:38px}",
                     ".nl2-t[data-nl2-t=\"re\"]{margin-top:10px}.nl2-retbw>.nl2-retb-empty{padding:8px}",
+                    ".nl2-t[data-nl2-t=\"re\"] .nl2-retb-chip{display:inline-block;border:1px solid #2c4a8a;color:#8fb4ff;border-radius:4px;padding:0 5px;margin:1px 3px 1px 0;font-size:12.5px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;max-width:100%;box-sizing:border-box}.nl2-t[data-nl2-t=\"re\"] .nl2-retb-chip.nl2-u{border-color:#2a6a7a;color:#7fd0e0}",
+                    ".nl2-t[data-nl2-t=\"re\"] .nl2-retb-br{display:inline-block;width:18px;height:18px;border-radius:4px;text-align:center;font-size:11px;line-height:18px;font-weight:700;margin-right:7px;vertical-align:1px}.nl2-t[data-nl2-t=\"re\"] .nl2-retb-br.nl2-m{background:#3a1520;color:#ff6b7f;border:1px solid #6a2535}.nl2-t[data-nl2-t=\"re\"] .nl2-retb-br.nl2-e{background:#3a2a10;color:#f5b83d;border:1px solid #6a4a18}.nl2-t[data-nl2-t=\"re\"] .nl2-retb-br.nl2-s{background:#10243a;color:#6fb0ff;border:1px solid #1e4f7a}",
                     ".nl2-retb tr.nl2-retb-gap td{height:18px;padding:0!important;border:0!important;background:transparent!important}.nl2-retb tr.nl2-retb-gap+tr.nl2-retb-bar td{border-top:1px solid #2a3446}",
                 ].join(""));
                 let on = ctx.store.get("on", true);
@@ -16064,7 +16084,7 @@
                     ".shipyard-filters[data-nl2-shl-f]{flex-wrap:wrap}",
                     ".shipyard-filters[data-nl2-shl-f]{background:rgba(168,85,247,.13)!important;border-color:rgba(168,85,247,.7)!important;box-shadow:inset 4px 0 0 #a855f7,0 0 12px rgba(168,85,247,.25)!important}",
                     ".sy-fleet-summary[data-nl2-shl] .sy-fleet-rows{display:block!important}",
-                    ".sy-fleet-summary[data-nl2-shl] .sy-fleet-row{display:grid!important;grid-template-columns:220px 90px 300px 1fr!important;grid-template-rows:auto!important;grid-auto-flow:column!important;align-items:center;gap:8px;min-height:0!important;height:auto!important;padding:2px 8px!important;margin:0;border-width:0 0 1px;border-radius:0;font-size:15px}",
+                    ".sy-fleet-summary[data-nl2-shl] .sy-fleet-row{display:grid!important;grid-template-columns:220px 90px 300px 1fr!important;grid-template-rows:auto!important;grid-auto-flow:column!important;align-items:center;gap:8px;min-height:0!important;height:auto!important;padding:2px 8px!important;margin:0;border-width:0 0 1px;border-radius:0;font-size:14px/*SH-068*/}",
                     ".sy-fleet-summary[data-nl2-shl] .sy-fleet-row>*{grid-row:1!important;margin:0!important;min-height:0!important}",
                     ".sy-fleet-summary[data-nl2-shl] .sy-fleet-row .entity-image,.sy-fleet-summary[data-nl2-shl] .sy-fleet-row img:not(.game-resource-icon){display:none!important}",
                     ".sy-fleet-summary[data-nl2-shl] .sy-fleet-row-info{grid-column:1!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;gap:8px;min-width:0;white-space:nowrap}",
@@ -16082,12 +16102,12 @@
                     ".sy-fleet-summary[data-nl2-shl] .sy-fleet-row-actions button{padding:2px 10px;min-height:0;font-size:13px}",
                     ".sy-fleet-summary[data-nl2-shl] .sy-fleet-cat-header{margin:8px 0 2px}",
                     ".shipyard-page[data-nl2-shb] .ship-grid{display:block!important}",
-                    ".shipyard-page[data-nl2-shb] .ship-card{display:grid!important;grid-template-columns:200px 52px minmax(0,1fr) auto!important;grid-template-rows:auto!important;grid-auto-flow:column!important;align-items:center!important;column-gap:12px;min-height:0!important;height:auto!important;padding:3px 8px!important;margin:0!important;border-width:0 0 1px!important;border-radius:0!important;font-size:15px;background-image:none!important}",
+                    ".shipyard-page[data-nl2-shb] .ship-card{display:grid!important;grid-template-columns:200px 52px minmax(0,1fr) auto!important;grid-template-rows:auto!important;grid-auto-flow:column!important;align-items:center!important;column-gap:12px;min-height:0!important;height:auto!important;padding:3px 8px!important;margin:0!important;border-width:0 0 1px!important;border-radius:0!important;font-size:14px/*SH-068*/;background-image:none!important}",
                     ".shipyard-page[data-nl2-shb] .ship-card>*{grid-row:1!important;margin:0!important;min-height:0!important}",
                     ".shipyard-page[data-nl2-shb] .ship-card .entity-image,.shipyard-page[data-nl2-shb] .ship-card [class*=\"entity-image\"],.shipyard-page[data-nl2-shb] .ship-card img:not(.game-resource-icon),.shipyard-page[data-nl2-shb] .ship-card .ship-desc{display:none!important}",
                     ".shipyard-page[data-nl2-shb] .ship-card-header{grid-column:1!important;display:flex!important;flex-direction:row!important;justify-content:flex-start!important;align-items:center!important;text-align:left!important;padding:0!important;background-image:none!important}",
                     ".shipyard-page[data-nl2-shb] .ship-header-text,.shipyard-page[data-nl2-shb] .ship-header-text>div{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:8px;text-align:left!important;margin:0!important}",
-                    ".shipyard-page[data-nl2-shb] .ship-header-text h4{margin:0!important;font-size:15px;flex:0 0 140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left!important}",
+                    ".shipyard-page[data-nl2-shb] .ship-header-text h4{margin:0!important;font-size:14px/*SH-068*/;flex:0 0 140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left!important}",
                     ".shipyard-page[data-nl2-shb] .ship-class{border:0!important;background:none!important;padding:0!important;font-size:13px!important;font-weight:400!important;letter-spacing:0!important;text-transform:none!important;color:#8a96a6!important;box-shadow:none!important}",
                     ".shipyard-page[data-nl2-shb] .ship-card[data-nl2-shl-own]::after{content:\"\\00d7\" attr(data-nl2-shl-own)!important;grid-column:2!important;grid-row:1!important;position:static!important;display:block!important;inset:auto!important;width:auto!important;height:auto!important;background:none!important;border:0!important;opacity:1!important;text-align:right;color:#c9d4e3}",
                     ".shipyard-page[data-nl2-shb] .ship-stats{display:none!important}",
@@ -16099,7 +16119,7 @@
                     ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-x]{display:none!important}",
                     ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-more]:not([data-nl2-shl-v])::after{content:\" \" attr(data-nl2-shl-more);font-size:12px;color:#8a96a6}",
                     ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-more][data-nl2-shl-v]::after{content:attr(data-nl2-shl-v) \" \" attr(data-nl2-shl-more)}",
-                    ".sy-fleet-qty[data-nl2-qv]{font-size:0!important}.sy-fleet-qty[data-nl2-qv]::after{content:attr(data-nl2-qv);font-size:15px}",
+                    ".sy-fleet-qty[data-nl2-qv]{font-size:0!important}.sy-fleet-qty[data-nl2-qv]::after{content:attr(data-nl2-qv);font-size:14px/*SH-068*/}",
                     ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-c=\"1\"]{grid-column:1!important}",
                     ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-c=\"2\"]{grid-column:2!important}",
                     ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-c=\"3\"]{grid-column:3!important}",
@@ -16149,7 +16169,7 @@
                 NL.css("sh-040", [
                     P40 + " .ship-card{grid-template-columns:minmax(120px,1fr) 70px 60px 474px 340px!important;column-gap:10px!important;padding:0 8px!important;min-height:32px!important;position:relative!important}",
                     P40 + " .ship-card-header," + P40 + " .ship-header-text," + P40 + " .ship-header-text>div{display:contents!important}",
-                    P40 + " .ship-header-text h4{grid-column:1!important;grid-row:1!important;flex:none!important;min-width:0;margin:0!important;font-size:15px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left!important}",
+                    P40 + " .ship-header-text h4{grid-column:1!important;grid-row:1!important;flex:none!important;min-width:0;margin:0!important;font-size:14px/*SH-068*/!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left!important}",
                     P40 + " .ship-class{grid-column:2!important;grid-row:1!important;justify-self:start;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
                     P40 + " .ship-card[data-nl2-shl-own]::after{grid-column:3!important;text-align:left!important;justify-self:start}",
                     P40 + " .ship-costs{grid-column:4!important;grid-template-columns:56px 56px 56px 56px 50px 50px 44px 78px!important;column-gap:4px!important;padding:0!important;margin:0!important;background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:hidden!important}",
@@ -16737,7 +16757,7 @@
                     `${P} .sy-fleet-stat:has(.lucide-gauge){grid-column:6!important}`,
                     `${P} .sy-fleet-row-stats>[data-nl2-shy],${P} .sy-fleet-row-stats>:has([data-nl2-shy]),${P} .sy-fleet-row-stats[data-nl2-shf]::after{grid-column:12!important;grid-row:1!important;margin:0 8px!important;justify-self:start}`,
                     `${P} .sy-fleet-row-actions{grid-column:13!important}`,
-                    `${P} .sy-fleet-row>span[data-nl2-shf]{grid-row:1;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}`,
+                    `${P} .sy-fleet-row>span[data-nl2-shf]{grid-row:1;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}`,
                     `${P} span[data-nl2-shf="hp"]{grid-column:3}${P} span[data-nl2-shf="sh"]{grid-column:4}${P} span[data-nl2-shf="at"]{grid-column:5}${P} span[data-nl2-shf="cg"]{grid-column:7}${P} span[data-nl2-shf="wp"]{grid-column:8;color:var(--nl2-onart)}${P} span[data-nl2-shf="ar"]{grid-column:9;color:var(--nl2-onart)}`,
                     `${P} span[data-nl2-shf="hp"][data-nl2-tip]{text-decoration:underline dotted rgba(192,204,224,.5);text-underline-offset:3px;cursor:help}`,
                     `${P} span[data-nl2-shf="good"],${P} span[data-nl2-shf="bad"]{white-space:normal;overflow:visible;font-size:13px;line-height:1.3;padding-top:2px!important;padding-bottom:2px!important}`,
@@ -16858,7 +16878,7 @@
                 const visBtn = (b) => !!b && getComputedStyle(b).display !== "none" && !b.hasAttribute("data-nl2-shmt");
                 const PILL = { Planetary: " nl2-t-pill-info", Orbital: " nl2-t-pill-purple" };
                 const COLS = [
-                    { k: "name", l: "Ship", w: 160, name: true, cls: "nl2-t-white", cell: (r) => NL.h("span", {}, r.name, r.dmg ? NL.h("span", { class: "nl2-t-warn" }, " " + r.dmg) : null) },
+                    { k: "name", l: "Ship", w: 160, name: true, cls: "nl2-t-white", cell: (r) => NL.h("span", {}, r.name) },
                     { k: "count", l: "Count", w: 72, cls: "nl2-t-count" },
                     { k: "stats", l: "Stats", w: 280, slots: [{ k: "hp", l: "HP", icon: "heart" }, { k: "sh", l: "Shield", icon: "shield" }, { k: "at", l: "Attack", icon: "swords" }, { k: "sp", l: "Speed", icon: "gauge" }, { k: "cg", l: "Cargo", icon: "package" }] },
                     { k: "wp", l: "Weapon", w: 68 },
@@ -19897,9 +19917,9 @@
       ${L} > .mission-card[data-nl2-fat-float]{position:absolute!important;z-index:5;margin:0!important;box-sizing:border-box}  
       ${L} table.nl2-t-tbl td.nl2-t-act>button.nl2-fat-arm{background:#d11f31;border-color:#ff8a94;color:#fff}  
       ${L} .nl2-fat-host .nl2-fat-flt{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:6px;padding:2px 4px 6px;font:600 13px Rajdhani,"Exo 2",sans-serif}
-      ${L} .nl2-fat-host .nl2-fat-det{margin:0 0 0 24px;border-left:2px solid var(--nl2-info,#38bdf8);padding:6px 10px}
+      ${L} .nl2-fat-host .nl2-fat-det{margin:0 0 0 24px;border-left:2px solid var(--nl2-info,#38bdf8);padding:6px 10px;font-size:14px}
       ${L} .nl2-fat-host .nl2-fat-det table{border-collapse:collapse;min-width:420px}
-      ${L} .nl2-fat-host .nl2-fat-det th{height:auto;color:var(--nl2-head,#8fb3d9);font-weight:600;font-size:13.6px;text-align:left;padding:3px 12px;border-bottom:1px solid rgba(120,200,255,.12)}
+      ${L} .nl2-fat-host .nl2-fat-det th{height:auto;color:var(--nl2-head,#8fb3d9);font-weight:600;font-size:12.8px;text-align:left;padding:3px 12px;border-bottom:1px solid rgba(120,200,255,.12)}
       ${L} .nl2-fat-host .nl2-fat-det td{height:auto;padding:3px 12px;border-bottom:1px solid rgba(120,200,255,.07)}
       ${L} .nl2-fat-host .nl2-fat-det .nl2-fat-num{text-align:right}${L} .nl2-fat-host .nl2-fat-det tr.nl2-fat-tot td{font-weight:700;border-top:1px solid rgba(120,200,255,.2)}
       ${L} .nl2-fat-host .nl2-fat-det .nl2-fat-lead{color:var(--nl2-amber,#fbbf24)}${L} .nl2-fat-host .nl2-fat-det .nl2-fat-btns{display:flex;gap:8px;margin-top:6px}
@@ -26946,7 +26966,7 @@
       .nl2-fpvr .nxs-launchbtn{margin-left:8px}`);
                 if (NL.fl142)
                     NL.css("fl-142", `
-      .nl2-fpvr .nxs-btn.nxs-launchbtn{order:-2;margin:0 10px 0 0;flex:0 0 190px;width:190px;height:38px;line-height:1.2;padding:0 18px;font-size:17px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-align:center;box-sizing:border-box}
+      .nl2-fpvr .nxs-btn.nxs-launchbtn{order:-2;margin:0 10px 0 0;flex:0 0 190px;width:190px;height:38px;line-height:1.2;padding:0 18px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-align:center;box-sizing:border-box}
       .nl2-fpvr .nxs-why{order:-1;margin-right:10px}`);
                 const labelOf = (b) => { const n = b.querySelector(".fleet-activity-label > span"); return ((n ? n.textContent : [...b.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join("")) || "").trim().toLowerCase(); };
                 const tabName = (b) => labelOf(b).replace(/\(\s*\d+\s*\)|\d+/g, "").trim();
@@ -29720,7 +29740,7 @@
             init() {
                 if (!NL.flTables3)
                     return;
-                const HEAD = "font:600 13.6px Rajdhani,\"Exo 2\",sans-serif;color:#8fb3d9;text-transform:none;letter-spacing:0";
+                const HEAD = "font:600 12.8px Rajdhani,\"Exo 2\",sans-serif;color:var(--nl2-head,#8fb3d9);text-transform:none;letter-spacing:0";
                 NL.css("fl-tables3", `
       
       :is(.nl2-fpx,.nl2-fpx-surv,.nl2-fstn) .nxs-head{flex-wrap:nowrap;gap:10px;min-height:30px}
@@ -33132,7 +33152,7 @@
             id: "mo-banner",
             set: "Moons",
             name: "Building banner",
-            desc: "MO-002: larger moon \"Building in progress\" banner with the building name and target level, big countdown and a yellow edge.",
+            desc: "MO-002: larger moon \"Building in progress\" banner with the building name and target level, bold countdown and a yellow edge.",
             init() {
                 NL.css("mo-banner", `
       .moon-queue-banner.nl2-moq{display:grid!important;grid-template-columns:auto 1fr auto auto;grid-template-areas:"ic ti cd x" "ic tx cd x";
@@ -33141,12 +33161,12 @@
         box-shadow:0 0 0 1px rgba(245,184,61,.15),0 4px 18px rgba(0,0,0,.45)}
       .moon-queue-banner.nl2-moq > svg{grid-area:ic;width:20px;height:20px;color:#f5b83d}
       .moon-queue-banner.nl2-moq > span:not(.countdown){grid-area:tx;font-size:13.5px;color:#a9bdd6}
-      .moon-queue-banner.nl2-moq > .countdown{grid-area:cd;font-size:20px;font-weight:700;color:#7ed4ff;font-variant-numeric:tabular-nums}
+      .moon-queue-banner.nl2-moq > .countdown{grid-area:cd;font-size:13.5px;font-weight:700;color:#7ed4ff;font-variant-numeric:tabular-nums}
       .moon-queue-banner.nl2-moq > .queue-cancel-btn{grid-area:x;font-size:12.5px;padding:4px 10px}
       .moon-queue-banner.nl2-moq > .nl2-moq-t{grid-area:ti;font-size:18px;font-weight:700;color:#fff;line-height:1.1}
       .moon-queue-banner.nl2-moq > .nl2-moq-t b{color:#f5b83d;font-weight:700}
       .moon-queue-banner.nl2-moq:not(.nl2-moq-named){grid-template-areas:"ic tx cd x" "ic tx cd x"}
-      .moon-queue-banner.nl2-moq:not(.nl2-moq-named) > span:not(.countdown){font-size:16px;font-weight:700;color:#fff}`);
+      .moon-queue-banner.nl2-moq:not(.nl2-moq-named) > span:not(.countdown){font-size:13.5px;font-weight:700;color:#fff}`);
                 let moons = {};
                 NL.onData(/^\/api\/planets\/activity-summary/, (p, d) => {
                     const m = {};
@@ -44975,7 +44995,7 @@
     .nxs-inst{font-size:11px;letter-spacing:.5px;color:#7fd4ff;border:1px solid rgba(56,189,248,.35);border-radius:4px;padding:0 6px}
     .nxs-info{color:#7890a5;font-size:11px;flex:1 1 200px}
     .nxs-banner{margin:0 0 12px;padding:10px 16px;border:1px solid rgba(82,115,140,.45);border-radius:8px;background:var(--bg-card,rgba(8,16,32,.94));text-align:center;color:#cfe9ff;letter-spacing:.4px}
-    .nxs-bl1{font-size:24px;font-weight:700;line-height:1.2}
+    .nxs-bl1{font-size:14px;font-weight:700;line-height:1.2}       
     .nxs-bl2{margin-top:4px;font-size:14px;font-weight:600}
 
     .nxs-rf{margin-left:auto}
@@ -47476,8 +47496,8 @@
                 const RW = "[data-nl2-tstd-r]:not(#nl2-tstd-none)";
                 const RC = [".buildings-page[data-nl2-bt] .building-costs>[data-nl2-bt-c]", ".moon-view[data-nl2-mt] .entity-bcard-costs>[data-nl2-mt-c]", ...[1, 2, 3, 4, 5, 6].map((c) => ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-c=\"" + c + "\"]")].join(",");
                 NL.css("gl-table-std", [
-                    `${S}>thead>tr>th,${S}>tbody>tr>th:not([class]){font:600 13.6px Rajdhani,"Exo 2",sans-serif!important;text-transform:none!important;letter-spacing:0!important;color:var(--nl2-head,#8fb3d9)!important}`,
-                    `${S}>tbody>tr>td{font-size:15px!important;height:32px;box-sizing:border-box}`,
+                    `${S}>thead>tr>th,${S}>tbody>tr>th:not([class]){font:600 12.8px Rajdhani,"Exo 2",sans-serif!important;text-transform:none!important;letter-spacing:0!important;color:var(--nl2-head,#8fb3d9)!important}`,
+                    `${S}>tbody>tr>td{font-size:14px!important;height:32px;box-sizing:border-box}`,
                     `${S}>thead>tr>th+th,${S}>tbody>tr>td+td,${S}>tbody>tr>th+td{border-left:1px solid ${LINE}}`,
                     `:is(${RC}):not(#nl2-tstd-none){display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;justify-self:start!important;gap:0!important;text-align:left!important}`,
                     `:is(${RC}):not(#nl2-tstd-none)>img.game-resource-icon{margin:0 4px 0 0!important;flex:0 0 auto!important}`,
@@ -47490,7 +47510,7 @@
                     ".fleet-page .nl2-fat .nl2-fat-ri{margin:0 4px 0 0!important}",
                     ".fleet-page .nl2-fat .nl2-fat-ra+.nl2-fat-ri{margin-left:10px!important}",
                     ".moon-view[data-nl2-mt] .moon-power-slider:has(>.nl2-tstd-pw)>input[type=\"range\"]:not(#nl2-tstd-none),.moon-view[data-nl2-mt] .moon-power-slider:has(>.nl2-tstd-pw)>.moon-power-value:not(#nl2-tstd-none){display:none!important}",
-                    ".nl2-tstd-pw{display:inline-flex;align-items:center;gap:3px;font-size:15px;color:var(--nl2-text,#d9e6f7)}",
+                    ".nl2-tstd-pw{display:inline-flex;align-items:center;gap:3px;font-size:14px;color:var(--nl2-text,#d9e6f7)}",
                     ".nl2-tstd-pw>input{width:48px;padding:0 6px;text-align:left}",
                     ".nl2-tstd-pw>input:not(#nl2-tstd-none){font:500 14px Rajdhani,\"Exo 2\",sans-serif!important;letter-spacing:0!important;color:#e2e8f0!important}",
                     `${S}[data-nl2-tstd-s="1"]>thead>tr>th:not([data-nl2-tstd-own]){cursor:pointer;user-select:none}`,
@@ -47501,7 +47521,7 @@
                     ".nl2-tstd-ctl label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;user-select:none}",
                     ".nl2-tstd-ctl input{margin:0;cursor:pointer}",
                     "[data-nl2-tstd-hide]{display:none!important}",
-                    ".nl2-tstd-gh{position:relative;height:28px;box-sizing:border-box;border-bottom:1px solid rgba(120,200,255,.12);font:600 13.6px Rajdhani,\"Exo 2\",sans-serif;color:var(--nl2-head,#8fb3d9);"
+                    ".nl2-tstd-gh{position:relative;height:28px;box-sizing:border-box;border-bottom:1px solid rgba(120,200,255,.12);font:600 12.8px Rajdhani,\"Exo 2\",sans-serif;color:var(--nl2-head,#8fb3d9);"
                         + "background-image:var(--nl2-tstd-bi,none);background-position:var(--nl2-tstd-bp,0 0);background-size:var(--nl2-tstd-bs,auto);background-repeat:no-repeat;flex:0 0 auto}",
                     ".nl2-tstd-gh>span{position:absolute;top:50%;transform:translateY(-50%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:3px;box-sizing:border-box;padding-right:4px}",
                     ".nl2-tstd-gh>span[data-k]{cursor:pointer;user-select:none}",
@@ -48114,10 +48134,10 @@
             const icon = (n) => { const d = document.createElement("span"); d.className = "nl2-t-ic"; d.innerHTML = "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">" + (ICONS[n] || "") + "</svg>"; return d; };
             const css = () => NL.css("gl-tbl-render", `
 .nl2-t{position:relative}
-table.nl2-t-tbl{table-layout:fixed;width:100%;border-collapse:collapse;font:400 15px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
+table.nl2-t-tbl{table-layout:fixed;width:100%;border-collapse:collapse;font:400 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
 table.nl2-t-tbl th,table.nl2-t-tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;box-sizing:border-box;padding:0 8px;height:32px;text-align:left}
 table.nl2-t-tbl td+td,table.nl2-t-tbl th+th{border-left:1px solid rgba(255,255,255,.06)}
-table.nl2-t-tbl thead th{font:600 13.6px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-head,#8fb3d9);height:28px;border-bottom:1px solid rgba(120,200,255,.12);user-select:none}
+table.nl2-t-tbl thead th{font:600 12.8px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-head,#8fb3d9);height:28px;border-bottom:1px solid rgba(120,200,255,.12);user-select:none}
 table.nl2-t-tbl thead th[data-k]:not([data-nosort]){cursor:pointer}
 table.nl2-t-tbl thead th .nl2-t-ar{margin-left:3px;font-size:10px}
 table.nl2-t-tbl tr.nl2-t-z>td{background:rgba(255,255,255,.035)}
@@ -48170,6 +48190,7 @@ table.nl2-t-tbl tr.nl2-t-det>td{height:auto;padding:8px;white-space:normal;overf
 .nl2-t-ok{color:var(--nl2-ok,#4ade80)}
 table.nl2-t-tbl tr.nl2-t-row-bad>td{background:rgba(248,113,113,.12)}
 table.nl2-t-tbl tr.nl2-t-row-dim>td{opacity:.55}
+table.nl2-t-tbl tr.nl2-t-row-ok>td{background:rgba(74,222,128,.08)}table.nl2-t-tbl tr.nl2-t-row-ok>td:first-child{box-shadow:inset 3px 0 0 var(--nl2-ok,#4ade80)}table.nl2-t-tbl tr.nl2-t-row-info>td{background:rgba(56,189,248,.07)}table.nl2-t-tbl tr.nl2-t-row-info>td:first-child{box-shadow:inset 3px 0 0 var(--nl2-info,#38bdf8)}
 table.nl2-t-tbl tr.nl2-t-row-mine>td{background:rgba(56,189,248,.08)}table.nl2-t-tbl tr.nl2-t-row-mine>td:first-child{box-shadow:inset 3px 0 0 var(--nl2-info,#38bdf8)}
 table.nl2-t-tbl td.nl2-t-x{cursor:pointer;color:var(--nl2-dim,#8aa3c0);text-align:center;padding:0;user-select:none}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-subt{margin-left:8px;color:var(--nl2-dim,#8aa3c0);font-weight:500;text-transform:none;letter-spacing:0}
@@ -48523,8 +48544,39 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                             td.textContent = String(out);
                     });
                 }
-                let shownMax = 0, lastOpts = {}, foot = null, emptyB = null;
+                let shownMax = 0, actMax = 0, lastOpts = {}, foot = null, emptyB = null;
+                let anchor = null, minT = 0;
+                const scroller = () => { for (let e = wrap.parentElement; e && e !== document.body; e = e.parentElement) {
+                    const cs = getComputedStyle(e);
+                    if (/(auto|scroll)/.test(cs.overflowY) && e.scrollHeight > e.clientHeight)
+                        return e;
+                } return document.scrollingElement || document.documentElement; };
+                const anchorEl = () => { if (!anchor)
+                    return null; const r = anchor.key != null ? table.querySelector("tbody tr[data-key=\"" + (window.CSS && CSS.escape ? CSS.escape(anchor.key) : anchor.key) + "\"]") : null; return r && r.offsetParent ? r : table; };
+                table.addEventListener("pointerdown", (e) => {
+                    const tr = e.target.closest("tbody tr[data-key]");
+                    anchor = { key: tr ? tr.dataset.key : null, at: Date.now() };
+                    if (tr && e.target.closest("button") && wrap.isConnected) {
+                        wrap.style.minHeight = wrap.offsetHeight + "px";
+                        clearTimeout(minT);
+                        minT = setTimeout(() => { wrap.style.minHeight = ""; }, 2000);
+                    }
+                }, true);
                 function render(sections, ropts) {
+                    if (held || !anchor || Date.now() - anchor.at > 4000 || !wrap.isConnected)
+                        return render0(sections, ropts);
+                    const el0 = anchorEl(), y0 = el0 ? el0.getBoundingClientRect().top : null;
+                    render0(sections, ropts);
+                    const el1 = anchorEl();
+                    if (y0 == null || !el1)
+                        return;
+                    const dy = el1.getBoundingClientRect().top - y0;
+                    if (dy && Math.abs(dy) < 3000) {
+                        const sc = scroller();
+                        sc.scrollTop += dy;
+                    }
+                }
+                function render0(sections, ropts) {
                     if (held) {
                         pending = true;
                         last = sections;
@@ -48695,7 +48747,8 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                         foot = null;
                     }
                     if (act) {
-                        const w = actW(shownMax);
+                        actMax = Math.max(actMax, shownMax);
+                        const w = actW(actMax);
                         if (actCol.style.width !== w)
                             actCol.style.width = w;
                     }
@@ -48712,9 +48765,9 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                     hold() { held++; },
                     release() { held = Math.max(0, held - 1); if (!held && pending) {
                         pending = false;
-                        render(last);
+                        render(last, lastOpts);
                     } },
-                    destroy() { document.removeEventListener("click", outside, true); closeMenu(); wrap.remove(); },
+                    destroy() { clearTimeout(minT); document.removeEventListener("click", outside, true); closeMenu(); wrap.remove(); },
                 };
             }
             const iconNum = (ic, v, o) => { const s = H("span", { class: "nl2-t-in" }); const n = iconNode(ic); if (n)
