@@ -1,5 +1,18 @@
 # Release notes
 
+## v0.5.138 · Nov 20, 2026
+
+**⚡ Energy**
+- Buildings and moon Buildings Table View: energy is green or red by sign, and the cheapest energy building gets a green pill with an "N RSS per energy" hover (BU-045, MO-063)
+
+**🎨 Look**
+- Bring (missing resources) buttons are amber on Buildings, Research, Shipyard and moon Buildings (GL-369, GL-370, MO-062)
+- The banner Hide ▾ button is the standard small button and stays inside the banner (GL-371)
+
+**🪐 Planets**
+- Shipyard build list Time without the clock, at 14px (SH-069); ship names 14px bold white (SH-070); locked rows fixed (SH-071)
+- Research Fragments column and picker smaller (RE-042)
+
 ## v0.5.137 · Nov 20, 2026
 
 **🔧 Hotfix**

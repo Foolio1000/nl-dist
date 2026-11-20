@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.137
+// @version      0.5.138
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.137", features: [] };
+    const NL = window.__nl2 = { version: "0.5.138", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -502,7 +502,7 @@
             catch (e) { } },
         };
     };
-    NL.css("btn-colours", ["green:#bbf7d0:#86efac:#166534", "red:#fecaca:#fca5a5:#991b1b", "blue:#bfdbfe:#93c5fd:#1e40af"].map((c) => {
+    NL.css("btn-colours", ["green:#bbf7d0:#86efac:#166534", "red:#fecaca:#fca5a5:#991b1b", "blue:#bfdbfe:#93c5fd:#1e40af", "amber:#fde68a:var(--nl2-tip):#92400e"].map((c) => {
         const [k, fill, hover, dark] = c.split(":");
         return `.nl2-c-${k}{background:${fill}!important;border:1px solid ${dark}!important;color:${dark}!important;box-shadow:none!important;text-shadow:none!important}` + `.nl2-c-${k}:hover:not([disabled]):not(.disabled){background:${hover}!important}`
             + `.nl2-c-${k}[disabled],.nl2-c-${k}.disabled{background:#d1d5db!important;border-color:#6b7280!important;color:#6b7280!important;opacity:1!important}`;
@@ -3733,6 +3733,10 @@
             const hr = hero.getBoundingClientRect(), cr = chips ? chips.getBoundingClientRect() : null;
             const pos = cr || onMoonBanner || path === "/overview" ? "bottom" : "top", other = pos === "bottom" ? "top" : "bottom";
             const v = (cr ? Math.max(0, Math.round(hr.bottom - cr.bottom)) : onMoonBanner || path === "/overview" ? 14 : 8) + "px";
+            const ban = NL.syInside !== false && (path === "/buildings" || path === "/research") && hero.firstElementChild !== box ? hero.firstElementChild : null;
+            const rv = ban ? Math.max(0, Math.round(hr.right - ban.getBoundingClientRect().right)) + 12 + "px" : "";
+            if (box.style.right !== rv)
+                box.style.right = rv;
             if (box.style[pos] !== v)
                 box.style[pos] = v;
             if (box.style[other])
@@ -3742,6 +3746,7 @@
                 refreshIdle();
             }
         }
+        NL.syInside = true;
         let syMenuWired = false;
         function ensureReminderBtns() {
             const isMoon = !!moonHere();
@@ -3867,7 +3872,7 @@
       .nl2-syopts{position:absolute;right:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
       .nl2-syopts.nl2-syopts-moon{z-index:2}
       .nl2-syopts.nl2-syopts-moon .nl2-synote{position:absolute;right:0;bottom:100%;margin-bottom:4px}
-      .nl2-sybtn{display:inline-flex;align-items:center;box-sizing:border-box;height:30px;padding:0 12px;border-radius:999px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:#d9e6f7;font-family:Rajdhani,"Exo 2",sans-serif;font-size:14px;font-weight:600;letter-spacing:.3px;line-height:1;white-space:nowrap;cursor:pointer}
+      .nl2-sybtn{display:inline-flex;align-items:center;box-sizing:border-box;height:24px;padding:0 10px;border-radius:6px;border:1px solid rgba(120,200,255,.35);background:rgba(56,189,248,.10);color:var(--nl2-text);font-family:Rajdhani,"Exo 2",sans-serif;font-size:13px;font-weight:600;letter-spacing:.3px;line-height:1;white-space:nowrap;cursor:pointer}
       .nl2-sybtn:hover:not(:disabled){background:rgba(56,189,248,.22);color:#fff}
       .nl2-sybtn.nl2-sysel{background:rgba(251,191,36,.22);border-color:rgba(245,158,11,.6);color:#fbbf24}
       .nl2-sygrp{display:inline-flex;align-items:center;gap:6px}
@@ -10705,11 +10710,11 @@
                             el.removeAttribute("data-nl2-bt");
                         return;
                     }
-                    if (!el.style.getPropertyValue("--nl2-btfs")) {
-                        const fs = getComputedStyle(el).fontSize;
-                        if (fs && fs !== "0px")
-                            el.style.setProperty("--nl2-btfs", fs);
-                    }
+                    if (el.hasAttribute("data-nl2-bt"))
+                        el.removeAttribute("data-nl2-bt");
+                    const fs = getComputedStyle(el).fontSize;
+                    if (fs && fs !== "0px" && el.style.getPropertyValue("--nl2-btfs") !== fs)
+                        el.style.setProperty("--nl2-btfs", fs);
                     if (el.getAttribute("data-nl2-bt") !== want)
                         el.setAttribute("data-nl2-bt", want);
                 };
@@ -13088,7 +13093,7 @@
             name: "Building ROI",
             desc: "Break-even time (days and hours) on Resources upgrade cards and a last ROI column in each building's level table.",
             init(ctx) {
-                NL.css("bu-roi", ".buildings-page[data-nl2-bt] .nl2-roi-l{display:none}.nl2-roi{display:block;margin:0 0 4px;padding:0 10px;font-size:inherit;font-weight:700;color:#7fd6a0}.nl2-roi.nl2-y,td.nl2-roi-c.nl2-y{color:#e6c34a}.nl2-roi.nl2-r,td.nl2-roi-c.nl2-r{color:#e06c6c}.nl2-roi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-roi-h,td.nl2-roi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-roi-c.nl2-dim{opacity:.5;color:#8a96a6}.nl2-demolish{margin-left:12px;padding:6px 14px;border-radius:6px;border:1px solid #b34a4a;background:transparent;color:#e08a8a;cursor:pointer}.nl2-demolish:hover{background:#3a1a1a}");
+                NL.css("bu-roi", ".buildings-page[data-nl2-bt] .nl2-roi-l{display:none}.nl2-roi{display:block;margin:0 0 4px;padding:0 10px;font-size:inherit/*BU-044*/;font-weight:700;color:#7fd6a0}.nl2-roi.nl2-y,td.nl2-roi-c.nl2-y{color:#e6c34a}.nl2-roi.nl2-r,td.nl2-roi-c.nl2-r{color:#e06c6c}.nl2-roi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-roi-h,td.nl2-roi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-roi-c.nl2-dim{opacity:.5;color:#8a96a6}.nl2-demolish{margin-left:12px;padding:6px 14px;border-radius:6px;border:1px solid #b34a4a;background:transparent;color:#e08a8a;cursor:pointer}.nl2-demolish:hover{background:#3a1a1a}");
                 const { ensureRates, roiClass, roiSeconds, ageTxt, hasRates } = NL.buRoi;
                 NL.buRoi.onChange(() => decorateAll());
                 const onScreen = () => {
@@ -13730,8 +13735,8 @@
                     NL.tip(sp, big ? (img ? img.getAttribute("alt") + ": " : "") + NL.fmt(n) : "");
                 });
                 NL.watch(".buildings-page[data-nl2-bt] .building-action-area > .construction-supply-trigger", (b) => {
-                    if (!b.classList.contains("nl2-c-blue"))
-                        b.classList.add("nl2-c-blue");
+                    if (!b.classList.contains("nl2-c-amber"))
+                        b.classList.add("nl2-c-amber");
                     const up = b.parentElement.querySelector(":scope > .upgrade-btn"), why = up ? (up.textContent || "").trim() : "";
                     NL.tip(b, "Bring missing resources" + (why ? "\nUpgrade: " + why : ""));
                 });
@@ -13933,10 +13938,12 @@
                     const st = statusOf(card);
                     const vals = { level: lvEl ? (lvEl.getAttribute("data-nl2-bt-lv") || txt(lvEl).replace(/^lv\.?\s*/i, "")) : "\u2014", en: en ? txt(en) : "", roi: roi ? txt(roi).replace(/^ROI\s*/i, "") : "", time: cd ? txt(cd) : bt ? txt(bt) : "" };
                     const tips = { name: [key, c2 ? txt(c2) : "", dmg ? txt(dmg) : ""].filter(Boolean).join("\n") }, cellCls = {}, sortVals = {}, sig = {};
+                    let enBest = false;
                     if (en) {
                         tips.en = en.getAttribute("data-nl2-tip") || "";
-                        if (en.hasAttribute("data-nl2-en-best"))
-                            cellCls.en = "nl2-t-ok";
+                        enBest = en.hasAttribute("data-nl2-en-best");
+                        const t = txt(en);
+                        cellCls.en = /^\+\s*[\d.,]*[1-9]/.test(t) ? "nl2-t-ok" : /^[-\u2212]\s*[\d.,]*[1-9]/.test(t) ? "nl2-t-bad" : "";
                     }
                     if (roi) {
                         tips.roi = roi.getAttribute("data-nl2-tip") || roi.getAttribute("title") || "";
@@ -13951,12 +13958,13 @@
                     } sig[k] = c ? c.v + (c.short ? "!" : "") : "-"; });
                     sig.rare = rare.map((c) => c.k + c.v + (c.short ? "!" : "")).join(",");
                     Object.keys(vals).forEach((k) => { sig[k] = vals[k] + "|" + (cellCls[k] || "") + "|" + (tips[k] || ""); });
+                    sig.en += enBest ? "|best" : "";
                     sig.fx = rest.join("|");
                     sig.name = tips.name;
                     sig.hide = String(card.classList.contains("nl2-hidden-card"));
                     const btn = {};
                     ["demolish", "repair", "bring", "up", "cancel"].forEach((k) => { btn[k] = btnOf(card, k); });
-                    const row = { key, vals, tips, cellCls, sortVals, sig, btn, by, rare, fx: rest, hid: card.classList.contains("nl2-hidden-card"), link: () => { const c = cardOf(key), h = c && c.querySelector("h4.building-name"); if (h)
+                    const row = { key, enBest, vals, tips, cellCls, sortVals, sig, btn, by, rare, fx: rest, hid: card.classList.contains("nl2-hidden-card"), link: () => { const c = cardOf(key), h = c && c.querySelector("h4.building-name"); if (h)
                             h.click(); } };
                     if (st)
                         row.span = { from: "ore", to: "rare", cell: () => pill(st.t, st.cls, st.tip) }, sig._span = st.t + st.cls;
@@ -14010,7 +14018,7 @@
                         cols: [
                             { k: "name", l: "Building", w: 170, name: true, cell: (r) => r.key },
                             { k: "level", l: "Level", w: 72 },
-                            { k: "en", l: "Energy", w: 56 },
+                            { k: "en", l: "Energy", w: 64, cell: (r) => (r.enBest ? NL.h("span", { class: "nl2-t-pill nl2-t-pill-ok" }, r.vals.en) : r.vals.en) },
                             { k: "fx", l: "Effect", w: "flex", wrap: true, cell: (r) => (r.fx.length ? NL.h("span", null, ...r.fx.map((x) => NL.h("span", { class: "nl2-btt-fx" }, x))) : "\u2014") },
                             { k: "roi", l: "ROI", w: 60 },
                             resCol("ore", "Ore"),
@@ -14039,7 +14047,7 @@
                         actions: { w: 104, empty: { label: "" }, list: [
                                 { k: "demolish", label: "Demolish", cls: "nl2-t-b-bad", show: (r) => !!r.btn.demolish && !r.open, run: (r) => press(r, "demolish") },
                                 { k: "repair", label: "Repair", cls: "nl2-t-b-ok", show: (r) => !!r.btn.repair, enabled: (r) => !r.btn.repair.disabled, tip: (r) => txt(r.btn.repair), run: (r) => press(r, "repair") },
-                                { k: "bring", label: "Bring", cls: "nl2-t-b-info", show: (r) => !!r.btn.bring, tip: (r) => "Bring missing resources" + (r.btn.up && txt(r.btn.up) ? "\nUpgrade: " + txt(r.btn.up) : ""), run: (r) => press(r, "bring") },
+                                { k: "bring", label: "Bring", cls: "nl2-t-b-amber", show: (r) => !!r.btn.bring, tip: (r) => "Bring missing resources" + (r.btn.up && txt(r.btn.up) ? "\nUpgrade: " + txt(r.btn.up) : ""), run: (r) => press(r, "bring") },
                                 { k: "up", cls: "nl2-t-b-ok", show: (r) => !!r.btn.up && !r.btn.bring, label: (r) => { const m = /upgrade\s+to\s+lv\.?\s*(\d+)/i.exec(txt(r.btn.up)); return m ? "\u2191 to lvl " + m[1] : txt(r.btn.up) || "Upgrade"; }, enabled: (r) => !r.btn.up.disabled, tip: (r) => (r.btn.up.disabled ? txt(r.btn.up) : ""), run: (r) => press(r, "up") },
                                 { k: "cancel", label: "Cancel", cls: "nl2-t-b-bad", show: (r) => !!r.btn.cancel, run: (r) => press(r, "cancel") },
                             ] },
@@ -14754,7 +14762,7 @@
             name: "Research ROI",
             desc: "RE-006: break-even time on production researches (card line and a level-table column), valued like Building ROI.",
             init() {
-                NL.css("re-roi", ".nl2-reroi{display:block;margin:0 0 4px;padding:0 10px;font-size:inherit;font-weight:700;color:#7fd6a0}.nl2-reroi.nl2-y,td.nl2-reroi-c.nl2-y{color:#e6c34a}.nl2-reroi.nl2-r,td.nl2-reroi-c.nl2-r{color:#e06c6c}.nl2-reroi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-reroi-h,td.nl2-reroi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-reroi-c.nl2-dim{opacity:.5;color:#8a96a6}");
+                NL.css("re-roi", ".nl2-reroi{display:block;margin:0 0 4px;padding:0 10px;font-size:inherit/*BU-044*/;font-weight:700;color:#7fd6a0}.nl2-reroi.nl2-y,td.nl2-reroi-c.nl2-y{color:#e6c34a}.nl2-reroi.nl2-r,td.nl2-reroi-c.nl2-r{color:#e06c6c}.nl2-reroi.nl2-na{color:#8a96a6;font-weight:400}th.nl2-reroi-h,td.nl2-reroi-c{color:#7fd6a0;text-align:right;white-space:nowrap}td.nl2-reroi-c.nl2-dim{opacity:.5;color:#8a96a6}");
                 const R = () => NL.buRoi;
                 const camel = (k) => String(k).replace(/_([a-z])/g, (m, c) => c.toUpperCase());
                 const items = () => { const l = NL.cache.latest(/^\/api\/research(\?|$)/); const r = l && l.data && l.data.research; return r ? Object.values(r) : []; };
@@ -15158,13 +15166,14 @@
                     ".nl2-retb .nl2-retb-br{display:inline-block;width:18px;height:18px;border-radius:4px;text-align:center;font-size:11px;line-height:18px;font-weight:700;margin-right:7px;vertical-align:1px}",
                     ".nl2-retb .nl2-retb-br.nl2-m{background:#3a1520;color:#ff6b7f;border:1px solid #6a2535}.nl2-retb .nl2-retb-br.nl2-e{background:#3a2a10;color:#f5b83d;border:1px solid #6a4a18}.nl2-retb .nl2-retb-br.nl2-s{background:#10243a;color:#6fb0ff;border:1px solid #1e4f7a}",
                     ".nl2-retb button.nl2-retb-btn{width:104px;box-sizing:border-box;padding:4px 8px;border-radius:6px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(34,197,94,.15);border:1px solid #166534;color:#4ade80}",
-                    ".nl2-retb button.nl2-retb-btn.nl2-bring{background:rgba(56,189,248,.12);border-color:#1e4f7a;color:#7cc4f5;font-weight:600}",
+                    ".nl2-retb button.nl2-retb-btn.nl2-bring{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.55);color:var(--nl2-amber,#fbbf24);font-weight:600}",
                     ".nl2-retb button.nl2-retb-btn:disabled{background:rgba(120,130,150,.12);border-color:#2a3446;color:#6b7686;cursor:default}",
                     ".nl2-retb .nl2-retb-btnph{display:inline-block;width:104px;text-align:center;color:#8a96a6}",
                     ".nl2-retb .nl2-retb-hide{display:flex;align-items:center;justify-content:center;cursor:pointer}.nl2-retb .nl2-retb-hide input{margin:0;cursor:pointer}",
                     ".nl2-retb tr.nl2-retb-bar td{cursor:pointer;font-weight:600;color:#c9d4e3;user-select:none}.nl2-retb tr.nl2-retb-bar:hover td{background:#13213a}",
                     ".nl2-retb tr.nl2-retb-hid td{opacity:.6}",
                     ".nl2-t[data-nl2-t=\"re\"] tbody[data-sec=\"hid\"]>tr.nl2-t-sec>td{padding-top:38px}",
+                    ".nl2-t[data-nl2-t=\"re\"] select.nl2-retb-fr{width:40px!important;height:22px!important;min-height:0!important;box-sizing:border-box;padding:0 2px!important;margin:0;font-size:14px!important;line-height:20px;cursor:pointer}",
                     ".nl2-t[data-nl2-t=\"re\"]{margin-top:10px}.nl2-retbw>.nl2-retb-empty{padding:8px}",
                     ".nl2-t[data-nl2-t=\"re\"] .nl2-retb-chip{display:inline-block;border:1px solid #2c4a8a;color:#8fb4ff;border-radius:4px;padding:0 5px;margin:1px 3px 1px 0;font-size:12.5px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;max-width:100%;box-sizing:border-box}.nl2-t[data-nl2-t=\"re\"] .nl2-retb-chip.nl2-u{border-color:#2a6a7a;color:#7fd0e0}",
                     ".nl2-t[data-nl2-t=\"re\"] .nl2-retb-br{display:inline-block;width:18px;height:18px;border-radius:4px;text-align:center;font-size:11px;line-height:18px;font-weight:700;margin-right:7px;vertical-align:1px}.nl2-t[data-nl2-t=\"re\"] .nl2-retb-br.nl2-m{background:#3a1520;color:#ff6b7f;border:1px solid #6a2535}.nl2-t[data-nl2-t=\"re\"] .nl2-retb-br.nl2-e{background:#3a2a10;color:#f5b83d;border:1px solid #6a4a18}.nl2-t[data-nl2-t=\"re\"] .nl2-retb-br.nl2-s{background:#10243a;color:#6fb0ff;border:1px solid #1e4f7a}",
@@ -15658,7 +15667,7 @@
                             { k: "roi", l: "ROI", w: 64 },
                             { k: "st", l: "Status", w: 84, cell: (r) => { const d = r.d; if (!d.end)
                                     return d.st; return NL.h("span", null, d.st + " ", NL.h("span", { class: "nl2-retb-cd", "data-end": String(d.end) }, (NL.buildTime && NL.buildTime((d.end - Date.now()) / 1000)) || NL.countdown(d.end - Date.now()))); } },
-                            { k: "frag", l: "Fragments", w: 64, sort: false, cell: (r) => {
+                            { k: "frag", l: "Fragments", w: 56, sort: false, cell: (r) => {
                                     const d = r.d;
                                     if (!(d.fmax >= 1))
                                         return "";
@@ -15674,7 +15683,7 @@
                                     k: "go",
                                     show: (r) => r.d.act !== "none",
                                     label: (r) => (r.d.act === "busy" ? "Lab busy" : r.d.act === "bring" ? "\u26DF Bring" : "\u25B7 " + r.d.btn),
-                                    cls: (r) => (r.d.act === "bring" ? "nl2-t-b-info" : "nl2-t-b-ok"),
+                                    cls: (r) => (r.d.act === "bring" ? "nl2-t-b-amber" : "nl2-t-b-ok"),
                                     enabled: (r) => r.d.act === "lvl" || r.d.act === "bring",
                                     tip: (r) => (r.d.act === "bring" ? "Bring missing resources" : r.d.act === "lvl" ? "" : (r.d.tip || r.d.st || "")),
                                     run: (r) => act(r.key, r.d.act === "bring" ? "bring" : "lvl"),
@@ -16174,6 +16183,8 @@
                     P40 + " .ship-card[data-nl2-shl-own]::after{grid-column:3!important;text-align:left!important;justify-self:start}",
                     P40 + " .ship-costs{grid-column:4!important;grid-template-columns:56px 56px 56px 56px 50px 50px 44px 78px!important;column-gap:4px!important;padding:0!important;margin:0!important;background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:hidden!important}",
                     P40 + " .ship-costs>*{justify-self:start!important;max-width:100%!important}",
+                    P40 + " .ship-costs>.ship-build-time>svg{display:none!important}" + P40 + " .ship-costs>.ship-build-time::after{font-size:14px!important}",
+                    P40 + " .ship-card h4," + P40 + " .ship-card h4 *," + P40 + " .ship-card .ship-name{font-size:14px!important;font-weight:700!important;color:#f1f5f9!important;line-height:1.3!important}",
                     P40 + " .ship-costs>[data-nl2-shl-v]>*:not(img):not(svg):not(:has(img,svg)){position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap!important}",
                     P40 + " .ship-build-row{grid-column:5!important;justify-content:flex-end!important;gap:6px!important}",
                     P40 + " .ship-build-row .qty-control{order:1;height:24px;display:inline-flex;align-items:center}",
@@ -16192,6 +16203,11 @@
                     P40 + " .ship-card[data-nl2-shl-short=\"costs\"] [data-nl2-shl-bring]," + P40 + " .ship-card[data-nl2-shl-short=\"card\"] [data-nl2-shl-bring]{position:absolute!important;grid-column:auto!important;grid-row:auto!important;right:8px!important;left:auto!important;top:50%!important;transform:translateY(-50%)!important;z-index:1}",
                     P40 + " .ship-card[data-nl2-shl-short=\"costs\"] .ship-build-row," + P40 + " .ship-card[data-nl2-shl-short=\"card\"] .ship-build-row{padding-right:116px!important}",
                     P40 + " .ship-card.locked>*:not(.ship-card-header):not(.ship-stats):not(.ship-costs):not(.ship-build-row):not(.ship-desc):not([class*=\"entity-image\"]){grid-column:4/6!important}",
+                    P40 + " .ship-card.locked>.ship-requirements{grid-column:4/5!important;grid-row:1!important;min-width:0;overflow:hidden;white-space:nowrap!important;text-overflow:ellipsis;font-size:14px!important;display:block!important;padding:0!important}",
+                    P40 + " .ship-card.locked>.ship-requirements *{display:inline!important;font-size:14px!important;white-space:nowrap!important}",
+                    P40 + " .ship-card.locked>.ship-requirements svg{display:none!important}",
+                    P40 + " .ship-card.locked>.ship-requirements .ship-req-warning+.ship-req-warning::before{content:\" \\00b7  \"}",
+                    P40 + " .ship-card.locked .ship-locked-badge{grid-column:5!important;grid-row:1!important;justify-self:end!important;align-self:center!important;position:static!important;margin:0!important;width:110px;box-sizing:border-box;justify-content:center;font-size:13px!important}",
                 ].join(""));
                 const box = (key, label) => {
                     const cb = NL.h("input", { type: "checkbox" });
@@ -16327,8 +16343,8 @@
                         let where = null;
                         if (bring) {
                             setAttr(bring, "data-nl2-shl-bring", "");
-                            if (!bring.classList.contains("nl2-c-blue"))
-                                bring.classList.add("nl2-c-blue");
+                            if (!bring.classList.contains("nl2-c-amber"))
+                                bring.classList.add("nl2-c-amber");
                             const top = [...c.children].find((k) => k.contains(bring));
                             where = !top || top.classList.contains("ship-build-row") ? "row" : top.classList.contains("ship-costs") ? "costs" : "card";
                         }
@@ -34093,6 +34109,7 @@
     {
         NL.moNameDesc = true;
         NL.moEnergyNet = true;
+        NL.moEnergyColor = true;
         NL.moCancelLabel = true;
         NL.feature({
             id: "mo-table",
@@ -34128,6 +34145,10 @@
                     P + ".entity-bcard-stat[data-nl2-mt-en]{position:absolute;left:0;top:50%;transform:translateY(-50%);width:64px;overflow:hidden}",
                     P + ".entity-bcard-stat[data-nl2-mt-en]>span{font-size:0!important}",
                     P + ".entity-bcard-stat[data-nl2-mt-en]>span::after{content:attr(data-nl2-mt-en);font-size:13px}",
+                    P + ".entity-bcard-stat>span[data-nl2-mt-es=\"pos\"]::after{color:var(--nl2-ok,#4ade80)}",
+                    P + ".entity-bcard-stat>span[data-nl2-mt-es=\"neg\"]::after{color:var(--nl2-bad,#f87171)}",
+                    P + ".entity-bcard-stat>span[data-nl2-mt-best]::after{display:inline-block;padding:0 6px;line-height:18px;border-radius:999px;border:1px solid rgba(74,222,128,.55);background:rgba(74,222,128,.12)}",
+                    P + ".entity-bcard-stat[data-nl2-mt-en]:has(>span[data-nl2-mt-best]){overflow:visible}",
                     P + ".entity-bcard>.moon-power-slider{" + col(COLS.slider) + ";display:flex!important;flex-direction:row!important;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;" + FLAT + "}",
                     P + ".moon-power-slider>svg{display:none!important}",
                     P + ".moon-power-slider>input{width:54px!important;min-width:0!important;flex:0 0 54px;margin:0!important}",
@@ -34142,6 +34163,7 @@
                     P + ".moon-bcard-upgrade>.entity-btn," + P + ".moon-bcard-upgrade>.construction-supply-trigger{" + col(COLS.btn) + ";" + BTN + "}",
                     P + ".moon-bcard-upgrade:has(>.construction-supply-trigger)>.entity-btn{display:none!important}",
                     P + ".moon-bcard-upgrade>.construction-supply-trigger>svg{display:none!important}",
+                    P + ".moon-bcard-upgrade>.construction-supply-trigger{background:rgba(251,191,36,.12)!important;border:1px solid rgba(251,191,36,.55)!important;color:var(--nl2-amber,#fbbf24)!important}",
                     P + ".moon-bcard-upgrade>.construction-supply-trigger>span{font-size:0!important;overflow:hidden}",
                     P + ".moon-bcard-upgrade>.construction-supply-trigger>span::after{content:\"Bring resources\";font-size:13px}",
                     P + ".moon-bcard-upgrade>.entity-btn[data-nl2-mt-up]{font-size:0!important}",
@@ -34212,7 +34234,12 @@
                     setAttr(st2, "data-nl2-mt-en", v);
                     if (sp)
                         setAttr(sp, "data-nl2-mt-en", v);
-                    NL.tip(st2, tip);
+                    const num = v != null ? Number(v.replace(/,/g, "")) : NaN;
+                    if (sp)
+                        setAttr(sp, "data-nl2-mt-es", NL.moEnergyColor !== false && isFinite(num) && num !== 0 ? (num > 0 ? "pos" : "neg") : null);
+                    setAttr(st2, "data-nl2-mt-et", tip || null);
+                    const extra = st2.getAttribute("data-nl2-mt-rpe");
+                    NL.tip(st2, [tip, extra].filter(Boolean).join("\n"));
                 });
                 NL.watch(".moon-view[data-nl2-mt] .entity-bcard-stats", (el) => {
                     NL.tip(el, el.scrollWidth > el.clientWidth + 1 ? [...el.children].map((k) => (k.textContent || "").trim()).filter(Boolean).join("  ") : "");
@@ -34230,6 +34257,49 @@
                     const n = Number((sp.textContent || "").replace(/[^\d]/g, "")), big = n >= 10000;
                     setAttr(sp, "data-nl2-mt-v", big ? NL.fmt(n, true) : null);
                     NL.tip(sp, big ? NL.fmt(n) : "");
+                });
+                NL.watch(".moon-view[data-nl2-mt]", (view) => {
+                    const on = NL.moEnergyColor !== false, w = (r) => (NL.buRoi && NL.buRoi.weight ? NL.buRoi.weight(r) : null), list = [];
+                    for (const card of view.querySelectorAll(".entity-bcard")) {
+                        const sp = card.querySelector(".entity-bcard-stat > span[data-nl2-mt-en]"), st2 = sp && sp.parentElement;
+                        if (!sp)
+                            continue;
+                        const net = Number(String(sp.getAttribute("data-nl2-mt-en")).replace(/,/g, ""));
+                        let rpe = null;
+                        const chips = card.querySelectorAll(".moon-bcard-upgrade .entity-bcard-costs > .entity-cost-chip");
+                        if (on && net > 0 && chips.length && !card.classList.contains("nl2-hidden-card") && !card.querySelector(".moon-bcard-upgrading, .entity-max-level")) {
+                            let cost = 0;
+                            for (const c of chips) {
+                                const img = c.querySelector("img.game-resource-icon"), src = img ? (img.getAttribute("src") || "").split("/").pop().replace(/\.\w+$/, "") || img.getAttribute("alt") : "";
+                                const k = Number(c.getAttribute("data-nl2-mt-c")) <= 4 ? RES[Number(c.getAttribute("data-nl2-mt-c")) - 1] : src, wt = w(k), n = Number((c.textContent || "").replace(/[^\d]/g, ""));
+                                if (wt == null) {
+                                    cost = NaN;
+                                    break;
+                                }
+                                cost += n * wt;
+                            }
+                            if (isFinite(cost) && cost > 0)
+                                rpe = Math.round(cost / net);
+                        }
+                        if (rpe != null)
+                            list.push({ sp, st2, rpe });
+                        else {
+                            setAttr(sp, "data-nl2-mt-best", null);
+                            if (st2.hasAttribute("data-nl2-mt-rpe")) {
+                                st2.removeAttribute("data-nl2-mt-rpe");
+                                NL.tip(st2, st2.getAttribute("data-nl2-mt-et") || "");
+                            }
+                        }
+                    }
+                    const best = list.length >= 2 ? list.reduce((a, b) => (b.rpe < a.rpe ? b : a)) : null;
+                    for (const x of list) {
+                        const extra = x.rpe.toLocaleString("en-US") + " RSS per energy" + (x === best ? "\nCheapest energy on this moon" : "");
+                        setAttr(x.sp, "data-nl2-mt-best", x === best ? "" : null);
+                        if (x.st2.getAttribute("data-nl2-mt-rpe") !== extra) {
+                            x.st2.setAttribute("data-nl2-mt-rpe", extra);
+                            NL.tip(x.st2, [x.st2.getAttribute("data-nl2-mt-et"), extra].filter(Boolean).join("\n"));
+                        }
+                    }
                 });
             },
         });
@@ -48151,6 +48221,7 @@ table.nl2-t-tbl td.nl2-t-act>button{width:var(--nl2-t-btnw,110px);padding:0 8px;
 table.nl2-t-tbl td.nl2-t-act>button{cursor:pointer;border-radius:6px;border:1px solid rgba(148,163,184,.5);background:rgba(148,163,184,.12);color:#cbd5e1}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-ok{border-color:rgba(74,222,128,.55);background:rgba(74,222,128,.12);color:var(--nl2-ok,#4ade80)}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-bad{border-color:rgba(248,113,113,.55);background:rgba(248,113,113,.12);color:var(--nl2-bad,#f87171)}
+table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-amber{border-color:rgba(251,191,36,.55);background:rgba(251,191,36,.12);color:var(--nl2-amber,#fbbf24)}   
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-info{border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.12);color:var(--nl2-info,#38bdf8)}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-bwrap{white-space:normal;height:auto;min-height:24px;padding-top:2px;padding-bottom:2px;line-height:1.2;overflow:visible;text-overflow:clip;vertical-align:middle}
 table.nl2-t-tbl td.nl2-t-act:has(>button.nl2-t-bwrap){white-space:normal}
