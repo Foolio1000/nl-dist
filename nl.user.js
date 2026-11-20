@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.142
+// @version      0.5.143
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.142", features: [] };
+    const NL = window.__nl2 = { version: "0.5.143", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -47068,6 +47068,7 @@
                 const RC = [".buildings-page[data-nl2-bt] .building-costs>[data-nl2-bt-c]", ".moon-view[data-nl2-mt] .entity-bcard-costs>[data-nl2-mt-c]", ...[1, 2, 3, 4, 5, 6].map((c) => ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-c=\"" + c + "\"]")].join(",");
                 NL.css("gl-table-std", [
                     `${S}{background:var(--bg-card,rgba(8,16,32,.98))}`,
+                    "[data-nl2-tstd-box]:not(#nl2-tstd-none){background-color:var(--bg-card,rgba(8,16,32,.98))!important;border-radius:8px}",
                     `${S}>thead>tr>th,${S}>tbody>tr>th:not([class]){font:600 12.8px Rajdhani,"Exo 2",sans-serif!important;text-transform:none!important;letter-spacing:0!important;color:var(--nl2-head,#8fb3d9)!important}`,
                     `${S}>tbody>tr>td{font-size:14px!important;height:32px;box-sizing:border-box}`,
                     `${S}>thead>tr>th+th,${S}>tbody>tr>td+td,${S}>tbody>tr>th+td{border-left:1px solid ${LINE}}`,

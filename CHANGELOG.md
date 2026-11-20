@@ -2,6 +2,11 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.143 · Nov 20, 2026
+
+**🔧 Hotfix**
+- The Shipyard build list, Buildings and moon Buildings grids and Fleet on Planet now have the solid table background too, not a see-through one (GL-389)
+
 ## v0.5.142 · Nov 20, 2026
 
 **🕒 Times**
@@ -376,18 +381,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 **🧩 Other**
 - Behind the scenes: wormhole runs (FL-373) and the Stations section (FL-372) moved into their own files; no change in how they work
 - Style checks cover the table standard (GL-295)
-
-## v0.5.123 · Nov 15, 2026
-
-**⚔️ PVP**
-- Each section (Priority, the list, Hidden) has its own filters, remembered; they replace the Range filter (FL-368)
-- Hide for 1, 2 or 3 days or indefinitely; a timed hide comes back by itself (FL-369)
-- Resources of 1M or more in green (FL-370)
-- Shield end UTC column muted grey, still editable (FL-371)
-
-**🛰 Fleet**
-- Active: Cargo amounts as short numbers (FL-367)
-
-**🧩 Other**
-- Leader crew table: crew count next to each role; the button now just says Unassign (GL-291)
-- Rankings: top 3 as plain rows (GL-292); players inactive 2+ days in orange (GL-293)
