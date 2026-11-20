@@ -1,5 +1,18 @@
 # Release notes
 
+## v0.5.136 · Nov 20, 2026
+
+**🔗 Planet links**
+- Your planet names open that planet's Overview, your moons open the moon's Overview, and another player's planet opens Galaxy at its system: in the Fleet tables, Transfer, Unsupplied, Stations, Mining and PVE lists, Reports, Espionage, Galaxy, the Combat Simulator note, Command Center, launch dialogs and attack targets (GL-358, FL-485, FL-486, FL-487, FL-488, FL-489, EM-040, GL-360)
+
+**🎨 Look**
+- Table sections get even spacing: 20px above, 10px below (GL-359)
+- Richness pill is easier to read: lighter fills, dark bold text (FL-491)
+- Hovers can show bold names (GL-362); shared table extras: an indigo pill, your own rows tinted, a little more room in action columns (GL-363)
+
+**🪐 Planets**
+- Fleet on Planet: Repair (N) / Maintain (N) and "N dmg" are back (SH-064); Good / Bad against show whole names that fit, then +N, full list on hover with bold names (SH-065); Built at moves to the end (SH-066)
+
 ## v0.5.135 · Nov 19, 2026
 
 **🎨 Tables**
