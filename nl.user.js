@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.143
+// @version      0.5.144
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.143", features: [] };
+    const NL = window.__nl2 = { version: "0.5.144", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -1163,7 +1163,7 @@
     .nl2-fleet-sum .nl2-fleet-key.nl2-bad{color:var(--nl2-bad, #f87171)}.nl2-fleet-sum .nl2-fleet-rem{font-size:13px;color:var(--nl2-dim, #8aa3c0)}
     .nl2-fleet-sum{align-items:baseline}
     .nl2-fleet .nl2-fleet-when{color:#fff;font-weight:500}.nl2-fleet .nl2-fleet-est{font-style:italic}.nl2-fleet .nl2-fleet-note{white-space:pre-line}
-    .nl2-fleet .nl2-fleet-btn.nl2-fleet-warnbtn{background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.55);color:#fb923c}.nl2-fleet .nl2-fleet-armed{font-weight:700}.nl2-fleet .nl2-fleet-qty input.nl2-fleet-short{border-color:rgba(251,146,60,.75);box-shadow:inset 0 0 0 1px rgba(251,146,60,.35);color:#fb923c}
+    .nl2-fleet .nl2-fleet-btn.nl2-fleet-warnbtn{background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.55);color:#fb923c}.nl2-fleet .nl2-fleet-armed{font-weight:700}.nl2-fleet .nl2-fleet-qty.nl2-fleet-short{border:2px solid #fb923c;padding:0 3px}.nl2-fleet .nl2-fleet-qty.nl2-fleet-short input{color:#fb923c;font-weight:700}
     .nl2-fleet-tplq{margin-right:26px}.nl2-fleet-cols{display:flex;justify-content:flex-end;gap:60px;padding:0 70px 2px 0;font:600 12px Rajdhani,sans-serif;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0)}.nl2-fleet-cols>span:first-child{margin-right:auto}
     .nl2-fleet-more>summary{cursor:pointer;color:#94a3b8;margin:4px 0}
     .nl2-fleet-chka{background:none;border:1px solid currentColor;border-radius:4px;color:inherit;font:inherit;font-size:12px;padding:0 6px;margin-left:4px;cursor:pointer}
@@ -1702,7 +1702,8 @@
                 const qtyRow = (name, have, get, set, max, extra, speed, ship, held, tplv) => {
                     const dash = NL.qtyDash && ship, shown = () => (dash && !get() ? "" : fmt(get()));
                     const inp = NL.h("input", { type: "text", inputmode: "numeric", value: shown(), ...(dash ? { placeholder: "\u2013" } : {}), ...(held ? { disabled: "" } : {}) });
-                    const markShort = () => inp.classList.toggle("nl2-fleet-short", !!(NL.fleetShortBox && tplv && Number(tplv.get()) > have));
+                    const qbox = NL.h("div", { class: "nl2-fleet-qty" }, inp);
+                    const markShort = () => qbox.classList.toggle("nl2-fleet-short", !!(NL.fleetShortBox && tplv && Number(tplv.get()) > have));
                     markShort();
                     const put = (v, retype) => { set(Math.max(0, v)); if (retype)
                         inp.value = shown(); inp.classList.toggle("nl2-bad", get() > have); markShort(); refresh(); extra && extra(); };
@@ -1713,7 +1714,7 @@
                             e.preventDefault();
                             inp.value = shown();
                         } });
-                    return NL.h("div", { class: "nl2-fleet-row" + (held ? " nl2-fleet-held" : "") }, NL.h("span", { class: "nl2-fleet-k", title: name }, name, held ? " (stays)" : "", speed > 0 ? NL.h("span", { class: "nl2-fleet-spd" }, " \u00B7 " + Math.round(speed) + " speed") : null), NL.h("div", { class: "nl2-fleet-d" }, tplv ? tplBox(tplv, have, (v) => put(Math.min(v, have), true)) : null, NL.h("button", { type: "button", class: "nl2-fleet-step nl2-fleet-minus", ...(held ? { disabled: "" } : {}), onclick: () => put(get() - 1, true) }, "-"), NL.h("div", { class: "nl2-fleet-qty" }, inp), NL.h("button", { type: "button", class: "nl2-fleet-step", ...(held ? { disabled: "" } : {}), onclick: () => put(get() + 1, true) }, "+"), NL.h("button", { type: "button", class: "nl2-fleet-max", ...(held ? { disabled: "" } : {}), onclick: () => put(max(), true) }, "max"), NL.h("span", { class: "nl2-fleet-have" }, "/" + fmt(have))));
+                    return NL.h("div", { class: "nl2-fleet-row" + (held ? " nl2-fleet-held" : "") }, NL.h("span", { class: "nl2-fleet-k", title: name }, name, held ? " (stays)" : "", speed > 0 ? NL.h("span", { class: "nl2-fleet-spd" }, " \u00B7 " + Math.round(speed) + " speed") : null), NL.h("div", { class: "nl2-fleet-d" }, tplv ? tplBox(tplv, have, (v) => put(Math.min(v, have), true)) : null, NL.h("button", { type: "button", class: "nl2-fleet-step nl2-fleet-minus", ...(held ? { disabled: "" } : {}), onclick: () => put(get() - 1, true) }, "-"), qbox, NL.h("button", { type: "button", class: "nl2-fleet-step", ...(held ? { disabled: "" } : {}), onclick: () => put(get() + 1, true) }, "+"), NL.h("button", { type: "button", class: "nl2-fleet-max", ...(held ? { disabled: "" } : {}), onclick: () => put(max(), true) }, "max"), NL.h("span", { class: "nl2-fleet-have" }, "/" + fmt(have))));
                 };
                 const section = (key, text, list) => {
                     const closed = () => !!(shut.get(o.kind || "fleet", {}) || {})[key];

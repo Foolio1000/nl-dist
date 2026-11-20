@@ -2,6 +2,11 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.144 · Nov 20, 2026
+
+**🛰 Fleet dialogs**
+- The short-ship Launch box no longer has a double outline: its own border turns light orange and the number bold orange (FL-519)
+
 ## v0.5.143 · Nov 20, 2026
 
 **🔧 Hotfix**
@@ -368,16 +373,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 **📊 Tables**
 - Resource cells line up the same way in every table (GL-299)
 - Fleet on Planet rows and Shipyard row dividers fixed (SH-038, SH-039); Command Center table fix (EM-034)
-
-## v0.5.124 · Nov 15, 2026
-
-**📊 Tables**
-- One table standard across our tables: same header and body sizes, sort on header click (ascending, descending, then the table's own order), remembered per table (GL-294)
-- Fleet tabs and Active fleets follow the standard (FL-374)
-- Buildings, moon Buildings and Shipyard grids get a header row, dividers and zebra rows (BU-038, MO-045, SH-037)
-- Research table follows the standard (RE-034)
-- Table View sits in each table's own control row
-
-**🧩 Other**
-- Behind the scenes: wormhole runs (FL-373) and the Stations section (FL-372) moved into their own files; no change in how they work
-- Style checks cover the table standard (GL-295)
