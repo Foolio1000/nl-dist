@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.141
+// @version      0.5.142
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.141", features: [] };
+    const NL = window.__nl2 = { version: "0.5.142", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -283,6 +283,8 @@
     NL.fmtDur = function (sec) {
         if (!Number.isFinite(sec) || sec <= 0)
             return "\u2014";
+        if (NL.timeStd)
+            return NL.duration(sec);
         const m = Math.round(sec / 60), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
         return d ? `${d}d ${h}h` : h ? `${h}h ${mm}m` : `${Math.max(mm, 1)}m`;
     };
@@ -318,7 +320,23 @@
         return Math.abs(v) < 1000000 ? +(v / 1000).toPrecision(3) + "K" : Math.abs(v) < 1000000000 ? +(v / 1000000).toPrecision(3) + "M" : +(v / 1000000000).toPrecision(3) + "B";
     };
     NL.cdShared = true;
+    NL.timeStd = true;
+    NL.duration = (sec) => {
+        const s = Math.max(0, Math.floor(Number(sec) || 0)), p = (n) => String(n).padStart(2, "0");
+        if (s > 864000)
+            return Math.floor(s / 86400) + "d";
+        if (s >= 90000)
+            return Math.floor(s / 86400) + "d " + p(Math.floor((s % 86400) / 3600)) + "h";
+        if (s >= 3600)
+            return Math.floor(s / 3600) + "h " + p(Math.floor((s % 3600) / 60)) + "m";
+        if (s >= 60)
+            return Math.floor(s / 60) + "m " + p(s % 60) + "s";
+        return s + "s";
+    };
+    NL.ago = (sec) => NL.duration(sec) + " ago";
     NL.countdown = (ms) => {
+        if (NL.timeStd)
+            return NL.duration((Number(ms) || 0) / 1000);
         const s = Math.max(0, Math.round((Number(ms) || 0) / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
         if (NL.cdShared && s >= 86400)
             return Math.floor(s / 86400) + "d " + String(Math.floor((s % 86400) / 3600)).padStart(2, "0") + "h";
@@ -1098,6 +1116,7 @@
         NL.fleetTplDrop = true;
         NL.fleetArm = true;
         NL.fleetFitTools = true;
+        NL.fleetShortBox = true;
         NL.hwMem = { get: (k) => { const v = hwMem.get(String(k), null); return typeof v === "boolean" ? v : null; }, set: (k, v) => hwMem.set(String(k), !!v) };
         NL.fleetHold = true;
         NL.noShipsRed = true;
@@ -1144,7 +1163,7 @@
     .nl2-fleet-sum .nl2-fleet-key.nl2-bad{color:var(--nl2-bad, #f87171)}.nl2-fleet-sum .nl2-fleet-rem{font-size:13px;color:var(--nl2-dim, #8aa3c0)}
     .nl2-fleet-sum{align-items:baseline}
     .nl2-fleet .nl2-fleet-when{color:#fff;font-weight:500}.nl2-fleet .nl2-fleet-est{font-style:italic}.nl2-fleet .nl2-fleet-note{white-space:pre-line}
-    .nl2-fleet .nl2-fleet-btn.nl2-fleet-warnbtn{background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.55);color:#fb923c}.nl2-fleet .nl2-fleet-armed{font-weight:700}
+    .nl2-fleet .nl2-fleet-btn.nl2-fleet-warnbtn{background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.55);color:#fb923c}.nl2-fleet .nl2-fleet-armed{font-weight:700}.nl2-fleet .nl2-fleet-qty input.nl2-fleet-short{border-color:rgba(251,146,60,.75);box-shadow:inset 0 0 0 1px rgba(251,146,60,.35);color:#fb923c}
     .nl2-fleet-tplq{margin-right:26px}.nl2-fleet-cols{display:flex;justify-content:flex-end;gap:60px;padding:0 70px 2px 0;font:600 12px Rajdhani,sans-serif;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0)}.nl2-fleet-cols>span:first-child{margin-right:auto}
     .nl2-fleet-more>summary{cursor:pointer;color:#94a3b8;margin:4px 0}
     .nl2-fleet-chka{background:none;border:1px solid currentColor;border-radius:4px;color:inherit;font:inherit;font-size:12px;padding:0 6px;margin-left:4px;cursor:pointer}
@@ -1683,8 +1702,10 @@
                 const qtyRow = (name, have, get, set, max, extra, speed, ship, held, tplv) => {
                     const dash = NL.qtyDash && ship, shown = () => (dash && !get() ? "" : fmt(get()));
                     const inp = NL.h("input", { type: "text", inputmode: "numeric", value: shown(), ...(dash ? { placeholder: "\u2013" } : {}), ...(held ? { disabled: "" } : {}) });
+                    const markShort = () => inp.classList.toggle("nl2-fleet-short", !!(NL.fleetShortBox && tplv && Number(tplv.get()) > have));
+                    markShort();
                     const put = (v, retype) => { set(Math.max(0, v)); if (retype)
-                        inp.value = shown(); inp.classList.toggle("nl2-bad", get() > have); refresh(); extra && extra(); };
+                        inp.value = shown(); inp.classList.toggle("nl2-bad", get() > have); markShort(); refresh(); extra && extra(); };
                     inp.addEventListener("input", () => put(num(inp.value), false));
                     inp.addEventListener("blur", () => { inp.value = shown(); });
                     if (dash)
@@ -4781,6 +4802,7 @@
             const arr = slT(m.arrivesAt), dep = slT(m.departsAt) || slT(m.createdAt);
             return arr && dep && arr > dep ? { t: arr + (arr - dep), est: true } : null;
         }
+        NL.fsFixedW = true;
         const slDur0 = (ms) => { const s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return (h ? h + "h " + String(m).padStart(2, "0") + "m " : m + "m ") + String(s % 60).padStart(2, "0") + "s"; };
         const slDur = (ms) => (NL.cdShared ? NL.countdown(ms) : slDur0(ms));
         const slTimeHtml = (t, est) => (est ? "<em>" + slDur(t - Date.now()) + "</em>" : slDur(t - Date.now()));
@@ -4924,8 +4946,8 @@
                 if (s.next) {
                     const tm = " \u00B7 " + slTimeHtml(s.next.t, s.next.est);
                     txt += " \u00B7 " + slDur(s.next.t - now);
-                    html += tm;
                     dlgHtml += tm;
+                    html += NL.fsFixedW ? " \u00B7 <span class=\"nl2-fs-t\">" + slTimeHtml(s.next.t, s.next.est) + "</span>" : tm;
                 }
                 slFull = s.max != null && s.used >= s.max;
                 slLow = s.max != null && s.max - s.used === 1;
@@ -4939,7 +4961,7 @@
                         slBox.innerHTML = "<span>" + html + "</span>";
                         slBox.dataset.nl2fs = html;
                     }
-                    NL.tip(slBox, s.next ? "Next slot frees at " + new Date(s.next.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + (s.next.est ? " (estimated)" : "") : "No fleet due home");
+                    NL.tip(slBox, s.next ? "Next slot frees at " + (NL.fsFixedW && NL.clock ? NL.clock(s.next.t) : new Date(s.next.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })) + (s.next.est ? " (estimated)" : "") : "No fleet due home");
                 }
             }
             if (!prev !== !s || (s && prev && (prev.used !== s.used || prev.max !== s.max))) {
@@ -5033,6 +5055,7 @@
             desc: "GL-028/GL-304: Fleet Slots used / total and a countdown to the next free slot in the top banner and every fleet dialog, kept in step with the game.",
             init() {
                 NL.css("gl-fleetslots", `
+      .topbar .nl2-rank.nl2-fslots .nl2-fs-t{display:inline-block;width:var(--nl2-fs-tw,7.6ch);text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
       .topbar .nl2-rank.nl2-fslots{--nl2-c:#e6edf7;margin-left:8px;border-color:rgba(192,204,224,.30);background:rgba(192,204,224,.07);cursor:default}
       .topbar .nl2-rank.nl2-fslots:hover{background:rgba(192,204,224,.07)}
       .topbar .nl2-fslots em{font-style:italic}
@@ -6278,6 +6301,11 @@
                 if (hpBox.nextElementSibling !== xpBox)
                     hpBox.after(xpBox);
                 pillHook(hpBox);
+                if (NL.hpGoLeader && !hpBox.dataset.nl2go) {
+                    hpBox.dataset.nl2go = "1";
+                    hpBox.style.cursor = "pointer";
+                    hpBox.addEventListener("click", hpGo);
+                }
             }
             else if (ldBox.nextElementSibling !== xpBox)
                 ldBox.after(xpBox);
@@ -6293,6 +6321,18 @@
             ldRender();
         }
         NL.ldStatus = true;
+        NL.hpGoLeader = true;
+        function hpGo() {
+            if (!NL.hpGoLeader || location.pathname === "/leadership")
+                return;
+            const a = document.querySelector(".sidebar-nav a.sidebar-link[href=\"/leadership\"]:not(.nl2-mirror)") || document.querySelector("a.topbar-command-core");
+            if (a)
+                a.click();
+            else if (!(NL.routerPush && NL.routerPush("/leadership"))) {
+                history.pushState({}, "", "/leadership");
+                window.dispatchEvent(new PopStateEvent("popstate", { state: {} }));
+            }
+        }
         let ldBox = null, hpBox = null, xpBox = null, ldData = null, ldReading = null, ldReadAt = 0, ldTick = 0;
         function ldRead(force) {
             if (ldReading)
@@ -10834,6 +10874,8 @@
             const v = Number(sec);
             if (!Number.isFinite(v) || v <= 0)
                 return "\u2014";
+            if (NL.timeStd)
+                return NL.duration(v);
             const s = Math.max(0, Math.floor(v)), p = (n) => String(n).padStart(2, "0");
             if (s >= 90000)
                 return Math.floor(s / 86400) + "d " + p(Math.floor((s % 86400) / 3600)) + "h";
@@ -47025,6 +47067,7 @@
                 const RW = "[data-nl2-tstd-r]:not(#nl2-tstd-none)";
                 const RC = [".buildings-page[data-nl2-bt] .building-costs>[data-nl2-bt-c]", ".moon-view[data-nl2-mt] .entity-bcard-costs>[data-nl2-mt-c]", ...[1, 2, 3, 4, 5, 6].map((c) => ".shipyard-page[data-nl2-shb] .ship-costs>[data-nl2-shl-c=\"" + c + "\"]")].join(",");
                 NL.css("gl-table-std", [
+                    `${S}{background:var(--bg-card,rgba(8,16,32,.98))}`,
                     `${S}>thead>tr>th,${S}>tbody>tr>th:not([class]){font:600 12.8px Rajdhani,"Exo 2",sans-serif!important;text-transform:none!important;letter-spacing:0!important;color:var(--nl2-head,#8fb3d9)!important}`,
                     `${S}>tbody>tr>td{font-size:14px!important;height:32px;box-sizing:border-box}`,
                     `${S}>thead>tr>th+th,${S}>tbody>tr>td+td,${S}>tbody>tr>th+td{border-left:1px solid ${LINE}}`,
@@ -47657,7 +47700,7 @@
             };
             const icon = (n) => { const d = document.createElement("span"); d.className = "nl2-t-ic"; d.innerHTML = "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">" + (ICONS[n] || "") + "</svg>"; return d; };
             const css = () => NL.css("gl-tbl-render", `
-.nl2-t{position:relative}
+.nl2-t{position:relative;background:var(--bg-card,rgba(8,16,32,.98));border-radius:8px}   
 table.nl2-t-tbl{table-layout:fixed;width:100%;border-collapse:collapse;font:400 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
 table.nl2-t-tbl th,table.nl2-t-tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;box-sizing:border-box;padding:0 8px;height:32px;text-align:left}
 table.nl2-t-tbl td+td,table.nl2-t-tbl th+th{border-left:1px solid rgba(255,255,255,.06)}
