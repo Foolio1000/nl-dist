@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.139
+// @version      0.5.140
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.139", features: [] };
+    const NL = window.__nl2 = { version: "0.5.140", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -206,6 +206,13 @@
     NL.tipSteady = true;
     NL.tipTrim = true;
     NL.tipSmart = true;
+    NL.setAttr = (el, name, v) => { if (!el)
+        return; if (v == null) {
+        if (el.hasAttribute(name))
+            el.removeAttribute(name);
+    }
+    else if (el.getAttribute(name) !== v)
+        el.setAttribute(name, v); };
     Object.defineProperty(NL, "tipA", { get: () => (NL.tipsOn ? "data-nl2-tip" : "title"), configurable: true });
     NL.tip = function (el, text) {
         if (!el)
@@ -502,11 +509,14 @@
             catch (e) { } },
         };
     };
-    NL.css("btn-colours", ["green:#bbf7d0:#86efac:#166534", "red:#fecaca:#fca5a5:#991b1b", "blue:#bfdbfe:#93c5fd:#1e40af", "amber:#fde68a:var(--nl2-tip):#92400e"].map((c) => {
+    NL.css("btn-colours", ["green:#bbf7d0:#86efac:#166534", "red:#fecaca:#fca5a5:#991b1b", "blue:#bfdbfe:#93c5fd:#1e40af"].map((c) => {
         const [k, fill, hover, dark] = c.split(":");
         return `.nl2-c-${k}{background:${fill}!important;border:1px solid ${dark}!important;color:${dark}!important;box-shadow:none!important;text-shadow:none!important}` + `.nl2-c-${k}:hover:not([disabled]):not(.disabled){background:${hover}!important}`
             + `.nl2-c-${k}[disabled],.nl2-c-${k}.disabled{background:#d1d5db!important;border-color:#6b7280!important;color:#6b7280!important;opacity:1!important}`;
     }).join("\n"));
+    NL.css("btn-amber", ".nl2-c-amber{background:rgba(251,191,36,.07)!important;border:1px solid rgba(251,191,36,.45)!important;color:var(--nl2-amber)!important;box-shadow:none!important;text-shadow:none!important}"
+        + ".nl2-c-amber:hover:not([disabled]):not(.disabled){background:rgba(251,191,36,.14)!important}"
+        + ".nl2-c-amber[disabled],.nl2-c-amber.disabled{background:#d1d5db!important;border-color:#6b7280!important;color:#6b7280!important;opacity:1!important}");
     {
         const KEY = "nl2.em-tabs.todo", MAX = 255, UNDO_MS = 86400000, subs = [];
         const all = () => { try {
@@ -10905,12 +10915,7 @@
       [data-nl2-crtv] .leadership-crew-action-hint{display:none!important}
       [data-nl2-crtv] .leadership-inline-action{white-space:nowrap}
     `);
-                const setAttr = (el, name, v) => { if (v == null) {
-                    if (el.hasAttribute(name))
-                        el.removeAttribute(name);
-                }
-                else if (el.getAttribute(name) !== v)
-                    el.setAttribute(name, v); };
+                const setAttr = NL.setAttr;
                 const fiberKey = (el) => { const k = Object.keys(el).find((x) => x.startsWith("__reactFiber")); const f = k && el[k]; return f && f.key != null ? String(f.key) : ""; };
                 const info = (card) => {
                     const copy = card.querySelector(".leadership-crew-card-copy");
@@ -13738,12 +13743,7 @@
                     P + ".building-card>.building-damage-banner{display:none!important}",
                 ].join(""));
                 const tvOn = () => st.get("on", true) !== false;
-                const setAttr = (el, name, v) => { if (v == null) {
-                    if (el.hasAttribute(name))
-                        el.removeAttribute(name);
-                }
-                else if (el.getAttribute(name) !== v)
-                    el.setAttribute(name, v); };
+                const setAttr = NL.setAttr;
                 NL.watch(".buildings-page > nav.bld-tabs", (nav) => {
                     setAttr(nav, "data-nl2-bt-nav", "");
                     let lab = nav.querySelector(":scope > .nl2-bt-cb");
@@ -14165,12 +14165,7 @@
                     return;
                 const weightOf = (r) => (NL.buRoi && NL.buRoi.weight ? NL.buRoi.weight(r) : null);
                 NL.css("bu-energy-cost", ".buildings-page[data-nl2-bt] .building-effect>[data-nl2-en-best]{box-shadow:inset 0 0 0 1px #4ade80;border-radius:4px;padding:0 4px;color:#4ade80}");
-                const setAttr = (el, name, v) => { if (v == null) {
-                    if (el.hasAttribute(name))
-                        el.removeAttribute(name);
-                }
-                else if (el.getAttribute(name) !== v)
-                    el.setAttribute(name, v); };
+                const setAttr = NL.setAttr;
                 const planet = () => {
                     if (!NL.cache || !NL.cache.all)
                         return null;
@@ -15199,7 +15194,7 @@
                     ".nl2-retb .nl2-retb-br{display:inline-block;width:18px;height:18px;border-radius:4px;text-align:center;font-size:11px;line-height:18px;font-weight:700;margin-right:7px;vertical-align:1px}",
                     ".nl2-retb .nl2-retb-br.nl2-m{background:#3a1520;color:#ff6b7f;border:1px solid #6a2535}.nl2-retb .nl2-retb-br.nl2-e{background:#3a2a10;color:#f5b83d;border:1px solid #6a4a18}.nl2-retb .nl2-retb-br.nl2-s{background:#10243a;color:#6fb0ff;border:1px solid #1e4f7a}",
                     ".nl2-retb button.nl2-retb-btn{width:104px;box-sizing:border-box;padding:4px 8px;border-radius:6px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(34,197,94,.15);border:1px solid #166534;color:#4ade80}",
-                    ".nl2-retb button.nl2-retb-btn.nl2-bring{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.55);color:var(--nl2-amber,#fbbf24);font-weight:600}",
+                    ".nl2-retb button.nl2-retb-btn.nl2-bring{background:rgba(251,191,36,.07);border-color:rgba(251,191,36,.45);color:var(--nl2-amber,#fbbf24);font-weight:600}",
                     ".nl2-retb button.nl2-retb-btn:disabled{background:rgba(120,130,150,.12);border-color:#2a3446;color:#6b7686;cursor:default}",
                     ".nl2-retb .nl2-retb-btnph{display:inline-block;width:104px;text-align:center;color:#8a96a6}",
                     ".nl2-retb .nl2-retb-hide{display:flex;align-items:center;justify-content:center;cursor:pointer}.nl2-retb .nl2-retb-hide input{margin:0;cursor:pointer}",
@@ -16249,12 +16244,7 @@
                 };
                 const tvOn = (key) => st.get(key, true) !== false;
                 const keyOf = (el) => { const img = el && el.querySelector("img"); return img ? (img.getAttribute("alt") || "").trim().toLowerCase() : ""; };
-                const setAttr = (el, name, v) => { if (v == null) {
-                    if (el.hasAttribute(name))
-                        el.removeAttribute(name);
-                }
-                else if (el.getAttribute(name) !== v)
-                    el.setAttribute(name, v); };
+                const setAttr = NL.setAttr;
                 NL.watch(".shipyard-page .sy-fleet-summary", (sum) => {
                     const h3 = sum.querySelector(":scope > h3");
                     if (h3) {
@@ -16814,12 +16804,7 @@
                     `${P} span[data-nl2-shf] b{font-weight:700}${P} span[data-nl2-shf] .nl2-shf-none{color:var(--nl2-dim)}`,
                     `${P} .sy-fleet-ship-name[data-nl2-shf-link]{cursor:pointer}${P} .sy-fleet-ship-name[data-nl2-shf-link]:hover{text-decoration:underline}`,
                 ].join(""));
-                const setAttr = (el, name, v) => { if (v == null) {
-                    if (el.hasAttribute(name))
-                        el.removeAttribute(name);
-                }
-                else if (el.getAttribute(name) !== v)
-                    el.setAttribute(name, v); };
+                const setAttr = NL.setAttr;
                 const cell = (r, k) => {
                     let c = r.querySelector(":scope > span[data-nl2-shf=\"" + k + "\"]");
                     if (!c) {
@@ -17535,12 +17520,7 @@
                     ".sy-fleet-summary[data-nl2-shl][data-nl2-shf-on] .sy-fleet-row-stats[data-nl2-shf-k=\"moon\"]::after{color:#cbd5e1;background:rgba(203,213,225,.12);border-color:rgba(203,213,225,.5)}",
                 ].join("\n"));
                 const KIND = [[/^planetary shipyard$/i, "planetary", "Planetary"], [/^orbital (shipyard|dock)$/i, "orbital", "Orbital"], [/^moon dockyard$/i, "moon", "Moon"]];
-                const setAttr = (el, name, v) => { if (v == null) {
-                    if (el.hasAttribute(name))
-                        el.removeAttribute(name);
-                }
-                else if (el.getAttribute(name) !== v)
-                    el.setAttribute(name, v); };
+                const setAttr = NL.setAttr;
                 const onRead = (fn) => (NL.shYard ? NL.shYard.onRead((pid, d) => fn(null, d)) : NL.onData(/^\/api\/planets\/\d+\/shipyard(\?|$)/, fn));
                 onRead((p, d) => {
                     if (!d || !Array.isArray(d.ships))
@@ -17944,12 +17924,7 @@
                     ".nl2-shq-hdr .nl2-shq-est{font-style:italic}",
                     ".nl2-shq-empty{margin-bottom:8px}",
                 ].join("\n"));
-                const setAttr = (el, name, v) => { if (v == null) {
-                    if (el.hasAttribute(name))
-                        el.removeAttribute(name);
-                }
-                else if (el.getAttribute(name) !== v)
-                    el.setAttribute(name, v); };
+                const setAttr = NL.setAttr;
                 const t = (s) => { const v = Date.parse(s); return Number.isFinite(v) ? v : null; };
                 const durOf = (it, d, ships) => {
                     const a = t(it.startsAt), b = t(it.endsAt);
@@ -34284,7 +34259,7 @@
                     P + ".moon-bcard-upgrade>.entity-btn," + P + ".moon-bcard-upgrade>.construction-supply-trigger{" + col(COLS.btn) + ";" + BTN + "}",
                     P + ".moon-bcard-upgrade:has(>.construction-supply-trigger)>.entity-btn{display:none!important}",
                     P + ".moon-bcard-upgrade>.construction-supply-trigger>svg{display:none!important}",
-                    P + ".moon-bcard-upgrade>.construction-supply-trigger{background:rgba(251,191,36,.12)!important;border:1px solid rgba(251,191,36,.55)!important;color:var(--nl2-amber,#fbbf24)!important}",
+                    P + ".moon-bcard-upgrade>.construction-supply-trigger{background:rgba(251,191,36,.07)!important;border:1px solid rgba(251,191,36,.45)!important;color:var(--nl2-amber,#fbbf24)!important}",
                     P + ".moon-bcard-upgrade>.construction-supply-trigger>span{font-size:0!important;overflow:hidden}",
                     P + ".moon-bcard-upgrade>.construction-supply-trigger>span::after{content:\"Bring resources\";font-size:13px}",
                     P + ".moon-bcard-upgrade>.entity-btn[data-nl2-mt-up]{font-size:0!important}",
@@ -34313,12 +34288,7 @@
                     P + ".entity-bcard>.nl2-cardtools>*{white-space:nowrap;flex:0 0 auto}",
                 ].join(""));
                 const tvOn = () => st.get("on", true) !== false;
-                const setAttr = (el, name, v) => { if (v == null) {
-                    if (el.hasAttribute(name))
-                        el.removeAttribute(name);
-                }
-                else if (el.getAttribute(name) !== v)
-                    el.setAttribute(name, v); };
+                const setAttr = NL.setAttr;
                 NL.watch(".moon-view .entity-building-grid", (grid) => {
                     const view = grid.closest(".moon-view");
                     let bar = grid.previousElementSibling;
@@ -36733,6 +36703,7 @@
                     if (!readLogTimer)
                         readLogTimer = setTimeout(() => { readLogTimer = 0; lsSet("nxsLoadLog", readLog); }, 4000);
                 }
+                const PAT_BANDS_NET = { id: "pve-patrol-bands", _net: { until: 0, backoff: 0 } };
                 async function getJson(url) {
                     const u = userRead;
                     try {
@@ -36791,6 +36762,8 @@
                         S.leader = data;
                         updateBadge();
                     }
+                    if (data && Array.isArray(data.fleet) && /^\/api\/(planets|moons)\/\d+\/fleet$/.test(path))
+                        learnDefNames(data.fleet);
                     if (pveMove() && path === "/api/fleet/patrol/capacity" && data && typeof data.total === "number") {
                         S.patCap = { total: num(data.total), used: num(data.used) };
                         updateBadge();
@@ -37013,6 +36986,21 @@
                 }
                 const tplSig = (zone, tpl) => zone + "|" + Object.keys(tpl || {}).filter((k) => num(tpl[k]) > 0).sort().map((k) => k + ":" + num(tpl[k])).join(",");
                 const tplClean = (tpl) => Object.fromEntries(Object.entries(tpl || {}).filter(([, n]) => num(n) > 0));
+                function defNameMap() { return NL._pveDefNames || (NL._pveDefNames = lsGet("nl2.shipDefNames", {}) || {}); }
+                function learnDefNames(list) {
+                    const m = defNameMap();
+                    let ch = false;
+                    for (const e of list || []) {
+                        const d = e && e.definition;
+                        if (d && d.id != null && d.name && m[d.id] !== d.name) {
+                            m[d.id] = d.name;
+                            ch = true;
+                        }
+                    }
+                    if (ch)
+                        lsSet("nl2.shipDefNames", m);
+                }
+                function shipNm(nm) { const k = /^#(\d+)$/.exec(String(nm || "")); return k ? defNameMap()[k[1]] || "Unknown ship" : String(nm || "Unknown ship"); }
                 function parseLost(list) {
                     const out = [];
                     if (Array.isArray(list))
@@ -37020,7 +37008,7 @@
                             if (!e || typeof e !== "object")
                                 continue;
                             const n = num(e.quantity != null ? e.quantity : e.count != null ? e.count : e.lost != null ? e.lost : e.amount != null ? e.amount : 1);
-                            const nm = e.shipName || e.name || (e.definition && (e.definition.name || e.definition.key)) || e.shipKey || e.key || (e.shipDefId != null ? "#" + e.shipDefId : "ship");
+                            const nm = e.shipName || e.name || (e.definition && (e.definition.name || e.definition.key)) || e.shipKey || e.key || (e.shipDefId != null ? shipNm("#" + e.shipDefId) : "ship");
                             if (n > 0)
                                 out.push({ name: String(nm), n });
                         }
@@ -37151,7 +37139,7 @@
                     if (!(num(w.total) > 0))
                         return "<span class=\"nxs-dim\">No ships lost in the last " + N + "</span>";
                     const pct = num(w.sent) > 0 ? Math.round(num(w.total) / num(w.sent) * 100) + "% of the fleet, " : "";
-                    return "<span class=\"nxs-dim\">Worst loss in the last " + N + ": " + esc((w.lost || []).map((x) => fmt(x.n) + " " + x.name).join(", ")) + " (" + pct + fmtAgo(Date.now() - w.at) + " ago)</span>";
+                    return "<span class=\"nxs-dim\">Worst loss in the last " + N + ": " + esc((w.lost || []).map((x) => fmt(x.n) + " " + shipNm(x.name)).join(", ")) + " (" + pct + fmtAgo(Date.now() - w.at) + " ago)</span>";
                 }
                 function badFor(zone, tpl, all) {
                     const sig = tplSig(zone, tpl), b = lsGet(BAD_KEY, {})[sig];
@@ -38077,7 +38065,7 @@
                     const fc = (Array.isArray(m.fleetComposition) ? m.fleetComposition : []).filter((x) => num(x.quantity) > 0).sort((a, b) => num(b.quantity) - num(a.quantity));
                     if (!fc.length)
                         return "\u2014";
-                    const shown = fc.slice(0, 3).map((x) => fmt(x.quantity) + " " + (x.shipName || x.shipKey || "?"));
+                    const shown = fc.slice(0, 3).map((x) => fmt(x.quantity) + " " + (x.shipName || x.shipKey || (x.shipDefId != null ? shipNm("#" + x.shipDefId) : "?")));
                     return shown.join(", ") + (fc.length > 3 ? " +" + (fc.length - 3) + " more" : "");
                 }
                 function fleetRows() {
@@ -38499,7 +38487,7 @@
                     if (!m)
                         return;
                     closeModal();
-                    const ships = (Array.isArray(m.fleetComposition) ? m.fleetComposition : []).map((x) => ({ id: x.shipDefId, name: x.shipName || x.shipKey || "?", max: num(x.quantity) + num(x.damagedQuantity) })).filter((x) => x.id != null && x.max > 0);
+                    const ships = (Array.isArray(m.fleetComposition) ? m.fleetComposition : []).map((x) => ({ id: x.shipDefId, name: x.shipName || x.shipKey || (x.shipDefId != null ? shipNm("#" + x.shipDefId) : "?"), max: num(x.quantity) + num(x.damagedQuantity) })).filter((x) => x.id != null && x.max > 0);
                     const want = {};
                     let lead = false;
                     const ov = document.createElement("div");
@@ -38609,7 +38597,7 @@
                     if (info.textContent !== txt)
                         info.textContent = txt;
                     const html = rows.length ? rows.map(({ m, t, est, home }) => {
-                        const ships = (Array.isArray(m.fleetComposition) ? m.fleetComposition : []).filter((x) => num(x.quantity) > 0).sort((a, b) => num(b.quantity) - num(a.quantity)).map((x) => fmt(x.quantity) + " " + (x.shipName || x.shipKey || "?")).join(", ");
+                        const ships = (Array.isArray(m.fleetComposition) ? m.fleetComposition : []).filter((x) => num(x.quantity) > 0).sort((a, b) => num(b.quantity) - num(a.quantity)).map((x) => fmt(x.quantity) + " " + (x.shipName || x.shipKey || (x.shipDefId != null ? shipNm("#" + x.shipDefId) : "?"))).join(", ");
                         const cl = cargoLines(m), tip = "From " + (m.sourcePlanetName || "\u2014") + (ships ? "\n" + ships : "") + (cl ? "\nCarrying:\n" + cl : "");
                         const an = actName(m), ac = ACT_COL[an] || ACT_COL._;
                         const cd = (v, e, why) => v != null ? (e ? "<em class=\"nxs-est\" " + NL.tipA + "=\"" + esc(why) + "\">" : "") + "<span data-cd=\"" + v + "\"></span>" + (e ? "</em>" : "") : "<span class=\"nxs-dim\"" + (e ? " " + NL.tipA + "=\"Not enough data to estimate\"" : "") + ">\u2014</span>";
@@ -39133,6 +39121,7 @@
                     const list = f && Array.isArray(f.fleet) ? f.fleet : null;
                     if (!list)
                         return null;
+                    learnDefNames(list);
                     const out = list.filter((e) => e && e.definition && num(e.quantity) > 0 && !(exclude || NO_SHIPS).includes(e.definition.key))
                         .map((e) => ({ id: e.definition.id, key: e.definition.key, name: e.definition.name || cap1(e.definition.key), qty: num(e.quantity), hp: num(e.definition.hp), mc: num(e.definition.effectiveMiningCargoCapacity || e.definition.miningCargoCapacity), cap: num(e.definition.effectiveCargoCapacity) || num(e.definition.cargoCapacity) }));
                     for (const k of want || [])
@@ -39248,7 +39237,7 @@
                                 continue;
                             L.done = true;
                             changed = true;
-                            fileResult(L.sig, L.tplKey, L.tpl, keepShips([].concat(...rs.map((x) => (Array.isArray(x.shipsLost) ? x.shipsLost : [])))).map((x) => ({ name: x.name || x.key || ("#" + x.shipDefId), quantity: num(x.quantity) })), Date.now(), rs[0].id);
+                            fileResult(L.sig, L.tplKey, L.tpl, keepShips([].concat(...rs.map((x) => (Array.isArray(x.shipsLost) ? x.shipsLost : [])))).map((x) => ({ name: x.name || x.key || shipNm("#" + x.shipDefId), quantity: num(x.quantity) })), Date.now(), rs[0].id);
                         }
                     }
                     if (changed)
@@ -39964,7 +39953,7 @@
                             if (!cfg.noTpl) {
                                 const bad = badFor(tplKey, tplZone());
                                 if (bad)
-                                    out.push({ level: "yellow", text: "This " + cfg.tplName + " template lost ships before: " + bad.worst.lost.map((x) => fmt(x.n) + " " + x.name).join(", ") + " (" + fmtAgo(Date.now() - bad.worst.at) + " ago" + (bad.clean ? "; " + bad.clean + " clean run" + (bad.clean > 1 ? "s" : "") + " since" : "") + ").", action: { label: "Dismiss", title: "Ignore these results; a new loss shows the warning again", run: () => setLossIgnore(tplKey, tplZone(), true) } });
+                                    out.push({ level: "yellow", text: "This " + cfg.tplName + " template lost ships before: " + bad.worst.lost.map((x) => fmt(x.n) + " " + shipNm(x.name)).join(", ") + " (" + fmtAgo(Date.now() - bad.worst.at) + " ago" + (bad.clean ? "; " + bad.clean + " clean run" + (bad.clean > 1 ? "s" : "") + " since" : "") + ").", action: { label: "Dismiss", title: "Ignore these results; a new loss shows the warning again", run: () => setLossIgnore(tplKey, tplZone(), true) } });
                                 const cg = cargoFor(tplKey, tplZone());
                                 if (cg)
                                     out.push({ level: "yellow", text: "Last run with this fleet ran out of cargo space and left loot behind: " + Object.entries(cg.short).map(([k, v]) => fmt(v) + " " + k.replace(/_/g, " ")).join(", ") + " (" + fmtAgo(Date.now() - cg.at) + " ago). Add cargo ships to carry more." });
@@ -40669,8 +40658,8 @@
                         exclude: NL.fl416 ? PAT_NO_SHIPS.filter((k) => k !== "hacker_ship") : PAT_NO_SHIPS,
                         cp: null,
                         estMore: NL.fl417 ? async (st, ships) => {
-                            const r = await fetch("/api/fleet/patrol/bands", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ ships, sourcePlanetId: st.src, attachLeader: false }) });
-                            return r.ok ? r.json().catch(() => null) : null;
+                            const r = await NL.postJson("/api/fleet/patrol/bands", { ships, sourcePlanetId: st.src, attachLeader: false }, PAT_BANDS_NET);
+                            return r && r.ok ? r.data : null;
                         } : undefined,
                         estAbove: NL.fl417 && NL.patReadout && NL.fleetCombat ? (el, st) => { el.innerHTML = patReadoutHtml(st.more, L.hours); } : undefined,
                         estNote: NL.fl417 && !(NL.patReadout && NL.fleetCombat && NL.fl427) ? (st) => {
@@ -44218,7 +44207,7 @@
                                 const lo = pjs(r.shipsLost, []), fc0 = pjs(r.fleetComposition, []);
                                 for (const x of (Array.isArray(lo) ? lo : []))
                                     if (x && num(x.lost) > 0) {
-                                        const nm = x.name || x.shipKey || "?";
+                                        const nm = x.name || x.shipKey || (x.shipDefId != null ? shipNm("#" + x.shipDefId) : "?");
                                         u.lost.set(nm, (u.lost.get(nm) || 0) + num(x.lost));
                                     }
                                 if (Array.isArray(fc0))
@@ -44248,12 +44237,12 @@
                                 ratio[x.shipKey] = num(x.quantity) / miners;
                                 names[x.shipKey] = x.shipName || x.name || x.shipKey;
                             }
-                        const lostL = (Array.isArray(lost) ? lost : []).filter((x) => x && num(x.lost) > 0).map((x) => ({ n: num(x.lost), name: x.name || x.shipKey || "?" }));
+                        const lostL = (Array.isArray(lost) ? lost : []).filter((x) => x && num(x.lost) > 0).map((x) => ({ n: num(x.lost), name: x.name || x.shipKey || (x.shipDefId != null ? shipNm("#" + x.shipDefId) : "?") }));
                         const cs = pjs(r.cargoStolen, 0);
                         const stolen = typeof cs === "object" && cs ? Object.values(cs).reduce((a, v) => a + num(v), 0) > 0 : num(cs) > 0;
                         const oc = String(r.combatOutcome || "");
                         const t = Date.parse(r.createdAt);
-                        list.push({ id: r.id, ratio, names, lost: lostL, stolen, outcome: oc, bad: lostL.length > 0 || stolen || (oc !== "" && oc !== "defender_won"), at: Number.isFinite(t) ? t : 0, loc: String(r.locationName || ""), pirates: (Array.isArray(pir) ? pir : []).filter((x) => x && num(x.quantity) > 0).map((x) => ({ n: num(x.quantity), name: x.name || "?" })) });
+                        list.push({ id: r.id, ratio, names, lost: lostL, stolen, outcome: oc, bad: lostL.length > 0 || stolen || (oc !== "" && oc !== "defender_won"), at: Number.isFinite(t) ? t : 0, loc: String(r.locationName || ""), pirates: (Array.isArray(pir) ? pir : []).filter((x) => x && num(x.quantity) > 0).map((x) => ({ n: num(x.quantity), name: x.name || (x.shipDefId != null ? shipNm("#" + x.shipDefId) : "?") })) });
                     }
                     list.runs = [...runs.values()].sort((a, b) => b.at - a.at).slice(0, 10).map((u) => ({ at: u.at, sent: u.sent, lost: [...u.lost].map(([name, n]) => ({ n, name })), total: [...u.lost.values()].reduce((a, v) => a + v, 0) }));
                     S.mrep = { at: Date.now(), list };
@@ -44463,7 +44452,7 @@
                             const losers = L.filter((rp) => rp.bad && keys.every((k) => Math.round((rp.ratio[k] || 0) * 100) >= cur[k])).sort((a, b) => b.at - a.at);
                             if (losers.length) {
                                 const w = losers[0];
-                                out.warn = "An escort ratio this strong or stronger lost ships before: " + (w.lost.length ? w.lost.map((x) => fmt(x.n) + " " + x.name).join(", ") : "no ships, but the raid went badly") + " at " + ratioStr(w, Object.keys(w.ratio)) + " (" + rpWhy(w) + ").";
+                                out.warn = "An escort ratio this strong or stronger lost ships before: " + (w.lost.length ? w.lost.map((x) => fmt(x.n) + " " + shipNm(x.name)).join(", ") : "no ships, but the raid went badly") + " at " + ratioStr(w, Object.keys(w.ratio)) + " (" + rpWhy(w) + ").";
                                 const allBad = L.filter((rp) => rp.bad).sort((a, b) => tot(b) - tot(a))[0], clean = L.filter((rp) => !rp.bad).sort((a, b) => tot(a) - tot(b))[0];
                                 out.info.push("Highest ratio that lost ships: " + ratioStr(allBad, Object.keys(allBad.ratio)) + (clean ? " \u00B7 lowest that came back clean: " + ratioStr(clean, Object.keys(clean.ratio)) : ""));
                             }
@@ -44471,11 +44460,11 @@
                         const R10 = L.runs || [];
                         if (R10.length) {
                             const N = R10.length + " run" + (R10.length > 1 ? "s" : ""), w = R10.reduce((x, r) => (r.total > x.total ? r : x), R10[0]);
-                            out.info.unshift(!(w.total > 0) ? "No ships lost in the last " + N : "Worst loss in the last " + N + ": " + w.lost.map((x) => fmt(x.n) + " " + x.name).join(", ") + " (" + (w.sent > 0 ? Math.round(w.total / w.sent * 100) + "% of the fleet, " : "") + fmtAgo(Date.now() - w.at) + " ago)");
+                            out.info.unshift(!(w.total > 0) ? "No ships lost in the last " + N : "Worst loss in the last " + N + ": " + w.lost.map((x) => fmt(x.n) + " " + shipNm(x.name)).join(", ") + " (" + (w.sent > 0 ? Math.round(w.total / w.sent * 100) + "% of the fleet, " : "") + fmtAgo(Date.now() - w.at) + " ago)");
                         }
                         const here = L.filter((rp) => rp.loc.split("/").pop().trim() === f.name && rp.pirates.length).sort((a, b) => b.at - a.at)[0];
                         if (here)
-                            out.info.push("Last raid at " + f.name + ": " + here.pirates.map((x) => fmt(x.n) + " " + x.name).join(", ") + " (" + rpWhy(here) + ")");
+                            out.info.push("Last raid at " + f.name + ": " + here.pirates.map((x) => fmt(x.n) + " " + shipNm(x.name)).join(", ") + " (" + rpWhy(here) + ")");
                         return out;
                     }
                     const fleetCache = new Map();
@@ -47834,12 +47823,7 @@
                         a.textContent = t;
                 };
                 const page = () => (location.pathname.split("/")[1] || "");
-                const setAttr = (el, n, v) => { if (v == null) {
-                    if (el.hasAttribute(n))
-                        el.removeAttribute(n);
-                }
-                else if (el.getAttribute(n) !== v)
-                    el.setAttribute(n, v); };
+                const setAttr = NL.setAttr;
                 const setOrder = (el, o) => { const v = o == null ? "" : String(o); if (el.style.order !== v)
                     el.style.order = v; };
                 const ourOrder = (el, o) => { setOrder(el, o); el.dataset.nl2TstdW = el.style.order; };
@@ -48388,7 +48372,7 @@ table.nl2-t-tbl td.nl2-t-act>button{width:var(--nl2-t-btnw,110px);padding:0 8px;
 table.nl2-t-tbl td.nl2-t-act>button{cursor:pointer;border-radius:6px;border:1px solid rgba(148,163,184,.5);background:rgba(148,163,184,.12);color:#cbd5e1}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-ok{border-color:rgba(74,222,128,.55);background:rgba(74,222,128,.12);color:var(--nl2-ok,#4ade80)}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-bad{border-color:rgba(248,113,113,.55);background:rgba(248,113,113,.12);color:var(--nl2-bad,#f87171)}
-table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-amber{border-color:rgba(251,191,36,.55);background:rgba(251,191,36,.12);color:var(--nl2-amber,#fbbf24)}   
+table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-amber{border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.07);color:var(--nl2-amber,#fbbf24)}   
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-info{border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.12);color:var(--nl2-info,#38bdf8)}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-bwrap{white-space:normal;height:auto;min-height:24px;padding-top:2px;padding-bottom:2px;line-height:1.2;overflow:visible;text-overflow:clip;vertical-align:middle}
 table.nl2-t-tbl td.nl2-t-act:has(>button.nl2-t-bwrap){white-space:normal}
