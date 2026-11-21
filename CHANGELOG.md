@@ -2,6 +2,23 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.147 · Nov 21, 2026
+
+**🛡 Station Operations**
+- Defense tables use the shared table: sections sort and remember their state, one text button per row plus Scan, Salvage and Remove as icons in fixed slots, and planet names link to the planet (GL-352, GL-392, GL-393, GL-396, FL-490)
+
+**🪐 Planets**
+- Overview: after an Evacuate, the button becomes a red "Recall" showing time flown; two clicks recall the fleet (OV-024)
+- Fleet on Planet: the two row buttons are stacked (FL-526)
+- Research cost cells are no longer cut off (RE-043)
+- Resources tab: Total column and Bulk subtotals removed, overflow fixed (EM-044)
+
+**🛰 Fleet**
+- Fleets Available slot count updates the moment a fleet launches or lands (GL-394, GL-395)
+- Debris Phase and Trip time fill straight away instead of showing "—" for 20 to 30 seconds (FL-524)
+- Bio picklist rows are tinted (FL-525)
+- Reports Time and Transfer Routes columns fit the page (FL-527, FL-528)
+
 ## v0.5.146 · Nov 21, 2026
 
 **📊 Resources**
@@ -324,22 +341,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🏆 Rankings**
 - Inactive players are flagged (GL-319)
-
-## v0.5.127 · Nov 16, 2026
-
-**⚔️ PVP and Intel**
-- A launch refused by a sleep shield fills in the target's Shield end on its own (FL-399)
-- Spy report Hide works together with PVP Hide (FL-400); Transports show next to Bulks on spy reports (FL-401)
-- Fleet Reports show a "Shielded" result (FL-402)
-- Scouts counts use the new scout math: spy report defenses count, civil ships are left out of % destroyed, and saved counts refresh once (FL-403)
-
-**🧮 Scout math**
-- Scouts per ship now aim for the 5% loss line, with civil ships and defenses per level, and Interceptors capped at the loss plateau (GL-317)
-- Defense2 and Offense2 Scouts needed come from the same shared math (GL-318)
-
-**🛰 Fleet dialogs**
-- Attack and salvage ship-count boxes are styled again after v0.5.126 (FL-398)
-
-**📊 Look and feel**
-- One standard look for every input box (GL-316)
-- Table colours restored: Stations Capacity yellow and red, Command Center Total header (GL-315)

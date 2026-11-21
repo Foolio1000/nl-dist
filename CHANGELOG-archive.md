@@ -1,5 +1,24 @@
 # Release notes archive
 
+## v0.5.127 · Nov 16, 2026
+
+**⚔️ PVP and Intel**
+- A launch refused by a sleep shield fills in the target's Shield end on its own (FL-399)
+- Spy report Hide works together with PVP Hide (FL-400); Transports show next to Bulks on spy reports (FL-401)
+- Fleet Reports show a "Shielded" result (FL-402)
+- Scouts counts use the new scout math: spy report defenses count, civil ships are left out of % destroyed, and saved counts refresh once (FL-403)
+
+**🧮 Scout math**
+- Scouts per ship now aim for the 5% loss line, with civil ships and defenses per level, and Interceptors capped at the loss plateau (GL-317)
+- Defense2 and Offense2 Scouts needed come from the same shared math (GL-318)
+
+**🛰 Fleet dialogs**
+- Attack and salvage ship-count boxes are styled again after v0.5.126 (FL-398)
+
+**📊 Look and feel**
+- One standard look for every input box (GL-316)
+- Table colours restored: Stations Capacity yellow and red, Command Center Total header (GL-315)
+
 ## v0.5.126 · Nov 15, 2026
 
 **🛒 Market**
