@@ -2,6 +2,23 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.148 · Nov 21, 2026
+
+**🛰 Fleet**
+- New Genesis tab: base tables, unread report count in the menu, an attack dialog, and Scout and Simulate buttons (FL-529, FL-530, FL-531, FL-532)
+- "Genesis base taken" and "Genesis base found" messages are quiet (FL-533, FL-534)
+- Debris To collect shows estimated Phase and Trip times (FL-535)
+
+**🪐 Planets**
+- Resources tab: numbers shown in full and right-aligned, with a Bulk need figure (EM-045, EM-046)
+- Recycling compare popover (RE-044)
+- Weapon and armor types show as coloured pills (GL-398)
+
+**⚙️ Other**
+- When browser storage is full, Nexus Legacy clears its own rebuildable caches and keeps saving, and shows a notice if it still can't (GL-399)
+- Sorting a table keeps your earlier sorts as tiebreakers (GL-400)
+- XP tip reads "Resets at 00:00 UTC" (GL-397)
+
 ## v0.5.147 · Nov 21, 2026
 
 **🛡 Station Operations**
@@ -328,16 +345,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **⛏ Mining**
 - When the game asks for its verification puzzle on a Mine launch, our dialog opens the game's own puzzle; you solve it and the launch is sent (FL-412, GL-330)
-
-## v0.5.128 · Nov 17, 2026
-
-**⛏ Mining**
-- Excavator mode on Fleet > Mining: send Excavators on their own at their own mining rate, left of One click mode (FL-404)
-- A mining belt the game refuses is hidden for 10 minutes instead of failing again (FL-405)
-- Refused launches now show the game's real reason instead of a bare 409 (GL-320)
-
-**🏠 Command Center**
-- The Fleet tab always lists every planet (EM-035); its input boxes follow the standard look
-
-**🏆 Rankings**
-- Inactive players are flagged (GL-319)
