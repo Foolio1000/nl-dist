@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.145
+// @version      0.5.146
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.145", features: [] };
+    const NL = window.__nl2 = { version: "0.5.146", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -962,9 +962,10 @@
         const homeBy = (t) => NL.clock(t);
         const arriveAt = (t) => { const d = new Date(t); return Number.isFinite(d.getTime()) ? d.toISOString().slice(11, 16) + " UTC" : ""; };
         const ONE_WAY = /transfer|deploy|relocat|coloni/i;
+        const vPend = (st) => !!st.estPending && !(NL.fleetSteady && st.est);
         const tripNodes = (st, which) => {
-            const e = st.est, d = st.estPending ? "\u2026" : "\u2014";
-            if (st.estPending || !e || e.travelSec == null)
+            const e = st.est, d = vPend(st) ? "\u2026" : "\u2014";
+            if (vPend(st) || !e || e.travelSec == null)
                 return [d];
             let sec = e.travelSec, est = false;
             if (which === "trip") {
@@ -1121,6 +1122,7 @@
         NL.fleetArm = true;
         NL.fleetFitTools = true;
         NL.fleetShortBox = true;
+        NL.fleetSteady = true;
         NL.hwMem = { get: (k) => { const v = hwMem.get(String(k), null); return typeof v === "boolean" ? v : null; }, set: (k, v) => hwMem.set(String(k), !!v) };
         NL.fleetHold = true;
         NL.noShipsRed = true;
@@ -1167,7 +1169,7 @@
     .nl2-fleet-sum .nl2-fleet-key.nl2-bad{color:var(--nl2-bad, #f87171)}.nl2-fleet-sum .nl2-fleet-rem{font-size:13px;color:var(--nl2-dim, #8aa3c0)}
     .nl2-fleet-sum{align-items:baseline}
     .nl2-fleet .nl2-fleet-when{color:#fff;font-weight:500}.nl2-fleet .nl2-fleet-est{font-style:italic}.nl2-fleet .nl2-fleet-note{white-space:pre-line}
-    .nl2-fleet .nl2-fleet-btn.nl2-fleet-warnbtn{background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.55);color:#fb923c}.nl2-fleet .nl2-fleet-armed{font-weight:700}.nl2-fleet .nl2-fleet-qty.nl2-fleet-short{border:2px solid #fb923c;padding:0 3px}.nl2-fleet .nl2-fleet-qty.nl2-fleet-short input{color:#fb923c;font-weight:700}
+    .nl2-fleet .nl2-fleet-btn.nl2-fleet-warnbtn{background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.55);color:#fb923c}.nl2-fleet .nl2-fleet-armed{font-weight:700}.nl2-fleet .nl2-fleet-stale{opacity:.55}.nl2-fleet.nl2-fleet-steady .nl2-fleet-msg{min-height:1.4em}.nl2-fleet.nl2-fleet-steady .nl2-fleet-sum > span{min-height:18px}.nl2-fleet .nl2-fleet-qty.nl2-fleet-short{border:2px solid #fb923c;padding:0 3px}.nl2-fleet .nl2-fleet-qty.nl2-fleet-short input{color:#fb923c;font-weight:700}
     .nl2-fleet-tplq{margin-right:26px}.nl2-fleet-cols{display:flex;justify-content:flex-end;gap:60px;padding:0 70px 2px 0;font:600 12px Rajdhani,sans-serif;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted,#c0cce0)}.nl2-fleet-cols>span:first-child{margin-right:auto}
     .nl2-fleet-more>summary{cursor:pointer;color:#94a3b8;margin:4px 0}
     .nl2-fleet-chka{background:none;border:1px solid currentColor;border-radius:4px;color:inherit;font:inherit;font-size:12px;padding:0 6px;margin-left:4px;cursor:pointer}
@@ -1275,7 +1277,7 @@
         const shipCount = (st, k) => st.ships.reduce((a, s) => a + (String(s.type || s.key) === k ? s.qty : 0), 0);
         function hangPlan(st) {
             const lv = Math.max(0, Math.floor(Number(typeof st.hangarOn.level === "function" ? st.hangarOn.level() : st.hangarOn.level) || 0));
-            const per = { fighter: 16 + lv, bomber: 4 + (lv >= 5 ? 1 : 0), shuttle: 4 + (lv >= 3 ? 1 : 0) };
+            const per = { fighter: 15 + lv, bomber: 4 + (lv >= 5 ? 1 : 0), shuttle: 4 + (lv >= 3 ? 1 : 0) };
             let left = shipCount(st, "carrier");
             const out = {};
             for (const [g, key] of WINGS) {
@@ -1464,7 +1466,7 @@
                     e.stopPropagation();
                     close();
                 } };
-                const panel = NL.h("div", { class: "nl2-fleet" + (NL.fleetCombat && (o.templates || o.wide) ? " nl2-fleet-wide" : ""), role: "dialog", "aria-label": o.title || "Fleet" }, NL.h("div", { class: "nl2-fleet-head" }, NL.h("h3", null, o.title || "Send fleet"), NL.h("button", { type: "button", class: "nl2-fleet-x", title: "Close", onclick: close }, "\u00D7")), body, chk, msg, NL.h("div", { class: "nl2-fleet-foot" }, tplBtn, NL.h("button", { type: "button", class: "nl2-fleet-btn nl2-sec", onclick: close }, "Cancel"), sendBtn));
+                const panel = NL.h("div", { class: "nl2-fleet" + (NL.fleetCombat && (o.templates || o.wide) ? " nl2-fleet-wide" : "") + (NL.fleetSteady ? " nl2-fleet-steady" : ""), role: "dialog", "aria-label": o.title || "Fleet" }, NL.h("div", { class: "nl2-fleet-head" }, NL.h("h3", null, o.title || "Send fleet"), NL.h("button", { type: "button", class: "nl2-fleet-x", title: "Close", onclick: close }, "\u00D7")), body, chk, msg, NL.h("div", { class: "nl2-fleet-foot" }, tplBtn, NL.h("button", { type: "button", class: "nl2-fleet-btn nl2-sec", onclick: close }, "Cancel"), sendBtn));
                 const ov = NL.h("div", { class: "nl2-fleet-ov" + (hidden ? " nl2-fleet-oc" : "") }, panel);
                 ov.addEventListener("mousedown", (e) => { if (e.target === ov)
                     close(); });
@@ -1596,18 +1598,18 @@
                         : ONE_WAY.test(String((st.mission && st.mission.value) || "")) || (!st.mission && ONE_WAY.test(String(o.kind || ""))));
                     st.oneWay = oneWayOf();
                     if (line) {
-                        const e = st.est, d = st.estPending ? "\u2026" : "\u2014";
+                        const e = st.est, d = vPend(st) ? "\u2026" : "\u2014";
                         const over = !!(e && e.hydrogenAvailable != null && e.fuel > e.hydrogenAvailable);
                         line.textContent = "";
-                        line.append("Fuel: ", NL.h("span", { class: over ? "nl2-bad" : null }, !st.estPending && e && e.fuel != null ? fmt(e.fuel) + " H\u2082" : d), !st.estPending && e && e.hydrogenAvailable != null ? " (" + fmt(e.hydrogenAvailable) + " available)" : "", ...(NL.fleetTrip ? [" \u00B7 Travel: ", tripNodes(st, "travel"), " \u00B7 Trip Time: ", tripNodes(st, "trip")].flat() : [
-                            " \u00B7 Travel: " + (!st.estPending && e && e.travelSec != null ? gameDur(e.travelSec) : d),
-                            fields.has("home") ? " \u00B7 Home by " + (!st.estPending && e && e.homeSec != null ? homeBy(Date.now() + e.homeSec * 1000) : d) : "",
-                            fields.has("arrive") ? " \u00B7 Arrives " + (!st.estPending && e && e.travelSec != null ? (NL.arrTime ? arriveAt : homeBy)(e.arrivesAt || Date.now() + e.travelSec * 1000) : d) : ""
+                        line.append("Fuel: ", NL.h("span", { class: over ? "nl2-bad" : null }, !vPend(st) && e && e.fuel != null ? fmt(e.fuel) + " H\u2082" : d), !vPend(st) && e && e.hydrogenAvailable != null ? " (" + fmt(e.hydrogenAvailable) + " available)" : "", ...(NL.fleetTrip ? [" \u00B7 Travel: ", tripNodes(st, "travel"), " \u00B7 Trip Time: ", tripNodes(st, "trip")].flat() : [
+                            " \u00B7 Travel: " + (!vPend(st) && e && e.travelSec != null ? gameDur(e.travelSec) : d),
+                            fields.has("home") ? " \u00B7 Home by " + (!vPend(st) && e && e.homeSec != null ? homeBy(Date.now() + e.homeSec * 1000) : d) : "",
+                            fields.has("arrive") ? " \u00B7 Arrives " + (!vPend(st) && e && e.travelSec != null ? (NL.arrTime ? arriveAt : homeBy)(e.arrivesAt || Date.now() + e.travelSec * 1000) : d) : ""
                         ]));
                     }
                     const sum = body.querySelector("[data-nl2-sum]");
                     if (sum) {
-                        const e = st.est, d = st.estPending ? "\u2026" : "\u2014", set = (k, v, bad) => { const el = sum.querySelector("[data-k=\"" + k + "\"]"); if (el) {
+                        const e = st.est, d = vPend(st) ? "\u2026" : "\u2014", set = (k, v, bad) => { const el = sum.querySelector("[data-k=\"" + k + "\"]"); if (el) {
                             el.textContent = v;
                             el.classList.toggle("nl2-bad", !!bad);
                         } };
@@ -1617,14 +1619,14 @@
                         const over = !!(e && e.hydrogenAvailable != null && e.fuel > e.hydrogenAvailable);
                         const hEl = NL.fleetKeyVals && sum.querySelector("[data-k=\"Hydrogen\"]");
                         if (hEl) {
-                            const has = !st.estPending && e && e.fuel != null;
+                            const has = !vPend(st) && e && e.fuel != null;
                             hEl.textContent = "";
                             hEl.append(NL.h("span", { class: "nl2-fleet-key" + (over ? " nl2-bad" : "") }, has ? fmt(e.fuel) : d));
                             if (has && e.hydrogenAvailable != null)
                                 hEl.append(" ", NL.h("span", { class: "nl2-fleet-rem" }, "(" + fmt(e.hydrogenAvailable - e.fuel) + ")"));
                         }
                         else
-                            set("Hydrogen", !st.estPending && e && e.fuel != null ? fmt(e.fuel) + " H\u2082" + (e.hydrogenAvailable != null ? " \u00B7 " + fmt(e.hydrogenAvailable - e.fuel) + " left" : "") : d, over);
+                            set("Hydrogen", !vPend(st) && e && e.fuel != null ? fmt(e.fuel) + " H\u2082" + (e.hydrogenAvailable != null ? " \u00B7 " + fmt(e.hydrogenAvailable - e.fuel) + " left" : "") : d, over);
                         const fill = (k, which) => { const el = sum.querySelector("[data-k=\"" + k + "\"]"); if (el)
                             el.replaceChildren(...tripNodes(st, which)); };
                         if (NL.fleetTrip) {
@@ -1633,21 +1635,21 @@
                             fill("Trip Time", "trip");
                         }
                         else
-                            set("Travel", !st.estPending && e && e.travelSec != null ? gameDur(e.travelSec) : d);
-                        set("Arrives", !st.estPending && e && e.travelSec != null ? (NL.arrTime ? arriveAt : homeBy)(e.arrivesAt || Date.now() + e.travelSec * 1000) : d);
-                        set("Home by", !st.estPending && e && e.homeSec != null ? (e.homeEst ? "\u2248 " : "") + homeBy(Date.now() + e.homeSec * 1000) : d);
+                            set("Travel", !vPend(st) && e && e.travelSec != null ? gameDur(e.travelSec) : d);
+                        set("Arrives", !vPend(st) && e && e.travelSec != null ? (NL.arrTime ? arriveAt : homeBy)(e.arrivesAt || Date.now() + e.travelSec * 1000) : d);
+                        set("Home by", !vPend(st) && e && e.homeSec != null ? (e.homeEst ? "\u2248 " : "") + homeBy(Date.now() + e.homeSec * 1000) : d);
                     }
                     const aboveEl = body.querySelector(".nl2-fleet-above");
                     if (aboveEl) {
                         try {
-                            o.etaAbove(aboveEl, snapshot(st), st.estPending ? null : st.est);
+                            o.etaAbove(aboveEl, snapshot(st), vPend(st) ? null : st.est);
                         }
                         catch (e) { }
                     }
                     const noteEl = body.querySelector(".nl2-fleet-note");
                     if (noteEl) {
                         let n = "";
-                        if (!st.estPending) {
+                        if (!vPend(st)) {
                             try {
                                 n = o.etaNote(snapshot(st), st.est) || "";
                             }
@@ -1659,6 +1661,28 @@
                         if (noteEl.textContent !== text)
                             noteEl.textContent = text;
                         noteEl.classList.toggle("nl2-bad", !!(n && n.bad));
+                    }
+                    if (NL.fleetSteady) {
+                        const stale = !!st.estPending && !vPend(st);
+                        for (const el of [line, aboveEl, noteEl])
+                            if (el)
+                                el.classList.toggle("nl2-fleet-stale", stale);
+                        if (sum)
+                            for (const k of ["Hydrogen", "Travel", "Trip Time", "Arrives", "Home by"]) {
+                                const el = sum.querySelector("[data-k=\"" + k + "\"]");
+                                if (el)
+                                    el.classList.toggle("nl2-fleet-stale", stale);
+                            }
+                        if (typeof NL._kick === "function")
+                            NL._kick();
+                        for (const el of [aboveEl, noteEl, chk, msg])
+                            if (el) {
+                                const h = el.offsetHeight, was = Number(el.dataset.nl2Hmax) || 0;
+                                if (h > was) {
+                                    el.dataset.nl2Hmax = String(h);
+                                    el.style.minHeight = h + "px";
+                                }
+                            }
                     }
                 };
                 const reEstimate = () => {
@@ -2239,6 +2263,8 @@
                         setTimeout(() => { msg.className = "nl2-fleet-msg"; refresh(); }, 1500);
                     });
                 (o.host && o.host.isConnected ? o.host : document.body).appendChild(ov);
+                if (NL.fleetSteady && typeof NL._kick === "function")
+                    NL._kick();
                 draw();
                 if (NL.fleetCombat && typeof o.ready === "function") {
                     try {
@@ -4952,7 +4978,7 @@
                     const tm = " \u00B7 " + slTimeHtml(s.next.t, s.next.est);
                     txt += " \u00B7 " + slDur(s.next.t - now);
                     dlgHtml += tm;
-                    html += NL.fsFixedW ? " \u00B7 <span class=\"nl2-fs-t\">" + slTimeHtml(s.next.t, s.next.est) + "</span>" : tm;
+                    html += tm;
                 }
                 slFull = s.max != null && s.used >= s.max;
                 slLow = s.max != null && s.max - s.used === 1;
@@ -4963,7 +4989,7 @@
                 if (slBox) {
                     slBox.style.display = "";
                     if (slBox.dataset.nl2fs !== html) {
-                        slBox.innerHTML = "<span>" + html + "</span>";
+                        slBox.innerHTML = "<span" + (NL.fsFixedW && s.next ? " class=\"nl2-fs-fix\"" : "") + ">" + html + "</span>";
                         slBox.dataset.nl2fs = html;
                     }
                     NL.tip(slBox, s.next ? "Next slot frees at " + (NL.fsFixedW && NL.clock ? NL.clock(s.next.t) : new Date(s.next.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })) + (s.next.est ? " (estimated)" : "") : "No fleet due home");
@@ -5060,7 +5086,7 @@
             desc: "GL-028/GL-304: Fleet Slots used / total and a countdown to the next free slot in the top banner and every fleet dialog, kept in step with the game.",
             init() {
                 NL.css("gl-fleetslots", `
-      .topbar .nl2-rank.nl2-fslots .nl2-fs-t{display:inline-block;width:var(--nl2-fs-tw,7.6ch);text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+      .topbar .nl2-rank.nl2-fslots > span.nl2-fs-fix{display:inline-block;width:var(--nl2-fs-w,15.6ch);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}   
       .topbar .nl2-rank.nl2-fslots{--nl2-c:#e6edf7;margin-left:8px;border-color:rgba(192,204,224,.30);background:rgba(192,204,224,.07);cursor:default}
       .topbar .nl2-rank.nl2-fslots:hover{background:rgba(192,204,224,.07)}
       .topbar .nl2-fslots em{font-style:italic}
@@ -17033,7 +17059,7 @@
                         location.href = path;
                 }, true);
                 NL.shFleetTbl = true;
-                const tables = new WeakMap();
+                let cur = null;
                 const rowOf = (sum, key) => [...sum.querySelectorAll(".sy-fleet-row")].find((r) => r.getAttribute("data-nl2-shft-k") === key) || null;
                 const gameBtn = (r, k) => {
                     if (!r)
@@ -17130,10 +17156,19 @@
                 function drawTable(sum) {
                     const secs = rowsOf(sum);
                     secs.forEach((s) => s.rows.forEach((r) => { r.sum = sum; }));
-                    let t = tables.get(sum), host = sum.querySelector(":scope > .nl2-shft-host");
-                    if (!host) {
+                    let t = cur && cur.t, host = sum.querySelector(":scope > .nl2-shft-host");
+                    if (!host && cur && !sum.contains(cur.host))
+                        host = cur.host;
+                    if (cur && host !== cur.host) {
+                        if (cur.t.destroy)
+                            cur.t.destroy();
+                        cur = null;
+                        t = null;
+                    }
+                    if (!host)
                         host = NL.h("div", { class: "nl2-shft-host" });
-                        const h3 = sum.querySelector(":scope > h3");
+                    const h3 = sum.querySelector(":scope > h3");
+                    if (host.parentNode !== sum) {
                         if (h3)
                             h3.after(host);
                         else
@@ -17141,15 +17176,17 @@
                     }
                     if (!t) {
                         t = NL.table.mount(host, { id: "shf", cols: COLS, actions: ACTIONS });
-                        tables.set(sum, t);
+                        cur = { t, host };
                     }
                     t.update(secs);
                 }
                 function dropTable(sum) {
-                    const t = tables.get(sum);
-                    if (t && t.destroy)
-                        t.destroy();
-                    tables.delete(sum);
+                    if (cur && (sum.contains(cur.host) || !cur.host.isConnected)) {
+                        if (cur.t.destroy)
+                            cur.t.destroy();
+                        cur.host.remove();
+                        cur = null;
+                    }
                     const host = sum.querySelector(":scope > .nl2-shft-host");
                     if (host)
                         host.remove();
@@ -17165,7 +17202,7 @@
                         drawTable(sum);
                         return;
                     }
-                    if (tables.has(sum) || sum.hasAttribute("data-nl2-shft"))
+                    if ((cur && sum.contains(cur.host)) || sum.hasAttribute("data-nl2-shft"))
                         dropTable(sum);
                     const on = NL.shFleetCols !== false && sum.hasAttribute("data-nl2-shl");
                     setAttr(sum, "data-nl2-shf", on ? "" : null);
@@ -19654,6 +19691,7 @@
                     }
                     return { ok, need, text, h2 };
                 };
+                NL.bulkCargo = () => bulkPer(null);
                 NL.onData(/^\/api\/planets\/\d+(\/fleet)?$/, () => NL._kick());
                 NL.evacuate = (btn) => evacuate(btn).catch((e) => ctx.log("evacuate failed", e));
                 NL.evacuateReady = () => !!planetId() && !!NL.fleet;
@@ -27497,7 +27535,7 @@
                 const nameCell = (d, extra) => NL.atkRows
                     ? NL.h("div", null, NL.h("b", null, d.name || d.key), spdOf(d) ? NL.h("span", { class: "nl2-atk-spd" }, " \u00B7 " + fmt(spdOf(d)) + " speed") : null, extra || null)
                     : null;
-                const slots = (lv) => ({ fighter: 16 + lv, bomber: 4 + (lv >= 5 ? 1 : 0), shuttle: 4 + (lv >= 3 ? 1 : 0) });
+                const slots = (lv) => ({ fighter: 15 + lv, bomber: 4 + (lv >= 5 ? 1 : 0), shuttle: 4 + (lv >= 3 ? 1 : 0) });
                 async function openShared(btn, r, o) {
                     const near = ((o && o.near) || []).map((m) => +m.id), moon = r.kind === "moon";
                     if (btn)
@@ -32668,6 +32706,7 @@
                     redraw();
                 } };
                 NL.onData(/^\/api\/command-center\/empire-resources(\?|$)/, (p, d, at) => takeRes(d, at));
+                NL.onData(/^\/api\/command-center\/fleet-overview(\?|$)/, () => redraw());
                 const listOf = (d) => (Array.isArray(d) ? d : d && Array.isArray(d.orders) ? d.orders : []);
                 const isActive = (o) => String(o && o.status || "").toLowerCase() === "active";
                 function tally(list) {
@@ -32824,6 +32863,23 @@
                         if (f)
                             r.tips[k] = Math.floor(f * 100) + "% of storage";
                     }
+                    const tot = RES.reduce((a, [k]) => a + r.parts[k].v, 0);
+                    r.parts.total = tot;
+                    r.sortVals.total = tot;
+                    r.vals.total = valNode(tot, 0, "");
+                    r.sig.total = String(Math.round(tot));
+                    if (kind === "planet") {
+                        const bk = bulkOf(b.id, tot);
+                        r.parts.bulk = bk;
+                        r.sortVals.bulk = bk.need != null ? bk.need - (bk.have || 0) : -1000000000000000;
+                        r.vals.bulk = bulkNode(bk);
+                        r.sig.bulk = [bk.have, bk.need].join("/");
+                    }
+                    else {
+                        r.vals.bulk = NL.h("div", { class: "nl2-t-dim" }, "\u2013");
+                        r.sig.bulk = "-";
+                        r.sortVals.bulk = -1000000000000000;
+                    }
                     if (kind === "planet") {
                         r.plink = true;
                         r.sig.name = "pl|" + b.name;
@@ -32837,15 +32893,39 @@
                         };
                     return r;
                 }
-                const totOf = (rows) => { const t = {}; for (const [k] of RES) {
-                    let v = 0, sold = 0;
-                    for (const r of rows) {
-                        v += r.parts[k].v;
-                        sold += r.parts[k].s;
+                const totOf = (rows) => {
+                    const t = {};
+                    for (const [k] of RES) {
+                        let v = 0, sold = 0;
+                        for (const r of rows) {
+                            v += r.parts[k].v;
+                            sold += r.parts[k].s;
+                        }
+                        t[k] = valNode(v, sold);
+                        t[k]._p = { v, s: sold };
                     }
-                    t[k] = valNode(v, sold);
-                    t[k]._p = { v, s: sold };
-                } return t; };
+                    return withTotBulk(t, rows.reduce((a, r) => a + (r.parts.total || 0), 0), rows.map((r) => r.parts.bulk).filter(Boolean));
+                };
+                function withTotBulk(t, tot, bks) {
+                    t.total = valNode(tot, 0, "");
+                    t.total._p = { v: tot, s: 0 };
+                    const sum = bks.length ? { have: bks.reduce((a, b) => (a == null || b.have == null ? null : a + b.have), 0), need: bks.reduce((a, b) => (a == null || b.need == null ? null : a + b.need), 0) } : null;
+                    t.bulk = sum ? bulkNode(sum) : NL.h("div", { class: "nl2-t-dim" }, "\u2013");
+                    t.bulk._b = bks;
+                    return t;
+                }
+                const fleetLocs = () => { const c = NL.cache && NL.cache.latest(/^\/api\/command-center\/fleet-overview(\?|$)/), d = c && c.data; return (d && d.locations) || null; };
+                function bulkOf(pid, tot) {
+                    const locs = fleetLocs(), loc = locs && locs.find((l) => l && String(l.key) === "planet:" + pid);
+                    const have = !locs ? null : loc ? (loc.ships || []).reduce((a, x) => a + (x && (x.shipKey === "bulk_carrier" || (x.definition && x.definition.key === "bulk_carrier")) ? Number(x.quantity) || 0 : 0), 0) : 0;
+                    const per = NL.bulkCargo ? Number(NL.bulkCargo()) || 0 : 0;
+                    return { have, need: per > 0 ? Math.ceil(tot / per) : null };
+                }
+                function bulkNode(bk) {
+                    const t = (bk.have == null ? "\u2014" : full(bk.have)) + " / " + (bk.need == null ? "\u2014" : full(bk.need));
+                    const short = bk.have != null && bk.need != null && bk.have < bk.need;
+                    return NL.h("div", short ? { class: "nl2-t-warn nl2-emres-short" } : {}, t);
+                }
                 const SECS = [["Planets", "planet"], ["Moons", "moon"], ["Outposts", "outpost"], ["Market Hubs", "hub"]];
                 let host = null, note = null, tbl = null;
                 function build() {
@@ -32853,6 +32933,7 @@
                     host = NL.h("div", { class: "nl2-emres" });
                     tbl = NL.table.mount(host, {
                         id: "emres",
+                        subFill: true,
                         cols: [{ k: "name", l: "Name", w: "flex", name: true, cell: (r) => (r.plink && NL.planetLink ? NL.planetLink(r.name) : r.name) }].concat(RES.map(([k, n]) => ({
                             k,
                             l: "",
@@ -32861,7 +32942,10 @@
                             tip: n,
                             icon: "/images/resources/" + snake(k) + ".webp",
                             cell: (r) => r.vals[k]
-                        }))),
+                        }))).concat([
+                            { k: "total", l: "Total", w: 120, wrap: true, cell: (r) => r.vals.total },
+                            { k: "bulk", l: "Bulk Carriers", w: 120, tip: "Bulk Carriers on the planet / needed to carry its Total", cell: (r) => r.vals.bulk }
+                        ]),
                     });
                     const old = st.get("coll", null);
                     if (Array.isArray(old)) {
@@ -32908,6 +32992,7 @@
                             }
                             grand[k] = valNode(v, sold);
                         }
+                        withTotBulk(grand, secs.reduce((a, s) => a + s.total.vals.total._p.v, 0), secs.flatMap((s) => s.total.vals.bulk._b));
                     }
                     tbl.update(secs, { total: grand ? { vals: grand } : null });
                 }
@@ -32920,7 +33005,8 @@
                     NL.emTabExtra.push(tab);
                 NL._kick();
                 NL.css("em-res", `
-      .nl2-emres{width:1100px;max-width:100%}
+      .nl2-emres{width:1340px;max-width:100%}
+      .nl2-emres .nl2-emres-short{color:var(--nl2-warn,#fb923c);font-weight:700}
       .nl2-emres table.nl2-t-tbl td,.nl2-emres table.nl2-t-tbl th{font-variant-numeric:tabular-nums}
       .nl2-emres table.nl2-t-tbl thead th .nl2-t-ic{width:20px;height:20px}
       .nl2-emres .nl2-emres-ord{color:var(--nl2-dim,#8aa3c0);font-size:13px;line-height:16px}
@@ -47772,6 +47858,7 @@ table.nl2-t-tbl thead th .nl2-t-ic+span{margin-left:4px}
 .nl2-t-in+.nl2-t-in{margin-left:10px}
 
 table.nl2-t-tbl tr.nl2-t-sub>td{font-weight:600;color:var(--nl2-text,#d9e6f7);background:none}
+table.nl2-t-tbl.nl2-t-subfill tr.nl2-t-sub>td{background:var(--nl2-sec-bg,rgba(255,255,255,.06));border-top:1px solid rgba(255,255,255,.12)}
 table.nl2-t-tbl tbody.nl2-t-foot tr.nl2-t-gap>td{height:12px;padding:0;border:0;background:none}
 table.nl2-t-tbl tr.nl2-t-grand>td{font-weight:700;color:#f1f5f9;background:var(--nl2-sec-bg,rgba(255,255,255,.06));border-top:2px solid var(--nl2-head,#8fb3d9)}
 
@@ -47824,7 +47911,7 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                 const cols = opts.cols.filter((c) => !c.after), tail = opts.cols.filter((c) => c.after), allCols = cols.concat(tail);
                 const nCells = cols.length + (act ? 1 : 0) + tail.length;
                 const wrap = H("div", { class: "nl2-t", "data-nl2-t": opts.id });
-                const table = H("table", { class: "nl2-t-tbl nl2-tbl" });
+                const table = H("table", { class: "nl2-t-tbl nl2-tbl" + (opts.subFill ? " nl2-t-subfill" : "") });
                 if (act)
                     table.style.setProperty("--nl2-t-btnw", (act.w || 110) + "px");
                 const widths = cols.map((c) => (c.w === "flex" || c.w == null ? null : (typeof c.w === "number" ? c.w + "px" : c.w)));
@@ -48156,6 +48243,19 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                         minT = setTimeout(() => { wrap.style.minHeight = ""; }, 2000);
                     }
                 }, true);
+                let secDown = null, secUpAt = 0;
+                const secOf = (e) => { const h = e.target.closest && e.target.closest("tr.nl2-t-sec"); const tb = h && h.closest("tbody[data-sec]"); return tb && !e.target.closest(".nl2-t-ctl") ? tb.dataset.sec : null; };
+                function toggleSec(id) {
+                    const tb = [...table.tBodies].find((x) => x.dataset.sec === id), h = tb && tb.querySelector("tr.nl2-t-sec");
+                    if (!h)
+                        return;
+                    const k = "open." + id;
+                    store.set(k, !(store.get(k, h.dataset.def !== "0") !== false));
+                    render(last);
+                }
+                table.addEventListener("pointerdown", (e) => { secDown = e.button === 0 ? secOf(e) : null; });
+                table.addEventListener("pointerup", (e) => { const d = secDown; secDown = null; if (d == null || e.button !== 0 || secOf(e) !== d)
+                    return; secUpAt = Date.now(); toggleSec(d); });
                 function render(sections, ropts) {
                     if (held || !anchor || Date.now() - anchor.at > 4000 || !wrap.isConnected)
                         return render0(sections, ropts);
@@ -48193,8 +48293,8 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                             let head = null;
                             if (sec.label != null) {
                                 head = H("tr", { class: "nl2-t-sec" + (sec.hidden ? " nl2-t-hid" : "") }, H("td", { colspan: String(nCells) }, H("span", { class: "nl2-t-bar" }), H("span", { class: "nl2-t-chev" }), H("span", { class: "nl2-t-lab" })));
-                                head.addEventListener("click", (e) => { if (e.target.closest(".nl2-t-ctl"))
-                                    return; const k = "open." + sec.id; store.set(k, !(store.get(k, !(sec.hidden || sec.closed)) !== false)); render(last); });
+                                head.addEventListener("click", (e) => { if (e.target.closest(".nl2-t-ctl") || Date.now() - secUpAt < 700)
+                                    return; toggleSec(sec.id); });
                                 tb.appendChild(head);
                             }
                             b = { tb, head, rows: new Map() };
@@ -48205,6 +48305,7 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                         prev = b.tb;
                         const open = sec.label == null || store.get("open." + sec.id, !(sec.hidden || sec.closed)) !== false;
                         if (b.head) {
+                            b.head.dataset.def = (sec.hidden || sec.closed) ? "0" : "1";
                             if (!sec.hidden) {
                                 const [, cName] = toneOf(sec, used);
                                 b.head.style.setProperty("--nl2-t-c", cName);

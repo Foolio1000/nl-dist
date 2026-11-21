@@ -2,6 +2,19 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.146 · Nov 21, 2026
+
+**📊 Resources**
+- Resources tab: Subtotal rows on a grey fill (EM-041), a Total column that adds each row's resources, rare included (EM-042), and a Bulk Carriers column with have / need per planet (EM-043)
+
+**🛰 Fleet dialogs**
+- No layout shift: while fuel and travel recalculate, the last values stay on screen dimmed, and lines keep their space so the Launch button doesn't move (FL-523)
+- Carrier hangars hold 15 + Carrier Operations level fighters, not 16 + level (FL-522)
+
+**🔧 Fixes**
+- Fleet on Planet sections collapse again (SH-074)
+- The Fleet Slots pill text is centred in its fixed width (GL-390)
+
 ## v0.5.145 · Nov 20, 2026
 
 **🪐 Planets**
@@ -330,37 +343,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 **📊 Look and feel**
 - One standard look for every input box (GL-316)
 - Table colours restored: Stations Capacity yellow and red, Command Center Total header (GL-315)
-
-## v0.5.126 · Nov 15, 2026
-
-**🛒 Market**
-- New Open Orders tab right of Order Book: every player's open orders on every hub in one read, with Value %, sort, filters, your own orders highlighted, and Buy now into the Order Book (GL-308)
-- Market Value and building ROI use the RSS weights from the shared sheet (GL-307, GL-309)
-
-**🚀 Fleets Available**
-- One shared fleet-slot count from the game's live feed, used by the top bar, the menu, Gather Fleets, PVE and Send (GL-304, GL-305, GL-306, FL-383)
-- Fleet > Active shows a row right after your own launch (FL-396)
-
-**⚔️ PVP and Intel**
-- Spy report link opens the report (FL-387); Hide for 5 and 7 days (FL-388); "Enemy colonies" heading (FL-389); the game's inactive marker on every row (FL-397)
-- Attack dialog fills in Scouts and Bulk Carriers from PVP (FL-392); spy reports show the Bulks needed to collect debris (FL-391); spy report rows follow the game's redrawn cards (FL-390)
-- Per-resource report tops (FL-378); Pacific/local dates in hovers now UTC (GL-301)
-
-**🛰 Fleet dialogs**
-- Ship boxes start blank with commas as you type, ship rows show modified speed, Arrives shows the time only (FL-393, FL-394, FL-395)
-- "No ships on this planet" line is red and shown in full (FL-384)
-- Dispatch Mission Briefing panel (FL-379); no notice after a route delete (FL-385)
-
-**🕒 Times in UTC**
-- Clocks everywhere read "HH:MM UTC" (GL-300, GL-302, GL-303, FL-380, FL-381, FL-382, MO-049)
-
-**🌙 Moons and Outposts**
-- Moon tab no longer snaps back after you click (MO-048); Energy shown as its own cause (MO-046); best resource building to upgrade (MO-047)
-- Jump Gate Select All in a single click (MO-051); outposts already relocating drop out of the list (OU-015)
-
-**🪐 Planets and tables**
-- Moon Power number box, Fleet on Planet outlines and Repair alignment, Shipyard Crew divider (MO-050, SH-041, SH-042, SH-043)
-- Even section spacing on every page and a teal Combat Ships heading in Shipyard
-
-**🌐 S0 server**
-- Features work on S0 when the game's transport layer is off (GL-311, FL-386, GL-312)
