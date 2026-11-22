@@ -2,6 +2,11 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.154 · Nov 22, 2026
+
+**🪐 Planets**
+- Buildings: hovering a short cost shows exactly what is missing (BU-048)
+
 ## v0.5.153 · Nov 22, 2026
 
 **🛰 Fleet**
@@ -269,26 +274,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🔔 Badges**
 - Badges clear the moment you act; the Patrol slot badge follows the game's capacity (GL-355, FL-479, FL-481)
-
-## v0.5.134 · Nov 19, 2026
-
-**🪐 Planets**
-- Fleet on Planet is our own table: names white and bold, damaged ships "N dmg" in amber, Count blue, Built at bubbles, no column dividers; the new shared table renderer behind it (SH-057, GL-348, GL-349, SH-056); its extra cells only in Table View (SH-051)
-- Research Table View column reads "Lab · Lv" (RE-037)
-- Building ROI and energy cost read one shared RSS weight lookup, no visible change (BU-039)
-
-**🛰 Fleet dialogs**
-- Travel and Hydrogen cost stand out in bold blue in every launch summary (FL-459)
-- The Galactic Highway box remembers your last launch for each dialog, Stations Make route included; Cancel saves nothing (FL-462)
-- Active Table View: Send Defense is blue, only Recall stays red (FL-464)
-
-**⛏ Mining and PVE**
-- Salvage Patrol coverage matches the game: Planet ×1, System ×2, Route ×2 with a Route target (FL-463)
-- Genesis bases are recorded (FL-465)
-
-**🔔 Badges**
-- An attacked Genesis base leaves the Fleet badge and Genesis tab badge (FL-460); the Expedition slot badge clears at launch (FL-461)
-
-**📊 Market and Empire**
-- Hub Inventory hides resources with 0 (GL-350)
-- Empire Resources totals in neutral colours, Total set apart (EM-037)

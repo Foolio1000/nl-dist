@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.153
+// @version      0.5.154
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.153", features: [] };
+    const NL = window.__nl2 = { version: "0.5.154", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -14636,6 +14636,14 @@
                 const SECS = ["Resource", "Energy", "Utility", "Military", "Fleet Defense", "Ground Defense"];
                 const GROUND = new Set(["Garrison", "Storage Cloaking", "Defense Traps"]);
                 const RES = ["ore", "silicates", "hydrogen", "alloys"];
+                const stock = {};
+                if (NL.onData)
+                    NL.onData(/^\/api\/planets\/\d+$/, (path, d) => { const res = d && d.resourceSnapshot && d.resourceSnapshot.resources; if (res) {
+                        stock[path.split("/").pop()] = res;
+                        NL._kick && NL._kick();
+                    } });
+                const haveOf = (k) => { const h = NL.here && NL.here(), res = h && h.kind === "planet" ? stock[String(h.id)] : null, v = res ? res[k] : null; return v == null || !isFinite(+v) ? null : +v; };
+                const shortTip = (c) => { const h = haveOf(c.k); return h != null && h < c.v ? "Short " + NL.fmt(c.v - h) + " " + c.name + " (need " + NL.fmt(c.v) + ", have " + NL.fmt(h) + ")" : "Short of " + c.name + " (need " + NL.fmt(c.v) + ")"; };
                 NL.css("bu-tbl2", [
                     ".buildings-page[data-nl2-btt] .buildings-grid{display:none!important}",
                     ".nl2-btt-host{margin-top:8px}",
@@ -14788,10 +14796,11 @@
                     }
                     RES.forEach((k) => { const c = by[k]; if (c) {
                         sortVals[k] = c.v;
-                        tips[k] = c.name + ": " + NL.fmt(c.v);
-                        if (c.short)
+                        if (c.short) {
                             cellCls[k] = "nl2-t-bad";
-                    } sig[k] = c ? c.v + (c.short ? "!" : "") : "-"; });
+                            tips[k] = shortTip(c);
+                        }
+                    } sig[k] = c ? c.v + (c.short ? "!" + tips[k] : "") : "-"; });
                     sig.rare = rare.map((c) => c.k + c.v + (c.short ? "!" : "")).join(",");
                     Object.keys(vals).forEach((k) => { sig[k] = vals[k] + "|" + (cellCls[k] || "") + "|" + (tips[k] || ""); });
                     sig.en += enBest ? "|best" : "";
