@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.154
+// @version      0.5.155
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.154", features: [] };
+    const NL = window.__nl2 = { version: "0.5.155", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -16895,7 +16895,7 @@
                 NL.reCompare = true;
                 let offers = [], eq = {};
                 const isCost = (e) => /cost/i.test(e.label || "") || e.leaderBonus === "fuelCostBonus";
-                const disp = (e) => { let v = Number(e.value) || 0; if (e.leaderBonus === "fuelCostBonus" || /fuel cost/i.test(e.label || ""))
+                const disp = (e) => { let v = Number(e.value) || 0; if (isCost(e))
                     v = -v; return e.unit === "percent" ? v * 100 : v; };
                 const fmt = (v, e, sign) => { const r = e.unit === "percent" ? Math.round(v * 10) / 10 : Math.round(v); const s = Math.abs(r).toLocaleString("en-US") + (e.unit === "percent" ? "%" : ""); return (r > 0 ? (sign ? "+" : "") : r < 0 ? "-" : (sign ? "\u00B1" : "")) + s; };
                 const ROM = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
@@ -49740,6 +49740,16 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                 const cols = opts.cols.filter((c) => !c.after), tail = opts.cols.filter((c) => c.after), allCols = cols.concat(tail);
                 const nCells = cols.length + (act ? 1 : 0) + tail.length;
                 const wrap = H("div", { class: "nl2-t", "data-nl2-t": opts.id });
+                wrap.addEventListener("mouseover", (e) => {
+                    const el = e.target && e.target.closest ? e.target.closest("[data-tauto]") : null;
+                    if (!el || !wrap.contains(el))
+                        return;
+                    const t = (el._nl2Tip && el._nl2Row ? el._nl2Tip(el._nl2Row) || "" : "") || (el.scrollWidth > el.clientWidth ? el.textContent.trim() : "");
+                    if (el.dataset.tipT !== t) {
+                        el.dataset.tipT = t;
+                        NL.tip && NL.tip(el, t);
+                    }
+                }, true);
                 const table = H("table", { class: "nl2-t-tbl nl2-tbl" + (opts.subFill ? " nl2-t-subfill" : "") });
                 if (act)
                     table.style.setProperty("--nl2-t-btnw", (act.w || 110) + "px");
@@ -49971,11 +49981,16 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                             location.assign(row.link); });
                         td.replaceChildren(inner);
                     }
-                    const own = row.tips && row.tips[c.k];
-                    const tip = own || (!c.wrap && td.scrollWidth > td.clientWidth ? td.textContent.trim() : "");
-                    if (td.dataset.tipT !== tip) {
-                        td.dataset.tipT = tip;
-                        NL.tip && NL.tip(td, tip);
+                    const own = row.tips && row.tips[c.k] || "";
+                    if (own || c.wrap) {
+                        if (td.dataset.tauto)
+                            delete td.dataset.tauto;
+                    }
+                    else if (td.dataset.tauto !== "1")
+                        td.dataset.tauto = "1";
+                    if (td.dataset.tipT !== own) {
+                        td.dataset.tipT = own;
+                        NL.tip && NL.tip(td, own);
                     }
                 }
                 function makeRow(row) {
@@ -50072,9 +50087,17 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                                 b.textContent = lab;
                             if (b.disabled === en)
                                 b.disabled = !en;
-                            if (b.dataset.tipT !== (tip || (a.icon ? lab : ""))) {
-                                b.dataset.tipT = tip || (a.icon ? lab : "");
-                                NL.tip && NL.tip(b, tip || (a.icon || b.scrollWidth > b.clientWidth ? lab : ""));
+                            const bt = tip || (a.icon ? lab : "");
+                            b._nl2Tip = a.tip || null;
+                            if (bt) {
+                                if (b.dataset.tauto)
+                                    delete b.dataset.tauto;
+                            }
+                            else if (b.dataset.tauto !== "1")
+                                b.dataset.tauto = "1";
+                            if (b.dataset.tipT !== bt) {
+                                b.dataset.tipT = bt;
+                                NL.tip && NL.tip(b, bt);
                             }
                         });
                         shownMax = Math.max(shownMax, nShow);

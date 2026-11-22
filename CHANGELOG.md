@@ -2,6 +2,14 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.155 · Nov 22, 2026
+
+**🚀 Performance**
+- Big tables no longer freeze while they redraw: a 2,000-row table now redraws in a blink instead of about 27 seconds, and the Galaxy table finishes loading (GL-410)
+
+**🪐 Planets**
+- Recycling compare shows the cost difference with the right sign and colour (RE-046)
+
 ## v0.5.154 · Nov 22, 2026
 
 **🪐 Planets**
@@ -248,29 +256,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🪐 Planets**
 - Fleet on Planet: Repair (N) / Maintain (N) and "N dmg" are back (SH-064); Good / Bad against show whole names that fit, then +N, full list on hover with bold names (SH-065); Built at moves to the end (SH-066)
-
-## v0.5.135 · Nov 19, 2026
-
-**🎨 Tables**
-- Most tables now use our shared table look: Fleet Active, Stations, Transfer, Unsupplied, the PVP tabs, Pirates reports, Debris, Wormholes, Pirates/Surveys/Debris, Mining, Survey and Ruins, Galaxy, Research, Buildings, Command Center Resources, Moon Scans and Market Open Orders (FL-466, FL-467, FL-468, FL-469, FL-470, FL-471, FL-472, FL-473, FL-474, FL-475, FL-476, FL-477, FL-478, GA-009, RE-038, BU-040, EM-038, GL-354, GL-353)
-- Style check for new tables (GL-351)
-
-**🛰 Fleet dialogs**
-- Fill cargo button on Fleet > Dispatch: fills by RSS weight, highest first, and Hydrogen keeps the trip's fuel (FL-482)
-- One launch sound per launch, no double sound on moon deliveries (FL-483)
-- Salvage Patrol Route target sits under Source and hides for Planet and System (FL-480, FL-484)
-
-**🛡 Banner and Inbound**
-- Leader HP bubble when the command vessel is damaged: yellow under 50%, red under 25% (GL-356)
-- Inbound fleets shows a red Overflow row for anything that would go over storage (GL-357)
-
-**🪐 Planets**
-- Fleet on Planet Good / Bad against shows the top 3, the rest on hover (SH-062); Repair (n) and Maintain (n) (SH-060, SH-061); Crushes bold again (SH-063)
-- Buildings Table View drops the "ROI " label (BU-041)
-- One shipyard listener, no visible change (SH-052)
-
-**🌙 Moons**
-- Moon Buildings Table View: no clock in Time (MO-059); Effect energy shows the next level's change (MO-060)
-
-**🔔 Badges**
-- Badges clear the moment you act; the Patrol slot badge follows the game's capacity (GL-355, FL-479, FL-481)
