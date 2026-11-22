@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.152
+// @version      0.5.153
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.152", features: [] };
+    const NL = window.__nl2 = { version: "0.5.153", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -9021,7 +9021,7 @@
                     const list = f && (Array.isArray(f) ? f : Array.isArray(f.fleet) ? f.fleet : Array.isArray(f.ships) ? f.ships : null);
                     if (!list)
                         return null;
-                    let ships = list.some((s) => s && n(s.quantity) + n(s.damagedQuantity) > 0);
+                    let ships = list.some((s) => s && n(s.quantity) > 0);
                     const lead = data(/^\/api\/leadership$/), v = lead && lead.unlocked !== false && lead.vessel;
                     if (v && !v.assignedMissionId && !/refit|repair/i.test(String(v.status || ""))) {
                         if (l.type === "planet" && v.currentPlanetId != null && +v.currentPlanetId === l.id && !v.currentMoonId)
@@ -47130,6 +47130,7 @@
                 tasksBoot(); },
         });
         NL.moScanTbl = true;
+        NL.gl408 = true;
         NL.taskData = NL.taskData || { snap: null, subs: [], sub(fn) { this.subs.push(fn); if (this.snap) {
                 try {
                     fn(this.snap);
@@ -48646,9 +48647,10 @@
                             st.est = null;
                             check();
                             msg.textContent = "Loading ships\u2026";
-                            const f = S.d.fleet[st.src], y = await getJson("/api/planets/" + st.src + "/shipyard", { user: true });
+                            const [y, fr] = await Promise.all([getJson("/api/planets/" + st.src + "/shipyard", { user: true }), NL.gl408 === false ? null : getJson("/api/planets/" + st.src + "/fleet", { user: true, force: true })]);
                             if (tok !== st.token || !ov.isConnected)
                                 return;
+                            const f = fr && Array.isArray(fr.fleet) ? fr : S.d.fleet[st.src];
                             for (const c of CARRIERS) {
                                 const e = ((f && f.fleet) || []).find((x) => x.definition && x.definition.key === c.key);
                                 const sd = y && Array.isArray(y.ships) ? y.ships.find((s) => s.key === c.key) : null;

@@ -2,6 +2,14 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.153 · Nov 22, 2026
+
+**🛰 Fleet**
+- The send dialog reads the source planet's fleet fresh, so it no longer says "0 of N needed" when ships are there (GL-408)
+
+**⚙️ Other**
+- The attack line counts only working ships; damaged ships in Repair or Maintain don't count (GL-409)
+
 ## v0.5.152 · Nov 22, 2026
 
 **🛰 Fleet**
@@ -284,26 +292,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 **📊 Market and Empire**
 - Hub Inventory hides resources with 0 (GL-350)
 - Empire Resources totals in neutral colours, Total set apart (EM-037)
-
-## v0.5.133 · Nov 19, 2026
-
-**🛰 Fleet dialogs**
-- Galactic Highway checkbox (unchecked by default) on every launch that the game lets use it: deliveries, Evacuate, Move out / Supply, moon sends, Mining, station and debris collects, attacks (FL-457)
-- Launch dialogs open at once with "Loading…", and closing while loading cancels (FL-456)
-- PVP attack dialog runs on the shared launch dialog; the old one stays behind a switch for a week (FL-439)
-- Every click shows something: Expeditions and Patrol Launch buttons keep working through refreshes, "Still loading planets…" instead of nothing (FL-456)
-
-**🪐 Planets**
-- Fleet on Planet columns, with ship-vs-ship matchups from Fleet Simulation and a flat Table View (SH-047, SH-048, SH-049, SH-050)
-
-**⛏ Mining and PVE**
-- Salvage Patrol capability readout (FL-455)
-- Stations cleanup in Transfer, PVE and Stations, no visible change (FL-443, FL-444, FL-446, FL-447, FL-448)
-
-**🌙 Moons**
-- Moon Evacuate and Call Ships keep capitals out of Sentinel space, like the other launches (MO-055)
-
-**🔔 Messages and under the hood**
-- Unread badges on the Messages page Players and System sub-tabs (GL-343)
-- S0: requests we cancel are no longer logged, slow reads log as "timeout" (GL-344)
-- New style rule: buttons built inside HTML strings are flagged (FL-456)
