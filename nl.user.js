@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.151
+// @version      0.5.152
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.151", features: [] };
+    const NL = window.__nl2 = { version: "0.5.152", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -7417,6 +7417,9 @@
                     { re: /^\/api\/outposts\/(\d+)\/relocate$/, reads: () => ["/api/outposts"] },
                     { re: /^\/api\/buildings\/planets\/(\d+)\/buildings\/\d+\/repair$/, reads: (m) => ["/api/planets/" + m[1]] },
                     { re: /^\/api\/artifacts\/\d+\/study$/, reads: () => ["/api/artifacts"] },
+                    { re: /^\/api\/artifacts\/trader\/summon$/, wait: 300, fresh: true, reads: () => ["/api/artifacts/trader"] },
+                    { re: /^\/api\/artifacts\/\d+\/(activate|deactivate)$/, wait: 300, reads: () => ["/api/artifacts"] },
+                    { re: /^\/api\/research\/[^/]+\/start$/, reads: () => ["/api/planets/activity-summary"] },
                     { re: /^\/api\/logistics\/routes$/, reads: () => ["/api/logistics/routes"] },
                     { re: /^\/api\/rogue-bases\/\d+\/(attack|abandon)$/, reads: () => ["/api/rogue-bases"] },
                     { re: /^\/api\/xeno\/reports\/read$/, reads: () => ["/api/xeno"] },
@@ -7438,8 +7441,15 @@
                         for (const p of r.reads(m)) {
                             if (due[p])
                                 continue;
-                            due[p] = setTimeout(() => { delete due[p]; if (!(seen[p] > at))
-                                NL.getJson(p, ctx); }, 1200);
+                            due[p] = setTimeout(() => {
+                                delete due[p];
+                                if (seen[p] > at)
+                                    return;
+                                if (r.fresh)
+                                    fetch(p, { credentials: "include", headers: { Accept: "application/json", "x-bypass-read-cache": "1" } }).catch(() => { });
+                                else
+                                    NL.getJson(p, ctx);
+                            }, r.wait != null ? r.wait : 1200);
                         }
                     });
                 }
@@ -9013,7 +9023,7 @@
                         return null;
                     let ships = list.some((s) => s && n(s.quantity) + n(s.damagedQuantity) > 0);
                     const lead = data(/^\/api\/leadership$/), v = lead && lead.unlocked !== false && lead.vessel;
-                    if (v && !v.assignedMissionId) {
+                    if (v && !v.assignedMissionId && !/refit|repair/i.test(String(v.status || ""))) {
                         if (l.type === "planet" && v.currentPlanetId != null && +v.currentPlanetId === l.id && !v.currentMoonId)
                             ships = true;
                         if (l.type === "moon" && v.currentMoonId != null && +v.currentMoonId === l.id)
@@ -17947,7 +17957,12 @@
       .nl2-gf td.nl2-gf-est{font-style:italic}
       .nl2-gf tr.nl2-gf-bad td{color:#f87171}
       .nl2-gf tr.nl2-gf-sent td{opacity:.55}
-      .nl2-gf tr.nl2-gf-total td{color:#fbbf24;font-weight:600}
+      .nl2-gf tr.nl2-gf-total td{color:var(--nl2-amber,#fbbf24);font-weight:600}
+      .nl2-gf td.nl2-gf-c{background:rgba(255,255,255,.04)}
+      .nl2-gf td.nl2-gf-cl{border-left:2px solid color-mix(in srgb,var(--nl2-head,#8fb3d9) 40%,transparent)}
+      .nl2-gf td.nl2-gf-cr{border-right:2px solid color-mix(in srgb,var(--nl2-head,#8fb3d9) 40%,transparent)}
+      .nl2-gf td.nl2-gf-ct{border-top:2px solid color-mix(in srgb,var(--nl2-head,#8fb3d9) 40%,transparent)}
+      .nl2-gf td.nl2-gf-cb{border-bottom:2px solid color-mix(in srgb,var(--nl2-head,#8fb3d9) 40%,transparent)}
       .nl2-gf .nl2-gf-msg{text-align:left;max-width:220px;overflow:hidden;text-overflow:ellipsis;font-size:13px}
       .nl2-gf .nl2-gf-go{padding:3px 12px;border-radius:4px;font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer;text-align:center}
       .nl2-gf .nl2-gf-none{margin:12px 0;color:var(--text-muted,#9fb3d1)}
@@ -18178,7 +18193,7 @@
                         r.xb = xb;
                         tr.append(NL.h("td", { class: "nl2-gf-place nl2-gf-px" }, NL.h("div", { class: "nl2-gf-pc" }, NL.h("span", { class: "nl2-gf-pn", "data-nl2-tip": label }, plink(r.name, r.moon), r.moon ? " (moon)" : ""), xb)));
                         for (const c of cols) {
-                            const have = r.have[c.key] || 0, td = NL.h("td");
+                            const have = r.have[c.key] || 0, td = NL.h("td", { class: "nl2-gf-c" });
                             if (!have)
                                 td.append("\u2014");
                             else {
@@ -18211,6 +18226,18 @@
                     totTr.append(NL.h("td"), NL.h("td"), NL.h("td"), NL.h("td"), NL.h("td"));
                     if (rows.length > 1)
                         tbl.append(totTr);
+                    const bodyTrs = rows.map((r) => r.tr);
+                    bodyTrs.forEach((tr, i) => {
+                        const cs = tr.querySelectorAll(":scope > td.nl2-gf-c");
+                        if (!cs.length)
+                            return;
+                        cs[0].classList.add("nl2-gf-cl");
+                        cs[cs.length - 1].classList.add("nl2-gf-cr");
+                        if (i === 0)
+                            cs.forEach((x) => x.classList.add("nl2-gf-ct"));
+                        if (i === bodyTrs.length - 1)
+                            cs.forEach((x) => x.classList.add("nl2-gf-cb"));
+                    });
                     function paintCell(r, c) { const inp = r.cells[c.key]; if (!inp)
                         return; inp.value = String(r.val[c.key]); inp.classList.toggle("nl2-gf-ed", r.ed.has(c.key)); }
                     function paintTotal() { for (const c of cols) {
@@ -20408,12 +20435,23 @@
                                 continue;
                             const c = capFleet(pid);
                             if (!c || Date.now() - c.at > 60000) {
+                                const t0 = Date.now();
+                                let j;
                                 try {
-                                    await read("/api/planets/" + pid + "/fleet");
+                                    j = await read("/api/planets/" + pid + "/fleet");
                                 }
                                 catch (err) {
                                     continue;
                                 }
+                                for (let i = 0; i < 40; i++) {
+                                    const n = capFleet(pid);
+                                    if (n && n.at >= t0)
+                                        break;
+                                    await flSleep(50);
+                                }
+                                const n = capFleet(pid);
+                                if ((!n || n.at < t0) && j && NL._put)
+                                    NL._put("/api/planets/" + pid + "/fleet", j);
                                 NL._kick();
                             }
                             for (let pass = 0; pass < 2; pass++) {
@@ -31198,6 +31236,13 @@
                 const nearV = (kind, o) => { const n = NL.pve && NL.pve.near ? NL.pve.near(kind, o) : null; return { near: n ? n.name : "\u2013", dist: n ? Math.round(n.dist) + " ly" : "\u2013", distN: n ? n.dist : Infinity }; };
                 const NEAR_COLS = [{ k: "near", l: "Nearest Planet", w: 140, cell: (x) => (x.vals.near && x.vals.near !== "\u2013" ? NL.planetLink(x.vals.near) : "\u2013") }, { k: "dist", l: "Distance", w: 90 }];
                 const ACT = (k, label, o) => ({ k, label, cls: "nl2-t-b-info", ...o });
+                NL.svTrash = true;
+                const TRASH = () => {
+                    const d = document.createElement("span");
+                    d.className = "nl2-t-ic";
+                    d.innerHTML = "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 6h18\"/><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"/><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"/><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"/><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"/></svg>";
+                    return d;
+                };
                 const gameClick = (g) => { if (g) {
                     g.click();
                     NL._kick();
@@ -31286,6 +31331,20 @@
                                         }) }],
                             } : null });
                     });
+                NL.svNoOldest = true;
+                if (NL.svNoOldest)
+                    NL.css("sv-no-oldest", ".surveys-tab .survey-oldest-action{display:none!important}");
+                if (NL.svNoOldest)
+                    NL.watch(".surveys-tab", (tab) => {
+                        const RE = /^\s*oldest available anomaly\s*$/i, hit = (el) => !el.hidden && !el.closest("table, .nl2-fpl, .survey-oldest-action") && RE.test(el.textContent || "");
+                        let els = [...tab.querySelectorAll("button, a")].filter(hit);
+                        if (!els.length)
+                            els = [...tab.querySelectorAll("span, div")].filter((x) => x.children.length <= 3 && (x.textContent || "").length < 40 && hit(x)).slice(0, 1);
+                        for (const t of els) {
+                            t.hidden = true;
+                            t.style.setProperty("display", "none", "important");
+                        }
+                    });
                 if (NL.fl168)
                     NL.watch(".surveys-tab", (tab) => {
                         if (!NL.pve || !NL.pve.open)
@@ -31315,7 +31374,7 @@
                         const rested = tab.querySelector(".survey-reports-heading .anomaly-rested-status");
                         place(tab, list, "inv", { one: true, open: true, info: rows.length + (openOnly ? " open" : "") + " of " + all.length, title: NL.fl195 ? "Investigate" : "", note: NL.fl195 && rested ? (rested.textContent || "").replace(/\s+/g, " ").trim() : "", sig: rows.map((r) => [r.o.id, r.anom, r.fr, r.gs.length, left(r.exp), r.age, r.sent, nearSig("inv", r.o)].join(":")).join(","), build: () => table(["Location", "Result", "Zone", "Expires", "Age", "Nearest Planet", "Distance", ""], ["110px", "", "90px", "90px", "90px", "140px", "90px", "200px"], rows.map((r) => NL.h("tr", { class: r.sent ? "nl2-fpl-sent" : null }, NL.h("td", null, r.o.systemName || dash()), NL.h("td", { title: r.title, class: r.anom ? "nl2-fpl-y" : null }, r.title || dash(), r.gs.length ? NL.h("span", { class: "nl2-fpl-r" }, " \u00B7 guarded") : ""), NL.h("td", null, r.o.securityZone || dash()), NL.h("td", null, r.exp ? left(r.exp) : dash()), NL.h("td", null, r.age || dash()), ...nearCells("inv", r.o), NL.h("td", { class: "nl2-fpl-act" }, gameBtn(r.del), act(r)))), openOnly ? "No open anomalies or freight." : "No survey reports."), tbl: shared() ? {
                                 opts: { id: "fl-surveys", cols: [{ k: "loc", l: "Location", w: 110, name: true, cell: (x) => zoneSys(x.r.o, x.r.o.systemName) }, { k: "res", l: "Result", w: "flex", cell: (x) => (x.r.gs.length ? NL.h("span", null, x.r.title || "\u2013", NL.h("span", { class: "nl2-t-bad" }, " \u00B7 guarded")) : x.r.title || "\u2013") }, { k: "zone", l: "Zone", w: 90 }, { k: "exp", l: "Expires", w: 90 }, { k: "age", l: "Age", w: 90 }, ...NEAR_COLS], actions: { w: 130, list: [
-                                            ACT("del", "Delete", { cls: "nl2-t-b-bad", show: (x) => !!x.r.del, run: (x) => gameClick(x.r.del) }),
+                                            ACT("del", "Delete", { cls: "nl2-t-b-bad", icon: NL.svTrash ? TRASH : undefined, show: (x) => !!x.r.del, run: (x) => gameClick(x.r.del) }),
                                             ACT("inv", "Investigate", { show: (x) => x.r.anom, label: (x) => (x.r.sent ? "Sent" : "Investigate"), enabled: (x) => !x.r.sent, tip: (x) => (x.r.sent ? "Our investigators are on the way" : ""), run: (x) => { const oc = x.one; if (oc && NL.fl226 && NL.pve.invClick) {
                                                     NL.pve.invClick(x.r.o.id);
                                                     NL._kick();

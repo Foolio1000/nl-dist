@@ -2,6 +2,19 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.152 · Nov 22, 2026
+
+**🛰 Fleet**
+- Surveys: the "Oldest available anomaly" pill is hidden, and Delete is a red trash icon (FL-564, FL-565)
+- Bulk need no longer misses a fleet read that finishes just as it checks (FL-563)
+
+**🪐 Planets**
+- Gather Fleets: a box frames the ship count cells (SH-076)
+
+**⚙️ Other**
+- The attack line ignores a leader vessel that is refitting or repairing (GL-405)
+- The "Trader: summon ready" badge clears right after you summon, and artifact or research changes update their badges at once (GL-406, GL-407)
+
 ## v0.5.151 · Nov 22, 2026
 
 **🛰 Fleet**
@@ -294,31 +307,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 - Unread badges on the Messages page Players and System sub-tabs (GL-343)
 - S0: requests we cancel are no longer logged, slow reads log as "timeout" (GL-344)
 - New style rule: buttons built inside HTML strings are flagged (FL-456)
-
-## v0.5.132 · Nov 18, 2026
-
-**🛰 Fleet dialogs**
-- Patrol config dialog: template ships move up out of the folded list, no resizing or bouncing after Launch, template dialogs use the wide size (FL-436, FL-437)
-- Cancel, × and Esc always close a launch dialog, and a second open no longer stacks a dialog (FL-452)
-- Every dialog section folds, with a grey bar behind each heading (FL-453)
-- Number boxes at the dialog text size, no sideways scroll (FL-454)
-
-**⛏ Mining and PVE**
-- A fleet slot failure no longer hides the belt (FL-438)
-- Expedition dialog closes after the second launch (FL-451)
-
-**🔔 Badges**
-- Fleet menu badge adds the game's Genesis and Xenoarchaeology tab badges, with hover lines and tab clicks (FL-450)
-
-**🛡 Station Operations**
-- Defense2 notes match the Scouts needed math; unknown enemy ship types show Scouts needed in italics with a hover naming them; our defenders valued the same way (GL-337, GL-338, GL-339)
-- One shared capitals list for Defense2, launch dialogs and the Fleet tables (GL-340)
-
-**🚚 Transfer and Stations**
-- Transfer pause state has one home, shared with Stations (FL-445, FL-449)
-
-**🪐 Planets**
-- All button shows only "n/m" while loading (SH-046)
-
-**🔧 Under the hood**
-- ESLint cleanup in Core's files (GL-335, part)
