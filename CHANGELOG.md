@@ -2,6 +2,19 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.150 · Nov 22, 2026
+
+**🚑 Hotfix**
+- Shipyard and other table pages no longer stutter: the weapon and armor pills stopped rewriting a shared stylesheet many times a second (GL-402)
+
+**🛰 Fleet**
+- PVP Attack: a Raid needs only Assault Shuttles, and opening Attack from a PVP row no longer fills cargo ships (FL-549, FL-550)
+- PVP target table uses the standard fonts (FL-556)
+- Genesis tab badge counts new reports, the same as the menu (FL-557)
+
+**🪐 Planets**
+- Bulk need retries a failed fuel estimate and explains on hover when it can't (FL-548)
+
 ## v0.5.149 · Nov 21, 2026
 
 **🛰 Fleet**
@@ -321,28 +334,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 - Build runs an ESLint check, warnings only (GL-094); escaping audit found nothing unescaped (GL-092)
 - Message quiet uses the shared game socket feed (GL-310)
 - Tracker sweep (GL-083) and a test update (RE-035)
-
-## v0.5.130 · Nov 18, 2026
-
-**🛰 Fleet**
-- Evacuate leaves capital ships home for Sentinel targets and warns you (FL-413); launch dialogs show a red line and keep Launch off when capitals are picked for a ruled target (FL-415)
-- Every launch dialog (Transfer, Moons, Outposts, Evacuate, Defense2, Quick Spy, delivery) has the standard summary rows and a Launch button (FL-429)
-- New Xenoarchaeology tab right of Ruins (FL-424) and Genesis tab after Expeditions, with tabs sized to their text (FL-425)
-- Transfer routes have Pause / Resume (FL-426); Active looks right again after being away (FL-431)
-- Shared cargo rule everywhere, so transport shuttles get their cargo bonus (GL-328)
-
-**⛏ Mining and PVE**
-- Expeditions line updates as soon as you launch; the dialog stays open while a slot is free (FL-423)
-- Hacker Ships in the Salvage Patrol dialog (FL-416)
-
-**⚔️ PVP and Intel**
-- A sleep-shield refusal from any launch fills in the target's Shield end (FL-406)
-- Attack line adds the planet's order reserves (GL-332); spy reports count order goods (FL-414)
-- Combat Simulator: ships available, Max and Clear per side (OV-021)
-- Cleanup: old switches and guesses removed, report helpers in their own module (FL-407, FL-408, FL-409, GL-329)
-
-**🛡 Station Operations**
-- From 24 Nov, Defend and Reinforce leave out Dreadnought, Titan and Arc Titan (GL-331)
-
-**🌙 Moons and look**
-- Moon Power box text in the normal font (MO-054); one shared "launched" signal for sounds and refreshes (GL-333)
