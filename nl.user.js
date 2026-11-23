@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.155
+// @version      0.5.156
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.155", features: [] };
+    const NL = window.__nl2 = { version: "0.5.156", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -37598,6 +37598,15 @@
                     const area = () => document.querySelector(".galaxy-page .galaxy-map-area");
                     host.append(NL.h("div", { class: "nl2-ga-tabs", role: "tablist" }, NL.h("button", { type: "button", class: "galaxy-btn", "data-v": "galaxy", onclick: () => setView(area(), "galaxy") }, "Galaxy"), NL.h("button", { type: "button", class: "galaxy-btn", "data-v": "table", onclick: () => setView(area(), "table") }, "Table")), NL.h("span", { class: "nl2-ga-from" }));
                 }
+                let sysMemo = null;
+                const sysRowsCached = (P, F, inf) => {
+                    const k = [P.systems, P.userSystemIds, P.hubPositions, P.stationMarkers, F && F.stationMarkers, P.wormholes, P.systemDebris, P.activeSystemId, inf, inf && inf.at];
+                    if (sysMemo && sysMemo.k.length === k.length && sysMemo.k.every((x, i) => x === k[i]))
+                        return sysMemo.rows;
+                    const rows = gaSystemRows(P, F, inf);
+                    sysMemo = { k, rows };
+                    return rows;
+                };
                 NL.watch(".galaxy-page .galaxy-map-area", (area) => {
                     if (area.getAttribute("data-nl2-ga") !== view)
                         area.setAttribute("data-nl2-ga", view);
@@ -37625,7 +37634,7 @@
                         readInfo();
                     if (!cols.some(([k]) => k === sort.k))
                         sort = { k: "dist", d: 1 };
-                    const rows = any ? gaRows(pr.P, pr.F) : gaSystemRows(pr.P, pr.F, info), from = fromPlanet();
+                    const rows = any ? gaRows(pr.P, pr.F) : sysRowsCached(pr.P, pr.F, info), from = fromPlanet();
                     const sig = (from && from.name) + "|" + selId + "|" + any + "|" + reading + "|" + (info && info.at) + "|" + sort.k + sort.d + "|" + pr.P.activeSystemId + "|" + rows.length + "|"
                         + (any ? rows.map((r) => [r.kind, r.name, r.system, r.detail, r.dist].join("\u0001")).join("\u0002") : pr.P.systems.length);
                     if (sig === lastSig && panel.firstChild)
@@ -49654,6 +49663,7 @@ table.nl2-t-tbl tr.nl2-t-det button.nl2-t-b-ok,table.nl2-t-tbl .nl2-t-ctl button
 table.nl2-t-tbl td.nl2-t-act>button:disabled{opacity:1;cursor:not-allowed;border-color:#2a3446;background:rgba(120,130,150,.12);color:#6b7686}
 table.nl2-t-tbl tr.nl2-t-sec>td{height:auto;padding:20px 8px 10px;border-left:0;background:none;cursor:pointer;user-select:none;font:700 13px Rajdhani,"Exo 2",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--nl2-t-c)}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-bar{display:inline-block;width:3px;height:14px;margin-right:8px;vertical-align:-2px;background:var(--nl2-t-c);border-radius:1px}
+table.nl2-t-tbl tr.nl2-t-vsp>td{padding:0!important;border:0!important;background:none!important;height:inherit}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-chev{display:inline-block;width:12px;font-size:11px}
 table.nl2-t-tbl tbody:first-of-type>tr.nl2-t-sec:first-child>td{padding-top:12px} 
 .nl2-t-slots{display:flex;align-items:center;overflow:hidden;gap:14px}
@@ -49722,6 +49732,7 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                     return 1;
                 return String(a == null ? "" : a).localeCompare(String(b == null ? "" : b), undefined, { numeric: true, sensitivity: "base" });
             };
+            const VMAX = 1000, VBUF = 40;
             function mount(host, opts) {
                 css();
                 const store = NL.store ? NL.store("nl2.tbl." + opts.id + ".") : { get: (k, d) => d, set() { } };
@@ -50177,6 +50188,25 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                 table.addEventListener("pointerdown", (e) => { secDown = e.button === 0 ? secOf(e) : null; });
                 table.addEventListener("pointerup", (e) => { const d = secDown; secDown = null; if (d == null || e.button !== 0 || secOf(e) !== d)
                     return; secUpAt = Date.now(); toggleSec(d); });
+                let vRaf = 0;
+                const vScroll = () => {
+                    if (vRaf || !wrap.isConnected)
+                        return;
+                    vRaf = requestAnimationFrame(() => {
+                        vRaf = 0;
+                        if (held || !last)
+                            return;
+                        for (const b of bodies.values()) {
+                            if (!b.vrows || !b.vopen)
+                                continue;
+                            const rh = b.rowH || 33, top = b.tb.getBoundingClientRect().top + (b.head ? b.head.offsetHeight : 0), vh = window.innerHeight || 900;
+                            const i0 = Math.max(0, Math.min(b.vrows.length, Math.floor(-top / rh) - VBUF)), i1 = Math.min(b.vrows.length, Math.max(i0, Math.ceil((vh - top) / rh) + VBUF));
+                            if (Math.abs(i0 - +b.vwin.split(":")[0]) > VBUF / 2 || Math.abs(i1 - +b.vwin.split(":")[1]) > VBUF / 2)
+                                return render0(last, lastOpts);
+                        }
+                    });
+                };
+                document.addEventListener("scroll", vScroll, { capture: true, passive: true });
                 function render(sections, ropts) {
                     if (held || !anchor || Date.now() - anchor.at > 4000 || !wrap.isConnected)
                         return render0(sections, ropts);
@@ -50280,7 +50310,41 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                         }
                         const keep = new Set();
                         let at = b.head, z = 0;
-                        for (const row of rows) {
+                        const virt = open && opts.virtual !== false && rows.length > VMAX && !rows.some((r) => r.detail && isOpen(r));
+                        b.vrows = virt ? rows : null;
+                        b.vopen = open;
+                        let i0 = 0, i1 = !open && rows.length > VMAX ? 0 : rows.length;
+                        if (virt) {
+                            const rh = b.rowH || 33, top = b.tb.isConnected ? b.tb.getBoundingClientRect().top + (b.head ? b.head.offsetHeight : 0) : 0, vh = window.innerHeight || 900;
+                            i0 = Math.max(0, Math.min(rows.length, Math.floor(-top / rh) - VBUF));
+                            i1 = Math.min(rows.length, Math.max(i0, Math.ceil((vh - top) / rh) + VBUF));
+                            b.vwin = i0 + ":" + i1;
+                            if (!b.vtop) {
+                                b.vtop = H("tr", { class: "nl2-t-vsp" }, H("td", { colspan: String(nCells) }));
+                                b.vbot = H("tr", { class: "nl2-t-vsp" }, H("td", { colspan: String(nCells) }));
+                            }
+                            const h0 = i0 * rh + "px", h1 = (rows.length - i1) * rh + "px";
+                            if (b.vtop.style.height !== h0)
+                                b.vtop.style.height = h0;
+                            if (b.vbot.style.height !== h1)
+                                b.vbot.style.height = h1;
+                            if (at ? at.nextSibling !== b.vtop : b.tb.firstChild !== b.vtop) {
+                                if (at)
+                                    at.after(b.vtop);
+                                else
+                                    b.tb.prepend(b.vtop);
+                            }
+                            at = b.vtop;
+                            z = i0;
+                        }
+                        else if (b.vtop) {
+                            b.vtop.remove();
+                            b.vbot.remove();
+                            b.vtop = b.vbot = null;
+                            b.vwin = null;
+                        }
+                        for (let ri = i0; ri < i1; ri++) {
+                            const row = rows[ri];
                             keep.add(String(row.key));
                             let tr = b.rows.get(String(row.key));
                             if (!tr) {
@@ -50318,6 +50382,15 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                             else if (det) {
                                 det.remove();
                                 tr._nl2Det = null;
+                            }
+                        }
+                        if (virt) {
+                            if (at.nextSibling !== b.vbot)
+                                at.after(b.vbot);
+                            if (!b.rowH && i1 > i0) {
+                                const h = b.rows.get(String(rows[i0].key)).getBoundingClientRect().height;
+                                if (h > 0)
+                                    b.rowH = h;
                             }
                         }
                         for (const [k, tr] of b.rows)
@@ -50394,7 +50467,7 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                         pending = false;
                         render(last, lastOpts);
                     } },
-                    destroy() { clearTimeout(minT); document.removeEventListener("click", outside, true); closeMenu(); wrap.remove(); },
+                    destroy() { clearTimeout(minT); document.removeEventListener("click", outside, true); document.removeEventListener("scroll", vScroll, true); closeMenu(); wrap.remove(); },
                 };
             }
             const iconNum = (ic, v, o) => { const s = H("span", { class: "nl2-t-in" }); const n = iconNode(ic); if (n)
