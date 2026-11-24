@@ -1,5 +1,22 @@
 # Release notes archive
 
+## v0.5.137 · Nov 20, 2026
+
+**🔧 Hotfix**
+- Buildings table no longer jumps and redraws on load; the Table View checkbox stays put (BU-042)
+
+**🎨 Look**
+- Emphasis is colour and weight, never a bigger size: launch dialog Travel and Hydrogen, the Fleet Slots strip and the moon queue banner keep the text size around them, still bold; the PVE Fleet Slots line and Launch button too (FL-492, GL-364, GL-365, FL-493)
+- Season colour presets: game default plus Navy, Crimson, Forest, Royal Purple and Amber; Custom still works (GL-366)
+
+**🪐 Planets**
+- Fleet on Planet Ship column drops "N dmg"; the count stays on the Repair / Maintain button (SH-067)
+- Research table: branch square and Effects pills styled again, no background bleed under the last row (RE-039, RE-040, RE-041); ROI values keep the text size around them
+
+**📊 Tables**
+- Tables use 14px text and 12.8px headers, Fleet > Active details and the Shipyard and Buildings grids included (GL-367, SH-068)
+- After a click the clicked row stays in place and the table doesn't jump for 2 seconds (GL-368); Buildings Building and Queued rows are highlighted again (BU-043)
+
 ## v0.5.136 · Nov 20, 2026
 
 **🔗 Planet links**
