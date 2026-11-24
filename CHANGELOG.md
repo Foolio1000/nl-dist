@@ -2,6 +2,19 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.159 · Nov 24, 2026
+
+**✨ New**
+- Market now sits right under Messages in the left menu (GL-417)
+- Command Center > Fleet: a "Highlight under N h" box sets the warning threshold, the Command Vessel box is hidden, and a ★ marks the leader's planet (EM-048, EM-049, EM-050)
+- Gather Fleets lists moons in their own collapsible Moons section (SH-079)
+- Wandering Trader > Modules: a sticky Equipped column and a slot label on each card, with no hover popup (RE-047, RE-048)
+- Mining resource pills each get their own colour, plus a 16x chip (FL-573, FL-575)
+- Genesis Bases: Tunnels column widened, and sectors show short names such as G17, with the full name on hover (FL-568, GL-411)
+
+**🐞 Fixes**
+- Bring missing resources, then picking a hub, fills only the missing resources in Market's Pickup, never every resource (GL-435)
+
 ## v0.5.158 · Nov 24, 2026
 
 **✨ New**
@@ -233,24 +246,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🔧 Under the hood**
 - One shared attribute helper replaces 9 copies, no visible change (GL-347)
-
-## v0.5.139 · Nov 20, 2026
-
-**🔊 Sound**
-- One click sound per click: buttons that hand your click on to the game's own button no longer click twice (GL-375)
-
-**🛰 Fleet dialogs**
-- Launch summaries show Travel "time (arrival UTC)" and, for return trips, Trip Time "time (home UTC)", bold blue; estimates in italic (FL-504)
-- Mining launch notes: no trip breakdown; Worst loss and Last raid on their own lines (FL-503)
-
-**⛏ Mining and PVE**
-- The 1x/2x/4x/8x multiplier is remembered per resource (FL-502)
-- PVE pill digits are centred (FL-499)
-
-**🎨 Tables**
-- System cells show a zone pill across PVP, Galaxy, PVE and Stations tables (GL-373, FL-496, FL-497, FL-498)
-- Unread reports use the standard unread row (GL-372, FL-494, FL-495)
-
-**⚔️ PVP**
-- PVP Targets: Player first, and a new Closest column (FL-500)
-- Quick Spy: Spy and Stealth en route pills in yellow (FL-501)
