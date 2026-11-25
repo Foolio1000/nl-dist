@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.160
+// @version      0.5.161
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.160", features: [] };
+    const NL = window.__nl2 = { version: "0.5.161", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -572,6 +572,7 @@
         return ks.map((x) => x[0]);
     };
     NL.storeFull = false;
+    NL.storeBigMax = 1000000;
     NL.storeSet = (key, str) => {
         try {
             localStorage.setItem(key, str);
@@ -581,6 +582,14 @@
             if (NL.storeSafe === false)
                 return false;
             const quota = e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014);
+            if (quota && NL.storeBigMax > 0 && str.length > NL.storeBigMax) {
+                try {
+                    localStorage.removeItem(key);
+                }
+                catch (e2) { }
+                console.warn("[NL] storage: not saved " + key + " (" + str.length + " chars, over the " + NL.storeBigMax + " single-value cap)");
+                return false;
+            }
             if (quota) {
                 const gone = NL.storeEvict(key);
                 try {
@@ -16981,7 +16990,9 @@
                 NL.reCompare = true;
                 let offers = [], eq = {};
                 const isCost = (e) => /cost/i.test(e.label || "") || e.leaderBonus === "fuelCostBonus";
-                const disp = (e) => { let v = Number(e.value) || 0; if (isCost(e))
+                const flip = {};
+                const lowerBetter = (e) => isCost(e) || /\btime\b|^enemy/i.test(e.label || "");
+                const disp = (e) => { let v = Number(e.value) || 0; const f = flip[norm(e.label)]; if (f === undefined ? isCost(e) : f)
                     v = -v; return e.unit === "percent" ? v * 100 : v; };
                 const fmt = (v, e, sign) => { const r = e.unit === "percent" ? Math.round(v * 10) / 10 : Math.round(v); const s = Math.abs(r).toLocaleString("en-US") + (e.unit === "percent" ? "%" : ""); return (r > 0 ? (sign ? "+" : "") : r < 0 ? "-" : (sign ? "\u00B1" : "")) + s; };
                 const ROM = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
@@ -16997,19 +17008,56 @@
                 function redo() { document.querySelectorAll("article.shard-trader-offer[data-nl2-rc]").forEach((c) => c.removeAttribute("data-nl2-rc")); NL._kick && NL._kick(); }
                 const linesOf = (card) => [...card.querySelectorAll(".shard-trader-effects > div")].filter((l) => !l.classList.contains("nl2-rc-own"));
                 const lineText = (l) => norm([...l.childNodes].filter((n) => !(n.classList && n.classList.contains("nl2-rc-d"))).map((n) => n.textContent).join(""));
+                const figOf = (t) => { const m = /^\s*([+\-\u2212]?)([\d.,]+)(%?)/.exec(t || ""); return m ? { neg: m[1] === "-" || m[1] === "\u2212", abs: +m[2].replace(/,/g, ""), pct: !!m[3] } : null; };
+                const STOP = new Set(["attached", "fleet", "leadership", "command", "vessel", "per", "round"]);
+                const words = (s) => norm(s).split(/[^a-z]+/).filter((w) => w.length > 2 && !STOP.has(w));
                 function offerOf(card) {
-                    const ls = linesOf(card).map(lineText);
+                    const ls = linesOf(card);
                     if (!ls.length)
                         return null;
-                    const fits = offers.filter((o) => (o.effects || []).length === ls.length && o.effects.every((e) => ls.some((l) => l.includes(norm(e.label)))));
-                    return fits.find((o) => o.effects.every((e) => ls.some((l) => l.includes(norm(e.label)) && l.replace(/[\s,]/g, "").startsWith(fmt(disp(e), e, true).replace(/,/g, "").toLowerCase().replace(/^±/, ""))))) || (fits.length === 1 ? fits[0] : null);
+                    const fig = ls.map((l) => figOf(lineText(l)));
+                    let best = null;
+                    offers.forEach((o) => {
+                        const fx = o.effects || [];
+                        if (fx.length !== ls.length)
+                            return;
+                        const used = new Set(), pair = new Map();
+                        let score = 0;
+                        for (const e of fx) {
+                            const pct = e.unit === "percent", size = Math.abs(Number(e.value) || 0) * (pct ? 100 : 1), ws = words(e.label);
+                            let pick = -1, pickScore = -1;
+                            ls.forEach((l, i) => {
+                                const f = fig[i];
+                                if (used.has(i) || !f || f.pct !== pct || Math.abs(f.abs - size) > (pct ? 0.051 : 0.51))
+                                    return;
+                                const t = lineText(l), sc = ws.filter((w) => t.includes(w)).length;
+                                if (sc > pickScore) {
+                                    pick = i;
+                                    pickScore = sc;
+                                }
+                            });
+                            if (pick < 0)
+                                return;
+                            used.add(pick);
+                            pair.set(e, ls[pick]);
+                            score += pickScore;
+                        }
+                        if (!best || score > best.score)
+                            best = { o, pair, score };
+                    });
+                    if (!best)
+                        return null;
+                    best.o.effects.forEach((e) => { const f = figOf(lineText(best.pair.get(e))), v = Number(e.value) || 0; if (f && f.abs && v)
+                        flip[norm(e.label)] = f.neg !== (v < 0); });
+                    card._nl2RcPair = best.pair;
+                    return best.o;
                 }
                 function rowsOf(o) {
                     const cur = eq[o.slot], cfx = cur ? cur.effects : [], rows = [];
                     (o.effects || []).forEach((e) => { const c = cfx.find((x) => norm(x.label) === norm(e.label)); const d = disp(e) - (c ? disp(c) : 0); rows.push({ e, c, d, lost: false }); });
                     cfx.forEach((c) => { if (!(o.effects || []).some((e) => norm(e.label) === norm(c.label)))
                         rows.push({ e: c, c, d: -disp(c), lost: true }); });
-                    rows.forEach((r) => { const eps = r.e.unit === "percent" ? 0.05 : 0.5; r.tone = Math.abs(r.d) < eps ? "n" : ((r.d > 0) !== isCost(r.e) ? "g" : "r"); });
+                    rows.forEach((r) => { const eps = r.e.unit === "percent" ? 0.05 : 0.5; r.tone = Math.abs(r.d) < eps ? "n" : ((r.d > 0) !== lowerBetter(r.e) ? "g" : "r"); });
                     return { cur, rows, same: !!cur && cur.key === o.key };
                 }
                 const store = NL.store("re-compare.");
@@ -17087,10 +17135,11 @@
                     const { cur, rows, same } = rowsOf(o), ls = linesOf(card), box = card.querySelector(".shard-trader-effects");
                     if (!box)
                         return;
+                    const pair = card._nl2RcPair || new Map();
                     const trs = rows.filter((r) => !r.lost).map((r) => {
-                        const l = ls.find((x) => lineText(x).includes(norm(r.e.label)));
-                        const v = (l && valOf(l.textContent)) || fmt(disp(r.e), r.e, true);
-                        return H("tr", null, H("td", { class: "nl2-rc-fl" }, r.e.label), H("td", { class: "nl2-rc-fv" }, v), H("td", { class: "nl2-rc-d nl2-rc-" + (same ? "n" : r.tone) }, same ? "equipped" : fmt(r.d, r.e, true)));
+                        const l = pair.get(r.e), txt = l ? l.textContent.trim() : "";
+                        const v = (l && valOf(txt)) || fmt(disp(r.e), r.e, true), lab = (l && txt.replace(/^\s*[+\-\u2212]?[\d.,]+%?\s*/, "")) || r.e.label;
+                        return H("tr", null, H("td", { class: "nl2-rc-fl" }, lab), H("td", { class: "nl2-rc-fv" }, v), H("td", { class: "nl2-rc-d nl2-rc-" + (same ? "n" : r.tone) }, same ? "equipped" : fmt(r.d, r.e, true)));
                     });
                     box.appendChild(H("div", { class: "nl2-rc-own" }, H("table", { class: "nl2-rc-fx" }, ...trs)));
                     const lost = rows.filter((r) => r.lost);
@@ -31693,8 +31742,42 @@
         const ptgLc = (s) => String(s || "").trim().toLowerCase();
         const ptgN = (v) => (v == null || v === "" || !Number.isFinite(+v) ? null : +v);
         {
-            const st = NL.store("colonies.");
+            const st = NL.store("colonies."), CI_KEY = "nl2.colonies.ci";
+            NL.gl437 = true;
+            NL.ciSaveMax = 1000000;
+            const saveCi = (v) => {
+                if (NL.gl437 === false) {
+                    st.set("ci", v);
+                    return;
+                }
+                let js = "";
+                try {
+                    js = JSON.stringify(v);
+                }
+                catch (e) {
+                    return;
+                }
+                if (js.length <= NL.ciSaveMax) {
+                    if (NL.storeSet)
+                        NL.storeSet(CI_KEY, js);
+                    else
+                        st.set("ci", v);
+                    return;
+                }
+                try {
+                    localStorage.removeItem(CI_KEY);
+                }
+                catch (e) { }
+            };
             let cur = st.get("ci", null), busy = null;
+            if (NL.gl437 !== false) {
+                try {
+                    const raw = localStorage.getItem(CI_KEY);
+                    if (raw && raw.length > NL.ciSaveMax)
+                        localStorage.removeItem(CI_KEY);
+                }
+                catch (e) { }
+            }
             const subs = [];
             NL.colonyIndex = {
                 get: () => cur,
@@ -31713,7 +31796,7 @@
                             const list = d && Array.isArray(d.colonies) ? d.colonies : null;
                             if (list && list.length) {
                                 cur = { at: Date.now(), colonies: list };
-                                st.set("ci", cur);
+                                saveCi(cur);
                                 subs.forEach((f) => { try {
                                     f(cur);
                                 }

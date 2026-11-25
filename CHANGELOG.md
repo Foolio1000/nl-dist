@@ -2,6 +2,12 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.161 · Nov 25, 2026
+
+**🐞 Fixes**
+- S0 no longer shows "Browser storage full" when the Espionage colony index is too big to save. The index stays in memory instead, and other saved data is left alone (GL-437)
+- Wandering Trader compares every module with what you have equipped, including modules whose card wording differs from the game's own label (RE-051)
+
 ## v0.5.160 · Nov 25, 2026
 
 **✨ New**
@@ -221,26 +227,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🛰 Fleet dialogs**
 - A ship whose template asks for more than the planet has gets its Launch box outlined in light orange (FL-518)
-
-## v0.5.141 · Nov 20, 2026
-
-**🎨 Button colours**
-- One outlined look for every coloured button: green for positive, red for negative, blue for neutral, light orange for a limit or warning, and purple for rare uses. Unavailable buttons are grey, like Research's "Lab busy" (GL-383, GL-384)
-- Build buttons on Shipyard, Research and moons match the Buildings build button (GL-382)
-- Shipyard: Queue Full is grey, Max and All blue, Repair green and Maintain blue (SH-072, SH-073); Reports and Espionage Save is blue (FL-512); Routes: Delete red, Edit blue, Pause orange (FL-513); Market: Deliver green, Pickup blue, Rare deliver purple (GL-384)
-- Zone pills in the tables use the new colours (GL-380)
-
-**🛰 Fleet dialogs**
-- Launch sound and Trip Time in every launch dialog (FL-510, FL-511)
-- Ships with template 0 fold under "N more ships" (FL-515)
-- A launch that needs a confirm turns the button into an orange "Launch anyway" instead of opening a box (FL-516)
-- Every Collect dialog (Debris and Send more, battle freight, station Collect) has the Transport type row and Fit transports to cargo (FL-517)
-
-**⛏ Mining and PVE**
-- Send dig from Ruins (FL-434)
-- The old PVE and Mining dialogs are gone (FL-442)
-
-**🪐 Planets**
-- Buildings Effect column: one pill per effect with an icon, red when it uses a resource, blue when it adds (BU-047)
-- With Show Demolish on, Demolish takes the far-right button column on Buildings and moon Buildings (BU-046, MO-067)
-- Fleet > Transfer hides an outpost's hydrogen Supply row while it's relocating (FL-514)
