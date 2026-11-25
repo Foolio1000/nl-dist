@@ -2,6 +2,16 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.160 · Nov 25, 2026
+
+**✨ New**
+- Wandering Trader > Modules has a roomier layout (RE-050)
+- Mining resource pills use stronger colours (FL-588)
+
+**🐞 Fixes**
+- Browser storage no longer fills up on S0. When storage is nearly full at load, the script clears caches it can rebuild from the game, largest first (GL-436)
+- Wandering Trader shows Equipped once instead of three times (RE-050)
+
 ## v0.5.159 · Nov 24, 2026
 
 **✨ New**
@@ -234,15 +244,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 - Buildings Effect column: one pill per effect with an icon, red when it uses a resource, blue when it adds (BU-047)
 - With Show Demolish on, Demolish takes the far-right button column on Buildings and moon Buildings (BU-046, MO-067)
 - Fleet > Transfer hides an outpost's hydrogen Supply row while it's relocating (FL-514)
-
-## v0.5.140 · Nov 20, 2026
-
-**🎨 Look**
-- Amber Bring buttons toned down: a dark translucent amber instead of a bright fill (GL-376)
-
-**⛏ Mining and PVE**
-- Expedition and raid loss notes show ship names instead of ids like "#4" (FL-505)
-- The Salvage Patrol bands read pauses and backs off when the game says "too many requests" (FL-458)
-
-**🔧 Under the hood**
-- One shared attribute helper replaces 9 copies, no visible change (GL-347)

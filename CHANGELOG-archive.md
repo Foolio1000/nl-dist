@@ -1,5 +1,17 @@
 # Release notes archive
 
+## v0.5.140 · Nov 20, 2026
+
+**🎨 Look**
+- Amber Bring buttons toned down: a dark translucent amber instead of a bright fill (GL-376)
+
+**⛏ Mining and PVE**
+- Expedition and raid loss notes show ship names instead of ids like "#4" (FL-505)
+- The Salvage Patrol bands read pauses and backs off when the game says "too many requests" (FL-458)
+
+**🔧 Under the hood**
+- One shared attribute helper replaces 9 copies, no visible change (GL-347)
+
 ## v0.5.139 · Nov 20, 2026
 
 **🔊 Sound**

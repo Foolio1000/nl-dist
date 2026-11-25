@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.159
+// @version      0.5.160
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.159", features: [] };
+    const NL = window.__nl2 = { version: "0.5.160", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -12075,7 +12075,7 @@
         NL.rank7dProfile = true;
         NL.rankPlainTop = true;
         {
-            const st = NL.store("gl-rank7d."), KEEP = 14, DAY = 86400000;
+            const st = NL.store("gl-rank7d."), KEEP = NL.storeGuard === false ? 14 : 8, DAY = 86400000;
             const CAT = { overall: "overallScore", military: "militaryScore", economy: "economyScore", research: "researchScore" };
             const utc = (ms) => new Date(ms).toISOString().slice(0, 10);
             const shift = (key, n) => utc(Date.parse(key + "T00:00:00Z") + n * DAY);
@@ -12176,7 +12176,11 @@
                 st.set("d." + key, snap);
                 days.set(key, snap);
                 const idx = (st.get("idx", []) || []).filter((k) => k !== key).concat([key]).sort();
-                while (idx.length > KEEP) {
+                st.set("idx", prune(idx));
+            }
+            function prune(idx) {
+                const cut = shift(utc(Date.now()), -(KEEP - 1));
+                while (idx.length && (idx.length > KEEP || idx[0] < cut)) {
                     const k = idx.shift();
                     try {
                         localStorage.removeItem("nl2.gl-rank7d.d." + k);
@@ -12184,7 +12188,12 @@
                     catch (e) { }
                     days.delete(k);
                 }
-                st.set("idx", idx);
+                return idx;
+            }
+            if (NL.rank7dOn && NL.storeGuard !== false) {
+                const idx0 = (st.get("idx", []) || []).slice().sort(), n0 = idx0.length;
+                if (prune(idx0).length !== n0)
+                    st.set("idx", idx0);
             }
             NL.rank7dSnap = (list, calc, at) => {
                 const u = {};
@@ -16986,7 +16995,7 @@
                     redo();
                 });
                 function redo() { document.querySelectorAll("article.shard-trader-offer[data-nl2-rc]").forEach((c) => c.removeAttribute("data-nl2-rc")); NL._kick && NL._kick(); }
-                const linesOf = (card) => [...card.querySelectorAll(".shard-trader-effects > div")].filter((l) => !l.classList.contains("nl2-rc-lost"));
+                const linesOf = (card) => [...card.querySelectorAll(".shard-trader-effects > div")].filter((l) => !l.classList.contains("nl2-rc-own"));
                 const lineText = (l) => norm([...l.childNodes].filter((n) => !(n.classList && n.classList.contains("nl2-rc-d"))).map((n) => n.textContent).join(""));
                 function offerOf(card) {
                     const ls = linesOf(card).map(lineText);
@@ -17003,46 +17012,62 @@
                     rows.forEach((r) => { const eps = r.e.unit === "percent" ? 0.05 : 0.5; r.tone = Math.abs(r.d) < eps ? "n" : ((r.d > 0) !== isCost(r.e) ? "g" : "r"); });
                     return { cur, rows, same: !!cur && cur.key === o.key };
                 }
-                NL.css("re-compare", ".nl2-rc-d{font-weight:700;margin-left:4px}.nl2-rc-g{color:var(--nl2-ok,#4ade80)}.nl2-rc-r{color:var(--nl2-bad,#f87171)}.nl2-rc-n{color:var(--nl2-dim,#8a96a6);font-weight:400}"
-                    + ".shard-trader-effects>.nl2-rc-lost{color:var(--nl2-bad,#f87171)}"
-                    + "[data-nl2-rceq]{position:relative;padding-right:296px!important}"
-                    + ".nl2-rc-eqcol{position:absolute;top:0;right:0;bottom:0;width:280px}"
-                    + ".nl2-rc-eq{position:sticky;top:10px;box-sizing:border-box;background:var(--bg-card,rgba(8,16,32,.98));border:1px solid color-mix(in srgb,var(--nl2-info) 30%,transparent);border-radius:8px;padding:10px 12px;font:14px Rajdhani,\"Exo 2\",sans-serif;color:var(--nl2-text,#d9e6f7)}"
-                    + ".nl2-rc-eq h4{margin:0 0 8px;font-size:13px;color:var(--nl2-info,#38bdf8);font-weight:700;letter-spacing:.06em;text-transform:uppercase}"
-                    + ".nl2-rc-eqs{padding:6px 0;border-top:1px solid color-mix(in srgb,var(--nl2-head) 15%,transparent)}.nl2-rc-eqk{font-size:12.8px;font-weight:600;color:var(--nl2-head,#8fb3d9)}"
-                    + ".nl2-rc-eqn{font-weight:700}.nl2-rc-eqe{font-size:14px;line-height:1.45}.nl2-rc-eqs.is-empty .nl2-rc-eqn{font-weight:400;color:var(--nl2-dim,#8a96a6)}"
-                    + ".nl2-rc-slot{display:block;margin-top:2px;font-size:12.8px;font-weight:600;color:var(--nl2-head,#8fb3d9)}");
+                const store = NL.store("re-compare.");
+                NL.css("re-compare", ".nl2-rc-g{color:var(--nl2-ok,#4ade80)}.nl2-rc-r{color:var(--nl2-bad,#f87171)}.nl2-rc-n{color:var(--nl2-dim,#8a96a6);font-weight:400!important}"
+                    + "[data-nl2-rcfx] .shard-trader-effects>div:not(.nl2-rc-own){display:none}"
+                    + "table.nl2-rc-fx{width:100%;border-collapse:collapse;font-size:14px}table.nl2-rc-fx td{padding:3px 0;vertical-align:top;border-bottom:1px solid color-mix(in srgb,var(--nl2-head) 10%,transparent)}"
+                    + "td.nl2-rc-fl{color:var(--nl2-text,#d9e6f7)}td.nl2-rc-fv{text-align:right;white-space:nowrap;padding-left:8px!important;font-weight:600}td.nl2-rc-d{text-align:right;white-space:nowrap;padding-left:8px!important;font-weight:700}"
+                    + ".nl2-rc-rep{margin-top:10px;font-size:12.8px;font-weight:600;color:var(--nl2-head,#8fb3d9)}.nl2-rc-lost{font-size:14px;line-height:1.45;color:var(--nl2-bad,#f87171)}"
+                    + ".nl2-rc-slot{display:inline-block;align-self:flex-start;margin:0 0 8px;font-size:12px;font-weight:600;color:var(--nl2-head,#8fb3d9);border:1px solid color-mix(in srgb,var(--nl2-head) 35%,transparent);border-radius:10px;padding:0 8px}"
+                    + ".nl2-rc-eq{margin:4px 0 18px;font:14px Rajdhani,\"Exo 2\",sans-serif;color:var(--nl2-text,#d9e6f7)}"
+                    + ".nl2-rc-eqh{display:inline-flex;align-items:center;gap:6px;border-left:3px solid var(--nl2-info,#38bdf8);padding-left:8px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nl2-info,#38bdf8);cursor:pointer;user-select:none;margin-bottom:10px}"
+                    + ".nl2-rc-eqg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.nl2-rc-eq.is-closed .nl2-rc-eqg{display:none}.nl2-rc-eq.is-closed .nl2-rc-eqh{margin-bottom:0}"
+                    + ".nl2-rc-eqs{background:color-mix(in srgb,var(--nl2-info) 5%,transparent);border:1px solid color-mix(in srgb,var(--nl2-info) 30%,transparent);border-radius:6px;padding:8px 10px}"
+                    + ".nl2-rc-eqk{font-size:12.8px;font-weight:600;color:var(--nl2-head,#8fb3d9)}.nl2-rc-eqn{font-weight:700;margin:1px 0 3px}.nl2-rc-eqe{font-size:14px;line-height:1.4}.nl2-rc-eqs.is-empty .nl2-rc-eqn{font-weight:400;color:var(--nl2-dim,#8a96a6)}");
                 const H = (t, a, ...k) => NL.h(t, a, ...k);
                 const SLOTS = ["weapon", "shield", "sensor", "auxiliary", "specialization", "armor", "engine"];
                 const slotName = (k) => String(k || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-                function eqPaint(col) {
-                    const sig = JSON.stringify(eq);
-                    if (col._nl2Sig === sig)
+                const eqOpen = () => store.get("eqOpen", true) !== false;
+                function eqPaint(strip) {
+                    const open = eqOpen(), sig = open + JSON.stringify(eq);
+                    if (strip._nl2Sig === sig)
                         return;
-                    col._nl2Sig = sig;
-                    col.firstChild.replaceChildren(H("h4", null, "Equipped"), ...SLOTS.map((k) => {
+                    strip._nl2Sig = sig;
+                    strip.classList.toggle("is-closed", !open);
+                    const head = H("div", { class: "nl2-rc-eqh", role: "button", tabindex: "0", "aria-expanded": String(open) }, (open ? "\u25BE" : "\u25B8") + " Equipped");
+                    const flip = () => { store.set("eqOpen", !eqOpen()); eqPaint(strip); };
+                    head.addEventListener("click", flip);
+                    head.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        flip();
+                    } });
+                    strip.replaceChildren(head, H("div", { class: "nl2-rc-eqg" }, ...SLOTS.map((k) => {
                         const m = eq[k];
                         return H("div", { class: "nl2-rc-eqs" + (m ? "" : " is-empty"), "data-nl2-slot": k }, H("div", { class: "nl2-rc-eqk" }, slotName(k)), H("div", { class: "nl2-rc-eqn" }, m ? nameOf(m.key) : "Empty"), ...(m ? m.effects : []).map((e) => H("div", { class: "nl2-rc-eqe" }, fmt(disp(e), e, true) + " " + (e.label || ""))));
-                    }));
+                    })));
                 }
                 function eqMount() {
-                    const bodies = new Set([...document.querySelectorAll("article.shard-trader-offer")].filter((c) => c._nl2RcOffer).map((c) => { const g = c.closest(".shard-trader-grid"); return g && g.parentElement; }).filter(Boolean));
-                    document.querySelectorAll("[data-nl2-rceq]").forEach((b) => { if (!bodies.has(b) || NL.reCompare === false) {
-                        b.removeAttribute("data-nl2-rceq");
-                        b.querySelectorAll(":scope > .nl2-rc-eqcol").forEach((x) => x.remove());
-                    } });
-                    if (NL.reCompare === false)
+                    const grids = [...new Set([...document.querySelectorAll("article.shard-trader-offer")].filter((c) => c._nl2RcOffer).map((c) => c.closest(".shard-trader-grid")).filter(Boolean))];
+                    let host = grids.length ? grids[0].parentElement : null;
+                    while (host && !grids.every((g) => host.contains(g)))
+                        host = host.parentElement;
+                    document.querySelectorAll(".nl2-rc-eq").forEach((x) => { if (x.parentElement !== host || NL.reCompare === false)
+                        x.remove(); });
+                    if (!host || NL.reCompare === false)
                         return;
-                    bodies.forEach((b) => {
-                        let col = b.querySelector(":scope > .nl2-rc-eqcol");
-                        if (!col) {
-                            col = H("div", { class: "nl2-rc-eqcol" }, H("div", { class: "nl2-rc-eq" }));
-                            b.appendChild(col);
-                            b.setAttribute("data-nl2-rceq", "");
-                        }
-                        eqPaint(col);
-                    });
+                    let anchor = grids[0];
+                    while (anchor.parentElement !== host)
+                        anchor = anchor.parentElement;
+                    if (anchor.previousElementSibling && /^H[1-6]$/.test(anchor.previousElementSibling.tagName))
+                        anchor = anchor.previousElementSibling;
+                    let strip = host.querySelector(":scope > .nl2-rc-eq");
+                    if (!strip)
+                        strip = H("div", { class: "nl2-rc-eq" });
+                    if (strip.nextElementSibling !== anchor)
+                        host.insertBefore(strip, anchor);
+                    eqPaint(strip);
                 }
+                const valOf = (t) => { const m = /^\s*([+\-−]?[\d.,]+%?)/.exec(t || ""); return m ? m[1].replace(/−/, "-") : null; };
                 NL.watch("article.shard-trader-offer", (card) => {
                     if (NL.reCompare === false || !offers.length)
                         return;
@@ -17052,21 +17077,26 @@
                     if (card.getAttribute("data-nl2-rc") === sig)
                         return;
                     card.setAttribute("data-nl2-rc", sig);
-                    card.querySelectorAll(".nl2-rc-d, .nl2-rc-lost, .nl2-rc-slot").forEach((x) => x.remove());
+                    card.querySelectorAll(".nl2-rc-own, .nl2-rc-slot").forEach((x) => x.remove());
+                    card.removeAttribute("data-nl2-rcfx");
                     if (!o)
                         return;
-                    const nm = card.querySelector(".shard-trader-item-heading strong");
-                    if (nm && o.slot)
-                        nm.insertAdjacentElement("afterend", H("span", { class: "nl2-rc-slot" }, slotName(o.slot)));
-                    const { rows, same } = rowsOf(o), ls = linesOf(card), box = card.querySelector(".shard-trader-effects");
-                    ls.forEach((l) => {
-                        const t = lineText(l), r = rows.find((x) => !x.lost && t.includes(norm(x.e.label)));
-                        if (!r)
-                            return;
-                        l.appendChild(H("span", { class: "nl2-rc-d nl2-rc-" + (same ? "n" : r.tone) }, same ? "(equipped)" : "(" + fmt(r.d, r.e, true) + ")"));
+                    const hd = card.querySelector(".shard-trader-item-heading");
+                    if (hd && o.slot)
+                        hd.insertAdjacentElement("afterend", H("span", { class: "nl2-rc-slot" }, slotName(o.slot)));
+                    const { cur, rows, same } = rowsOf(o), ls = linesOf(card), box = card.querySelector(".shard-trader-effects");
+                    if (!box)
+                        return;
+                    const trs = rows.filter((r) => !r.lost).map((r) => {
+                        const l = ls.find((x) => lineText(x).includes(norm(r.e.label)));
+                        const v = (l && valOf(l.textContent)) || fmt(disp(r.e), r.e, true);
+                        return H("tr", null, H("td", { class: "nl2-rc-fl" }, r.e.label), H("td", { class: "nl2-rc-fv" }, v), H("td", { class: "nl2-rc-d nl2-rc-" + (same ? "n" : r.tone) }, same ? "equipped" : fmt(r.d, r.e, true)));
                     });
-                    if (!same && box)
-                        rows.filter((r) => r.lost).forEach((r) => box.appendChild(H("div", { class: "nl2-rc-lost" }, "loses " + fmt(disp(r.c), r.c, true) + " " + r.e.label)));
+                    box.appendChild(H("div", { class: "nl2-rc-own" }, H("table", { class: "nl2-rc-fx" }, ...trs)));
+                    const lost = rows.filter((r) => r.lost);
+                    if (!same && cur && lost.length)
+                        box.appendChild(H("div", { class: "nl2-rc-own" }, H("div", { class: "nl2-rc-rep" }, "Replaces " + nameOf(cur.key)), ...lost.map((r) => H("div", { class: "nl2-rc-lost" }, "\u2212" + fmt(Math.abs(disp(r.c)), r.c, false) + " " + r.e.label))));
+                    card.setAttribute("data-nl2-rcfx", "");
                 });
                 NL.watch(".shard-trader-grid", eqMount);
             },
@@ -31121,8 +31151,8 @@
                     NL.css("fl-mt-res", `
       .nl2-mt-chip[data-mtres="ore"]{--mc:168,162,158}.nl2-mt-chip[data-mtres="gas"]{--mc:129,140,248}.nl2-mt-chip[data-mtres="plasma"]{--mc:244,114,182}
       .nl2-mt-chip[data-mtres="ice"]{--mc:165,243,252}.nl2-mt-chip[data-mtres="quantum"]{--mc:45,212,191}.nl2-mt-chip[data-mtres="dark"]{--mc:192,132,252}
-      .nl2-mt-chip[data-mtres]{color:rgb(var(--mc));border-color:rgba(var(--mc),.45)}
-      .nl2-mt-chip[data-mtres].nl2-on{background:rgba(var(--mc),.2);border-color:rgb(var(--mc));color:#e2f3ff}`);
+      .nl2-mt-chip[data-mtres]{color:rgb(var(--mc));border-color:rgba(var(--mc),.85);background:rgba(var(--mc),.14)}
+      .nl2-mt-chip[data-mtres].nl2-on{background:rgba(var(--mc),.4);border-color:rgb(var(--mc));color:#fff;box-shadow:0 0 0 1px rgb(var(--mc))}`);
                 const labelOf = (b) => { const n = b.querySelector(".fleet-activity-label > span"); return ((n ? n.textContent : [...b.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join("")) || "").trim().toLowerCase(); };
                 const tabName = (b) => labelOf(b).replace(/\(\s*\d+\s*\)|\d+/g, "").trim();
                 const gameActive = (pg) => pg.querySelector(".fleet-command-navigation .fleet-tab.active:not(.nl2-fpx-tab):not(.nl2-fstn-tab):not(.nl2-ftr-tab)");
@@ -47530,6 +47560,44 @@
                 for (const k of ["nl2.colonies.ci", "nl2.ga-table.sysinfo2"])
                     if (!NL.storeEvictable.includes(k))
                         NL.storeEvictable.push(k);
+        }
+        NL.storeGuard = true;
+        NL.storeGuardAt = 4000000;
+        NL.storeGuardTo = 3500000;
+        NL.storeTrim = (to) => {
+            const gone = [];
+            let use = NL.storeUse ? NL.storeUse() : 0;
+            if (use <= to || !Array.isArray(NL.storeEvictable))
+                return gone;
+            const ks = NL.storeEvictable.map((k) => { let v = null; try {
+                v = localStorage.getItem(k);
+            }
+            catch (e) { } return [k, v == null ? 0 : k.length + v.length]; })
+                .filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]);
+            for (const [k, n] of ks) {
+                if (use <= to)
+                    break;
+                try {
+                    localStorage.removeItem(k);
+                    use -= n;
+                    gone.push(k);
+                }
+                catch (e) { }
+            }
+            return gone;
+        };
+        if (NL.storeGuard !== false && Array.isArray(NL.storeEvictable)) {
+            for (const k of ["nl2.zones.map", "nl2.gl-offense2.map", "nl2.gl-defense2.map", "nl2.gl.rankList", "nl2.fl-targets.ranks", "nl2.fl-spy-launch.ranks"])
+                if (!NL.storeEvictable.includes(k))
+                    NL.storeEvictable.push(k);
+            try {
+                const use = NL.storeUse ? NL.storeUse() : 0;
+                if (use > NL.storeGuardAt) {
+                    const gone = NL.storeTrim(NL.storeGuardTo);
+                    console.warn("[NL] storage at " + Math.round(use / 1000) + "K: cleared caches " + (gone.join(", ") || "none") + " (" + Math.round(NL.storeUse() / 1000) + "K now)");
+                }
+            }
+            catch (e) { }
         }
         if (NL.enabled("gl-task-data"))
             (function dashTasks() {
