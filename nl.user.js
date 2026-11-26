@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.163
+// @version      0.5.164
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.163", features: [] };
+    const NL = window.__nl2 = { version: "0.5.164", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -17565,7 +17565,7 @@
                 let maintRow = null, maintAt = 0;
                 document.addEventListener("click", (e) => {
                     const b = e.target.closest && e.target.closest(".sy-fleet-row button");
-                    if (b && SH_MAINT.test(b.textContent)) {
+                    if (b && (SH_MAINT.test(b.textContent) || b.classList.contains("maintenance"))) {
                         maintRow = b.closest(".sy-fleet-row");
                         maintAt = Date.now();
                     }
@@ -17573,7 +17573,7 @@
                 NL.onWrite(/^\/api\/planets\/\d+\/maintenance-repair$/, () => {
                     if (!maintRow || Date.now() - maintAt > 120000 || !maintRow.isConnected)
                         return;
-                    maintRow.querySelectorAll("button").forEach((b) => { if (SH_MAINT.test(b.textContent))
+                    maintRow.querySelectorAll("button").forEach((b) => { if (SH_MAINT.test(b.textContent) || b.classList.contains("maintenance"))
                         b.setAttribute("data-nl2-shmt", String(Date.now())); });
                     maintRow.setAttribute("data-nl2-shmt", String(Date.now()));
                     maintRow = null;
@@ -17985,11 +17985,12 @@
                     if (!r)
                         return null;
                     const bs = [...r.querySelectorAll(".sy-fleet-row-actions button, .sy-fleet-damaged-line button, button.sy-repair-chip")];
+                    const isMaint = (b) => b.classList.contains("maintenance") || SH_MAINT_RE.test(b.textContent);
                     if (k === "maint")
-                        return bs.find((b) => SH_MAINT_RE.test(b.textContent)) || null;
+                        return bs.find(isMaint) || null;
                     if (k === "scrap")
                         return bs.find((b) => b.classList.contains("scrap-btn")) || null;
-                    return bs.find((b) => (b.classList.contains("sy-repair-chip") || b.classList.contains("repair-btn")) && !b.classList.contains("scrap-btn") && !SH_MAINT_RE.test(b.textContent)) || null;
+                    return bs.find((b) => (b.classList.contains("sy-repair-chip") || b.classList.contains("repair-btn")) && !b.classList.contains("scrap-btn") && !isMaint(b)) || null;
                 };
                 const SH_MAINT_RE = /^\s*maintain\b/i;
                 const IC = { shield: "hp", swords: "at", gauge: "sp" };
@@ -34448,6 +34449,8 @@
       .nl2-emx td.nl2-shq-warn .nl2-shq-l,.nl2-emx td.nl2-shq-warn .nl2-shq-f{color:#fb923c;font-weight:700}
       .nl2-shq-ctl{display:flex;align-items:center;gap:6px;margin-right:12px;font-size:13.6px;color:var(--nl2-onart);white-space:nowrap}
       .nl2-shq-ctl[hidden]{display:none!important}
+      .nl2-emx tr.nl2-shq td.nl2-shq-go{cursor:pointer}
+      .nl2-emx tr.nl2-shq td.nl2-shq-go:hover{text-decoration:underline}
       .nl2-shq-ctl input{width:56px;text-align:right}`);
                 const put = (pid, d) => {
                     if (typeof NL.shQueueFinish !== "function")
@@ -34530,6 +34533,17 @@
                 const warnTip = () => "Under " + warnH() + (warnH() === 1 ? " hour" : " hours") + " left in this queue";
                 const EST_TIP = "Estimate: the game doesn't give repair times for waiting repairs, so they are counted at about a quarter of the build time.";
                 const dash = () => NL.h("td", { class: "nl2-d" }, "\u2013");
+                const GO_TIP = "Click to open this planet's Shipyard";
+                const go = (td, c) => {
+                    const [type] = String(c.key).split(":");
+                    if (type !== "planet" || td.textContent === "\u2013" || !NL.openPlanet)
+                        return td;
+                    td.classList.add("nl2-shq-go");
+                    const tip = td.getAttribute("data-nl2-tip");
+                    td.setAttribute("data-nl2-tip", (tip ? tip + "\n" : "") + GO_TIP);
+                    td.addEventListener("click", () => NL.openPlanet(c.name, "/shipyard"));
+                    return td;
+                };
                 const cellFor = (key, k) => {
                     const [type, pid] = String(key).split(":");
                     if (type !== "planet")
@@ -34553,7 +34567,7 @@
                         return [];
                     cols = colsIn.map((c) => String(c.key)).filter((k) => k.startsWith("planet:")).map((k) => k.split(":")[1]);
                     want(cols, false);
-                    return [["p", "Planetary"], ["o", "Orbital"]].map(([k, label], i) => NL.h("tr", { class: "nl2-shq" + (i ? " nl2-shq-last" : "") }, NL.h("td", null, label), colsIn.map((c) => cellFor(c.key, k)), NL.h("td", { class: "nl2-tot" }, "")));
+                    return [["p", "Planetary"], ["o", "Orbital"]].map(([k, label], i) => NL.h("tr", { class: "nl2-shq" + (i ? " nl2-shq-last" : "") }, NL.h("td", null, label), colsIn.map((c) => go(cellFor(c.key, k), c)), NL.h("td", { class: "nl2-tot" }, "")));
                 };
                 NL.emShqSig = () => (NL.emShq === false ? "" : "q" + ver + "h" + warnH());
                 let ctl = null;

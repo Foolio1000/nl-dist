@@ -1,5 +1,10 @@
 # Release notes archive
 
+## v0.5.144 · Nov 20, 2026
+
+**🛰 Fleet dialogs**
+- The short-ship Launch box no longer has a double outline: its own border turns light orange and the number bold orange (FL-519)
+
 ## v0.5.143 · Nov 20, 2026
 
 **🔧 Hotfix**

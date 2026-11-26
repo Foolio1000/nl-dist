@@ -2,6 +2,14 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.164 · Nov 26, 2026
+
+**🏠 Command Center**
+- In the Fleet Matrix, clicking a planet's Planetary or Orbital queue cell opens that planet's Shipyard (EM-060)
+
+**🐞 Fixes**
+- Fleet on Planet shows Maintain for Mining Vessels again. The game now labels that button "Repair", so we tell them apart by type instead (SH-083)
+
 ## v0.5.163 · Nov 26, 2026
 
 **🎨 Left menu and images**
@@ -228,8 +236,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🛰 Fleet**
 - Routes buttons on Transfer and Stations: Edit green, Pause blue, Resume orange, Delete red (FL-520)
-
-## v0.5.144 · Nov 20, 2026
-
-**🛰 Fleet dialogs**
-- The short-ship Launch box no longer has a double outline: its own border turns light orange and the number bold orange (FL-519)
