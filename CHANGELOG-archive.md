@@ -1,5 +1,10 @@
 # Release notes archive
 
+## v0.5.143 · Nov 20, 2026
+
+**🔧 Hotfix**
+- The Shipyard build list, Buildings and moon Buildings grids and Fleet on Planet now have the solid table background too, not a see-through one (GL-389)
+
 ## v0.5.142 · Nov 20, 2026
 
 **🕒 Times**

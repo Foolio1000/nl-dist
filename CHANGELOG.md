@@ -2,6 +2,21 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.163 · Nov 26, 2026
+
+**🎨 Left menu and images**
+- The left menu shows its old line icons again on all 20 entries, in place of the new pictures from the 26 Nov game update. Badges are unchanged (GL-446)
+- The game's new artifact pictures are hidden everywhere, and the cards close up to their text (GL-447)
+
+**🛰 Fleet**
+- The Spy dialog has a Gateway box, unticked each time it opens (FL-607)
+- The old attack dialog is gone; Attack always opens the shared dialog (FL-440)
+
+**🐞 Fixes after the 26 Nov game update**
+- Shipyard: hiding ships and the in-queue chips, the fleet stat columns and the Buildings slots chip work again (SH-080)
+- Shipyard Table View finds HP, Attack and Speed again, so Speed sorts. The Shield column is now HP, since the game no longer has a separate shield stat (SH-081)
+- Fleet on Planet shows the Repair button again (SH-082)
+
 ## v0.5.162 · Nov 26, 2026
 
 **🐞 Fixes**
@@ -218,8 +233,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🛰 Fleet dialogs**
 - The short-ship Launch box no longer has a double outline: its own border turns light orange and the number bold orange (FL-519)
-
-## v0.5.143 · Nov 20, 2026
-
-**🔧 Hotfix**
-- The Shipyard build list, Buildings and moon Buildings grids and Fleet on Planet now have the solid table background too, not a see-through one (GL-389)
