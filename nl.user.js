@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.161
+// @version      0.5.162
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.161", features: [] };
+    const NL = window.__nl2 = { version: "0.5.162", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -5641,6 +5641,7 @@
             return rows.sort((a, b) => (a.at || Infinity) - (b.at || Infinity));
         }
         NL.gl357 = true;
+        const IN_BASE = ["ore", "silicates", "hydrogen", "alloys"];
         function inOverflow(pid, mid, tot, lastAt) {
             let src = null, at0 = 0;
             if (mid != null) {
@@ -5675,7 +5676,8 @@
             for (const [k, inc] of Object.entries(tot)) {
                 if (!IN_NAME[k] || !(inc > 0))
                     continue;
-                const c = SUP_CAMEL(k), rs = src.rareResourceStorage, cap = +src[c + "Storage"] || (rs && typeof rs === "object" ? +rs[c] : +rs) || 0;
+                const c = SUP_CAMEL(k), base = IN_BASE.includes(k), stOf = (x) => (x == null ? 0 : typeof x === "object" ? +(x[c] != null ? x[c] : x[k] != null ? x[k] : base ? 0 : x.rare) || 0 : +x || 0);
+                const cap = +src[c + "Storage"] || (base ? stOf(src.storage) : src.rareResourceStorage != null ? stOf(src.rareResourceStorage) : stOf(src.storage)) || 0;
                 if (!(cap > 0))
                     continue;
                 const have = +src[c] || 0, stock = Math.max(have, Math.min(cap, have + (+src[c + "Rate"] || 0) * hrs)), v = Math.floor(stock + inc - cap);
@@ -11030,8 +11032,8 @@
             }
             const typeKey = (k) => String(k || "").toLowerCase().replace(/[\s-]+/g, "_");
             const COMBAT = new Set(["scout", "fighter", "interceptor", "cruiser", "torpedo_frigate", "carrier", "battleship", "missile_cruiser", "bomber", "dreadnought", "titan", "electronic_warfare_ship"]);
-            const CAPS = new Set(NL.capitals || ["dreadnought", "titan", "arc_titan"]), CAPS_OFF = Date.UTC(2026, 10, 24);
-            const stationOk = (k) => COMBAT.has(k) && !(CAPS.has(k) && Date.now() >= CAPS_OFF);
+            const CAPS = new Set(NL.capitals);
+            const stationOk = (k) => COMBAT.has(k) && !CAPS.has(k);
             function cruiserSpeed(f) {
                 const pick = (list) => { const d = (list || []).map((x) => x && x.definition).find((x) => x && typeKey(x.key) === "cruiser"); return d ? n0(d.displaySpeed) : 0; };
                 let v = pick(f && f.fleet);
@@ -38573,6 +38575,7 @@
         NL.fl576 = true;
         NL.fl566 = true;
         NL.fl575 = true;
+        NL.fl589 = true;
         NL.fl428 = true;
         NL.mineSlotKeep = true;
         NL.pvTbl = true;
@@ -39023,7 +39026,7 @@
                     const sp = OP_ROUTES[key];
                     if (!sp)
                         throw new Error("unknown route " + key);
-                    return NL.transportCall(sp, method, payload, { timeout: READ_TIMEOUT, log: logRead, on429: noteThrottled, pause: false, ...(xo && xo.headers ? { headers: xo.headers } : {}), notFound: sp.act ? "Launch blocked: could not find the game\u2019s " + key + " route (the game may have updated)" : undefined });
+                    return NL.transportCall(sp, method, payload, { timeout: (xo && xo.timeout) || READ_TIMEOUT, log: logRead, on429: noteThrottled, pause: false, ...(xo && xo.headers ? { headers: xo.headers } : {}), notFound: sp.act ? "Launch blocked: could not find the game\u2019s " + key + " route (the game may have updated)" : undefined });
                 }
                 const limiter = { until: 0 };
                 const queue = [];
@@ -39119,7 +39122,18 @@
                         S.cache = c;
                         return;
                     }
-                    const d = await transportCall(MAP_OP, "GET", { id: null, query: {} });
+                    const mapGet = () => transportCall(MAP_OP, "GET", { id: null, query: {} }, NL.fl589 ? { timeout: 60000 } : undefined);
+                    let d = null;
+                    try {
+                        d = await mapGet();
+                    }
+                    catch (e) {
+                        if (!NL.fl589)
+                            throw e;
+                        console.warn("[pve] galaxy map read failed, retrying", e && e.message || e);
+                    }
+                    if (NL.fl589 && (!d || !Array.isArray(d.systems)))
+                        d = await mapGet();
                     if (!d || !Array.isArray(d.systems))
                         throw new Error("galaxy map unavailable");
                     const byId = new Map(d.systems.map((s) => [s.id, s]));
@@ -45308,11 +45322,14 @@
                     }
                     const old = S.cache;
                     S.cache = null;
+                    S.mapFail = false;
                     try {
                         await ensureMap();
                     }
                     catch (e) {
                         S.cache = old || (c && c.origins ? c : null);
+                        S.mapFail = !S.cache;
+                        console.warn("[pve] galaxy map unavailable", e && e.message || e);
                     }
                 }
                 async function stnPrep() {
@@ -45619,7 +45636,9 @@
                         rb.value = minRich ? String(minRich) : "";
                     const tb = sec.querySelector(".nxs-tbody"), foot = sec.querySelector(".nl2-mt-foot");
                     let html, ft = "";
-                    if (!S.cache || !S.planets.length)
+                    if (!S.cache && NL.fl589 && S.mapFail)
+                        html = "<tr><td colspan=\"7\" class=\"nxs-dim\"><span class=\"nxs-r\">Could not load the galaxy map.</span> Press Refresh to try again.</td></tr>";
+                    else if (!S.cache || !S.planets.length)
                         html = "<tr><td colspan=\"7\" class=\"nxs-dim\">Loading your planets and the map\u2026</td></tr>";
                     else if (!srcs.length)
                         html = "<tr><td colspan=\"7\" class=\"nxs-dim\">No Dead Space planet to mine from.</td></tr>";
@@ -45727,7 +45746,11 @@
                         S.mtShips = null;
                         if (S.mineRefused)
                             S.mineRefused.clear();
-                        U(() => Promise.all([loadFieldIndex(), loadMyOutposts(), loadMissions(), NL.flIdleRead ? loadProbes().then(paintIdle) : null])).catch(() => { }).finally(() => { rf.disabled = false; paintIdle(); paintMineTab(); });
+                        if (NL.fl589 && !S.cache) {
+                            S.mapFail = false;
+                            paintMineTab();
+                        }
+                        U(() => Promise.all([NL.fl589 && !S.cache ? stnPrep() : null, loadFieldIndex(), loadMyOutposts(), loadMissions(), NL.flIdleRead ? loadProbes().then(paintIdle) : null])).catch(() => { }).finally(() => { rf.disabled = false; paintIdle(); paintMineTab(); });
                     }
                 }
                 let mtRangeT = null;

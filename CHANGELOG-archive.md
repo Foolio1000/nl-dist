@@ -1,5 +1,18 @@
 # Release notes archive
 
+## v0.5.142 · Nov 20, 2026
+
+**🕒 Times**
+- One time format everywhere: "45s" under a minute, "4m 32s", "24h 09m", "13d 16h" from 25 hours, and days only past 10 days ("13d"); "time since" reads "3h 12m ago" (GL-385)
+- The Fleet Slots countdown in the top bar has a fixed width, so the pills beside it no longer shift every second; its hover shows UTC (GL-387)
+
+**🎨 Look**
+- Every table gets the same solid background as Fleet on Planet (GL-388)
+- The HP pill in the top bar opens the Leader screen for repairs (GL-386)
+
+**🛰 Fleet dialogs**
+- A ship whose template asks for more than the planet has gets its Launch box outlined in light orange (FL-518)
+
 ## v0.5.141 · Nov 20, 2026
 
 **🎨 Button colours**

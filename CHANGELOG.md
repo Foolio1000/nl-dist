@@ -2,6 +2,15 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.162 · Nov 26, 2026
+
+**🐞 Fixes**
+- A moon's Overflow tooltip uses the moon's real storage for Ore, Silicates, Hydrogen and Alloys. Only rare resources use the rare cap (GL-440)
+- Fleet > Mining on S0 no longer sticks on "Loading your planets and the map…". The map read gets 60 seconds and one retry, a failure shows an error, and Refresh tries again (FL-589)
+
+**🧩 Other**
+- Capitals are always left out of Defend and Reinforce, now that the game refuses capitals at stations (GL-341)
+
 ## v0.5.161 · Nov 25, 2026
 
 **🐞 Fixes**
@@ -214,16 +223,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🔧 Hotfix**
 - The Shipyard build list, Buildings and moon Buildings grids and Fleet on Planet now have the solid table background too, not a see-through one (GL-389)
-
-## v0.5.142 · Nov 20, 2026
-
-**🕒 Times**
-- One time format everywhere: "45s" under a minute, "4m 32s", "24h 09m", "13d 16h" from 25 hours, and days only past 10 days ("13d"); "time since" reads "3h 12m ago" (GL-385)
-- The Fleet Slots countdown in the top bar has a fixed width, so the pills beside it no longer shift every second; its hover shows UTC (GL-387)
-
-**🎨 Look**
-- Every table gets the same solid background as Fleet on Planet (GL-388)
-- The HP pill in the top bar opens the Leader screen for repairs (GL-386)
-
-**🛰 Fleet dialogs**
-- A ship whose template asks for more than the planet has gets its Launch box outlined in light orange (FL-518)
