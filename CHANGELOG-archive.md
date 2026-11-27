@@ -1,5 +1,22 @@
 # Release notes archive
 
+## v0.5.148 · Nov 21, 2026
+
+**🛰 Fleet**
+- New Genesis tab: base tables, unread report count in the menu, an attack dialog, and Scout and Simulate buttons (FL-529, FL-530, FL-531, FL-532)
+- "Genesis base taken" and "Genesis base found" messages are quiet (FL-533, FL-534)
+- Debris To collect shows estimated Phase and Trip times (FL-535)
+
+**🪐 Planets**
+- Resources tab: numbers shown in full and right-aligned, with a Bulk need figure (EM-045, EM-046)
+- Recycling compare popover (RE-044)
+- Weapon and armor types show as coloured pills (GL-398)
+
+**⚙️ Other**
+- When browser storage is full, Nexus Legacy clears its own rebuildable caches and keeps saving, and shows a notice if it still can't (GL-399)
+- Sorting a table keeps your earlier sorts as tiebreakers (GL-400)
+- XP tip reads "Resets at 00:00 UTC" (GL-397)
+
 ## v0.5.147 · Nov 21, 2026
 
 **🛡 Station Operations**

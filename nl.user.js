@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.167
+// @version      0.5.168
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.167", features: [] };
+    const NL = window.__nl2 = { version: "0.5.168", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -2974,6 +2974,82 @@
         else
             loadOpTable();
     }
+    NL.data = (function dataRegistry() {
+        const S = 1000, M = 60 * S, H = 60 * M;
+        const sets = {
+            planets: { path: "/api/planets", fresh: 0, via: "plain", keep: true, from: "game reads on page open" },
+            planet: { path: "/api/planets/:id", fresh: 0, via: "plain", keep: true, from: "game reads on planet switch" },
+            planetFleet: { path: "/api/planets/:id/fleet", fresh: 0, via: "plain", keep: true, from: "game reads on Fleet open and planet switch" },
+            planetShipyard: { path: "/api/planets/:id/shipyard", fresh: 10 * M, via: "plain", keep: true, from: "92_gl_task_data TTL_SLOW" },
+            moonsOwned: { path: "/api/moons/owned", fresh: 10 * M, via: "plain", from: "92_gl_task_data TTL_SLOW" },
+            moon: { path: "/api/moons/:id", fresh: 10 * M, via: "plain", from: "92_gl_task_data TTL_SLOW" },
+            moonFleet: { path: "/api/moons/:id/fleet", fresh: 0, via: "plain", from: "game reads on moon open" },
+            moonScanReports: { path: "/api/moons/:id/scan/reports", fresh: 0, via: "tee", from: "game reads on Phalanx open" },
+            activitySummary: { path: "/api/planets/activity-summary", fresh: 5 * S, via: "tee", from: "game's fetchActivitySummary skip window" },
+            research: { path: "/api/research", fresh: 10 * M, via: "plain", from: "92_gl_task_data TTL_SLOW" },
+            leadership: { path: "/api/leadership", fresh: 10 * M, via: "plain", from: "92_gl_task_data TTL_SLOW" },
+            outposts: { path: "/api/outposts", fresh: 10 * M, via: "plain", from: "92_gl_task_data TTL_SLOW" },
+            outpost: { path: "/api/outposts/:id", fresh: 0, via: "plain", from: "read on Outposts open" },
+            artifacts: { path: "/api/artifacts", fresh: 2 * M, via: "plain", from: "92_gl_task_data TTL_FAST" },
+            artifactMarks: { path: "/api/artifacts/inventory-marks", fresh: 0, via: "plain", from: "read on our own action" },
+            artifactTrader: { path: "/api/artifacts/trader", fresh: 0, via: "tee", from: "game reads on Trader open" },
+            xeno: { path: "/api/xeno", fresh: 0, via: "plain", from: "read on Ruins open" },
+            genesisCore: { path: "/api/genesis-core", fresh: 0, via: "plain", from: "read on Genesis open" },
+            rogueBases: { path: "/api/rogue-bases", fresh: 0, via: "plain", from: "read on Pirates open" },
+            missions: { path: "/api/fleet/missions", fresh: 60 * S, via: "plain", from: "game's only timer (Fleet page, 60 s); features used 30 s or 60 s before GL-459" },
+            fleetSupply: { path: "/api/fleet/supply", fresh: 10 * M, via: "plain", from: "92_gl_task_data TTL_SLOW" },
+            fleetBounties: { path: "/api/fleet/bounties", fresh: 10 * M, via: "tee", from: "92_gl_task_data TTL_SLOW" },
+            patrolCapacity: { path: "/api/fleet/patrol/capacity", fresh: 0, via: "plain", from: "read on PVE open" },
+            wormholeRuns: { path: "/api/fleet/wormhole-runs", fresh: 60 * S, via: "plain", from: "90_pve wormhole watch (FL-037), 1 min" },
+            surveyCooldowns: { path: "/api/fleet/survey-cooldowns", fresh: 30 * S, via: "plain", from: "90_pve REFRESH_MS while PVE is open (GL-025)" },
+            reportUnread: { path: "/api/fleet/report-unread-summary", fresh: 0, via: "plain", from: "game reads on Fleet open" },
+            reportSaves: { path: "/api/fleet/report-saves", fresh: 0, via: "plain", from: "read on Reports open" },
+            reports: { path: "/api/fleet/reports", fresh: 0, via: "plain", from: "read on Reports open" },
+            report: { path: "/api/fleet/reports/:id", fresh: 0, via: "plain", from: "read on report open; a report never changes" },
+            spyReports: { path: "/api/fleet/spy-reports", fresh: 0, via: "plain", from: "read on Espionage open and 3 s after a probe lands" },
+            miningReports: { path: "/api/fleet/mining-reports", fresh: 30 * S, via: "plain", from: "90_pve REFRESH_MS" },
+            patrolReports: { path: "/api/fleet/patrol-reports", fresh: 30 * S, via: "plain", from: "90_pve REFRESH_MS" },
+            pirateReports: { path: "/api/fleet/pirate-reports", fresh: 30 * S, via: "plain", from: "90_pve REFRESH_MS" },
+            surveyReports: { path: "/api/fleet/survey-reports", fresh: 30 * S, via: "plain", from: "90_pve REFRESH_MS" },
+            expeditionReports: { path: "/api/fleet/expedition-reports", fresh: 30 * S, via: "plain", from: "90_pve REFRESH_MS" },
+            fleetOverview: { path: "/api/command-center/fleet-overview", fresh: 2 * M, via: "tee", from: "92_gl_task_data TTL_FAST" },
+            empireResources: { path: "/api/command-center/empire-resources", fresh: 0, via: "plain", from: "read on Command Center open" },
+            ccTrader: { path: "/api/command-center/trader", fresh: 0, via: "plain", from: "read on Trader open" },
+            stationOps: { path: "/api/station-operations", fresh: 0, via: "plain", from: "read on Station Operations open" },
+            captureAlarms: { path: "/api/station-operations/capture-alarms", fresh: 15 * S, via: "tee", from: "game's query cache (15 s) and 18_gl_defense2 LIVE_MS" },
+            stationIntel: { path: "/api/station-operations/intel", fresh: 0, via: "tee", from: "game reads on Station Operations open" },
+            reportShares: { path: "/api/station-operations/report-shares", fresh: 0, via: "plain", from: "read on our own action" },
+            station: { path: "/api/stations/:id", fresh: 0, via: "plain", from: "read on station open" },
+            stationStorage: { path: "/api/alliances/station-storage", fresh: 0, via: "plain", from: "read on Stations open" },
+            allianceSearch: { path: "/api/alliances/search", fresh: 0, via: "plain", from: "read on our own action" },
+            marketHubs: { path: "/api/market/hubs", fresh: 0, via: "plain", from: "read on Market open" },
+            marketBalances: { path: "/api/market/my-balances", fresh: 0, via: "plain", from: "read on Market open" },
+            marketMyOrders: { path: "/api/market/my-orders", fresh: 0, via: "plain", from: "read on Market open" },
+            marketOrders: { path: "/api/market/orders", fresh: 0, via: "plain", from: "read on Open Orders open (GL-308)" },
+            logisticsRoutes: { path: "/api/logistics/routes", fresh: 0, via: "plain", from: "read on Transfer open and after our own route write" },
+            logisticsHubs: { path: "/api/logistics/hub-levels", fresh: 0, via: "plain", from: "read on Transfer open" },
+            logisticsSources: { path: "/api/logistics/collectible-sources", fresh: 0, via: "tee", from: "game reads on Logistics open" },
+            rankMe: { path: "/api/rankings/me", fresh: 2 * M, via: "plain", from: "G-060, David's 2-minute refresh" },
+            rankPlayers: { path: "/api/rankings/players", fresh: H, via: "plain", from: "69_fl_targets PTG_RANK_FRESH" },
+            rankAlliances: { path: "/api/rankings/alliances", fresh: H, via: "plain", from: "69_fl_targets PTG_RANK_FRESH" },
+            playerProfile: { path: "/api/players/:id/profile", fresh: 0, via: "tee", from: "game reads on profile open" },
+            messagesSystem: { path: "/api/messages/system", fresh: 0, via: "plain", from: "socket new_message, then one read" },
+            messagesUnread: { path: "/api/messages/unread-count", fresh: 0, via: "plain", from: "socket new_message, then one read" },
+            conversations: { path: "/api/messages/conversations", fresh: 0, via: "plain", from: "read on Messages open" },
+            fieldIndex: { path: "/api/galaxy/field-index", fresh: 0, via: "transport", from: "read on PVE open" },
+            colonyIndex: { path: "/galaxy/colony-index", fresh: 30 * M, via: "transport", from: "69_fl_targets PTG_CI_FRESH" },
+            galaxyMap: { path: "/galaxy/map", fresh: 24 * H, via: "transport", from: "nl2.zones.map: at most one read a day (FL-496)" },
+        };
+        const rx = (p) => new RegExp("^" + p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/:id/g, "\\d+") + "$");
+        for (const k of Object.keys(sets)) {
+            sets[k].name = k;
+            sets[k].re = rx(sets[k].path);
+        }
+        const nameOf = (path) => { const p = String(path || "").split("?")[0]; for (const k of Object.keys(sets))
+            if (sets[k].re.test(p))
+                return k; return null; };
+        return { sets, nameOf };
+    })();
     NL.tableRules = true;
     {
         const GL_KEY = (k) => "nl2.gl." + k;
@@ -14769,8 +14845,16 @@
                     const m = /(\d{4}-\d\d-\d\d)[ T](\d\d:\d\d(?::\d\d)?)\s*UTC/i.exec(t.textContent || "");
                     setAttr(t, "data-nl2-bt-at", m ? NL.clock(m[1] + "T" + m[2] + "Z") : null);
                 });
+                const enMask = (g) => { const st = g.style || {}; let m = st.maskImage || st.webkitMaskImage || ""; if (!m || m === "none") {
+                    try {
+                        const cs = getComputedStyle(g);
+                        m = cs.maskImage || cs.webkitMaskImage || "";
+                    }
+                    catch (e) { }
+                } return m; };
+                const enIcon = (sp) => !!sp.querySelector("svg") || [...sp.querySelectorAll(".ui-icon, .game-glyph")].some((g) => !/\/(stat(?!Energy)[A-Za-z]*|wpn[A-Za-z]*|armor[A-Za-z]*)\.(?:webp|png|svg)/i.test(enMask(g)));
                 NL.watch(".buildings-page .building-effect > *", (sp) => {
-                    const en = !!sp.querySelector("svg") && !sp.querySelector("img.game-resource-icon") && /^[+\-−]?\s*[\d.,]+(\/h)?$/.test((sp.textContent || "").trim());
+                    const en = enIcon(sp) && !sp.querySelector("img.game-resource-icon") && /^[+\-−]?\s*[\d.,]+(\/h)?$/.test((sp.textContent || "").trim());
                     setAttr(sp, "data-nl2-bt-en", en ? "" : null);
                 });
                 NL.watch(".buildings-page[data-nl2-bt] .building-effect", (el) => {
@@ -14810,6 +14894,7 @@
                     ".nl2-btt-fx img,.nl2-btt-fx svg{width:14px;height:14px;flex:0 0 14px;display:block}",
                     ".nl2-btt-det{display:flex;align-items:center;gap:16px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}",
                     ".nl2-btt-det .nl2-btt-opt{display:inline-flex;align-items:center;gap:8px}",
+                    ".nl2-t-pill.nl2-btt-st{display:block;box-sizing:border-box;width:100%;text-align:center}",
                 ].join(""));
                 const on = () => NL.btTbl !== false && !!(NL.table && NL.table.mount);
                 const txt = (el) => (el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "");
@@ -14905,6 +14990,7 @@
                 }
                 const pill = (t, cls, tip) => { const p = NL.h("span", { class: "nl2-t-pill" + (cls ? " " + cls : "") }, t); if (tip && NL.tip)
                     NL.tip(p, tip); return p; };
+                const BUSY_RE = /^(building|queued)$/i;
                 function statusOf(card) {
                     const ul = card.querySelector(".building-upgrading-line");
                     if (ul) {
@@ -14972,10 +15058,7 @@
                     const row = { key, enBest, vals, tips, cellCls, sortVals, sig, btn, by, rare, fx: rest, fxs, hid: card.classList.contains("nl2-hidden-card"), link: () => { const c = cardOf(key), h = c && c.querySelector("h4.building-name"); if (h)
                             h.click(); } };
                     if (st)
-                        row.span = { from: "ore", to: "rare", cell: () => pill(st.t, st.cls, st.tip) }, sig._span = st.t + st.cls;
-                    const busy = card.querySelector(".building-upgrading-line");
-                    if (busy)
-                        row.cls = /queued/i.test(txt(busy)) ? "nl2-t-row-info" : "nl2-t-row-ok";
+                        row.span = { from: "ore", to: "rare", cell: () => pill(st.t, st.cls + (BUSY_RE.test(st.t) ? " nl2-btt-st" : ""), st.tip) }, sig._span = st.t + st.cls;
                     const det = detailOf(card, key);
                     if (det) {
                         row.detail = det;
@@ -15020,6 +15103,7 @@
                     grid.after(host);
                     t = NL.table.mount(host, {
                         id: "bu",
+                        zebra: false,
                         cols: [
                             { k: "name", l: "Building", w: 170, name: true, cell: (r) => r.key },
                             { k: "level", l: "Level", w: 72 },
@@ -15188,7 +15272,15 @@
                     } });
                     return raw > 0 ? fin / raw : null;
                 };
-                const chipOf = (card) => [...card.querySelectorAll(".building-effect > *")].find((sp) => !!sp.querySelector("svg") && !sp.querySelector("img.game-resource-icon")
+                const maskOf = (g) => { const st = g.style || {}; let m = st.maskImage || st.webkitMaskImage || ""; if (!m || m === "none") {
+                    try {
+                        const cs = getComputedStyle(g);
+                        m = cs.maskImage || cs.webkitMaskImage || "";
+                    }
+                    catch (e) { }
+                } return m; };
+                const enIcon = (sp) => !!sp.querySelector("svg") || [...sp.querySelectorAll(".ui-icon, .game-glyph")].some((g) => !/\/(stat(?!Energy)[A-Za-z]*|wpn[A-Za-z]*|armor[A-Za-z]*)\.(?:webp|png|svg)/i.test(maskOf(g)));
+                const chipOf = (card) => [...card.querySelectorAll(".building-effect > *")].find((sp) => enIcon(sp) && !sp.querySelector("img.game-resource-icon")
                     && /^\+\s*[\d.,]+$/.test((sp.textContent || "").trim()));
                 NL.watch(".buildings-page .buildings-grid", (g) => {
                     const on = !!g.closest(".buildings-page[data-nl2-bt]");
@@ -47695,7 +47787,7 @@
                     ks.forEach((k) => localStorage.removeItem(k));
                     localStorage.setItem(mark, v);
                     if (ks.length)
-                        console.warn("[NL] removed the game's sim scratch keys: " + ks.join(", "));
+                        console.warn("[NL] removed our sim scratch keys: " + ks.join(", "));
                 }
             }
             catch (e) { }
@@ -50302,7 +50394,7 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                         NL.tip && NL.tip(el, t);
                     }
                 }, true);
-                const table = H("table", { class: "nl2-t-tbl nl2-tbl" + (opts.subFill ? " nl2-t-subfill" : "") });
+                const table = H("table", { class: "nl2-t-tbl nl2-tbl" + (opts.subFill ? " nl2-t-subfill" : "") + (opts.zebra === false ? " nl2-t-nozebra" : "") });
                 if (act)
                     table.style.setProperty("--nl2-t-btnw", (act.w || 110) + "px");
                 const widths = cols.map((c) => (c.w === "flex" || c.w == null ? null : (typeof c.w === "number" ? c.w + "px" : c.w)));
@@ -50901,7 +50993,7 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                             at = tr;
                             fillRow(tr, row);
                             tr.hidden = !open;
-                            tr.classList.toggle("nl2-t-z", (z++ % 2) === 1);
+                            tr.classList.toggle("nl2-t-z", opts.zebra !== false && (z++ % 2) === 1);
                             let det = tr._nl2Det;
                             if (row.detail && isOpen(row)) {
                                 if (!det) {

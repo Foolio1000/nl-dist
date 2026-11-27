@@ -2,6 +2,19 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.168 · Nov 27, 2026
+
+**🏗 Buildings**
+- The Buildings table has its own look: no stripes, no tint on rows that are building or queued, and the Building / Queued pill spans all five resource columns (BU-051)
+
+**⚙ Behind the scenes**
+- A new build check keeps every game read, timer and storage write going through one shared place, so new features can't add hidden background work (GL-467)
+- The rules for what the script keeps in memory are written down in one place (GL-458), and the list of the script's timers is now generated from the code (GL-345)
+
+**🐞 Fixes**
+- The Buildings Energy column, its RSS per energy hover and the cheapest-energy highlight work again after the 26 Nov game update (BU-050)
+- The memory clean-up's console message now says it removed our own sim results, not the game's (GL-466)
+
 ## v0.5.167 · Nov 27, 2026
 
 **⚙ Speed and memory**
@@ -205,20 +218,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **⚙️ Other**
 - Smaller caches, so browser storage stays well under the limit (GL-401)
-
-## v0.5.148 · Nov 21, 2026
-
-**🛰 Fleet**
-- New Genesis tab: base tables, unread report count in the menu, an attack dialog, and Scout and Simulate buttons (FL-529, FL-530, FL-531, FL-532)
-- "Genesis base taken" and "Genesis base found" messages are quiet (FL-533, FL-534)
-- Debris To collect shows estimated Phase and Trip times (FL-535)
-
-**🪐 Planets**
-- Resources tab: numbers shown in full and right-aligned, with a Bulk need figure (EM-045, EM-046)
-- Recycling compare popover (RE-044)
-- Weapon and armor types show as coloured pills (GL-398)
-
-**⚙️ Other**
-- When browser storage is full, Nexus Legacy clears its own rebuildable caches and keeps saving, and shows a notice if it still can't (GL-399)
-- Sorting a table keeps your earlier sorts as tiebreakers (GL-400)
-- XP tip reads "Resets at 00:00 UTC" (GL-397)
