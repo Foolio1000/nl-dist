@@ -1,5 +1,18 @@
 # Release notes archive
 
+## v0.5.150 · Nov 22, 2026
+
+**🚑 Hotfix**
+- Shipyard and other table pages no longer stutter: the weapon and armor pills stopped rewriting a shared stylesheet many times a second (GL-402)
+
+**🛰 Fleet**
+- PVP Attack: a Raid needs only Assault Shuttles, and opening Attack from a PVP row no longer fills cargo ships (FL-549, FL-550)
+- PVP target table uses the standard fonts (FL-556)
+- Genesis tab badge counts new reports, the same as the menu (FL-557)
+
+**🪐 Planets**
+- Bulk need retries a failed fuel estimate and explains on hover when it can't (FL-548)
+
 ## v0.5.149 · Nov 21, 2026
 
 **🛰 Fleet**

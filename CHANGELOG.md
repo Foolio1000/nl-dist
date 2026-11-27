@@ -2,6 +2,21 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.170 · Nov 27, 2026
+
+**🏗 Buildings**
+- The Max Level pill is grey, and a queued row's Time shows the game's build time for the next level. It reads "Waiting" only when that time isn't known (BU-054)
+- The Shield Generator row's Effect shows how much shield HP and regen the upgrade adds (BU-055)
+
+**⚙ Behind the scenes**
+- A shared helper for reading game data, so features can share one read instead of each making their own (GL-459)
+- The fleet dialog's attack check and the re-reads after a launch use that helper (GL-471, first part)
+
+**🐞 Fixes**
+- Command Center remembers your last tab again when you open it from the menu (EM-062)
+- The hidden copy of the Patrol form no longer plays click sounds while you make selections (FL-611)
+- The storage report no longer lists table settings as unknown keys (GL-472)
+
 ## v0.5.169 · Nov 27, 2026
 
 **🏗 Buildings**
@@ -207,16 +222,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🌙 Moons**
 - A phalanx scan that finds nothing now says so (MO-068)
-
-## v0.5.150 · Nov 22, 2026
-
-**🚑 Hotfix**
-- Shipyard and other table pages no longer stutter: the weapon and armor pills stopped rewriting a shared stylesheet many times a second (GL-402)
-
-**🛰 Fleet**
-- PVP Attack: a Raid needs only Assault Shuttles, and opening Attack from a PVP row no longer fills cargo ships (FL-549, FL-550)
-- PVP target table uses the standard fonts (FL-556)
-- Genesis tab badge counts new reports, the same as the menu (FL-557)
-
-**🪐 Planets**
-- Bulk need retries a failed fuel estimate and explains on hover when it can't (FL-548)

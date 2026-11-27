@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.169
+// @version      0.5.170
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.169", features: [] };
+    const NL = window.__nl2 = { version: "0.5.170", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -285,7 +285,7 @@ nl2.re-compare.* | 40_research | own
 nl2.sh-gather.* | 52_sh_gather | own
 nl2.sh-facility.* | 54_sh_facility | own
 nl2.sh.moonShip | 50_shipyard | own
-nl2.tbl.* | 97_tbl_render | own
+nl2.nl2.tbl.* | 97_tbl_render | own
 nl2.nl2.tbl.emres.* | 71_em_resources | own
 nl2.mo-thr.* | 84_mo_thresholds | own
 nl2.mo.phMe.* | 84_mo_phalanx | own
@@ -386,6 +386,10 @@ nxtCache | 92_gl_task_data | copy | clear cap=300000
 nxtOutpostTimes | 92_gl_task_data | own
 nxtScanHours | 92_gl_task_data | own
 nxtScanned | 92_gl_task_data | own
+nxsHangar | 90_pve | legacy
+nxsWhLossPct | 90_pve | legacy
+nl2.fl413.* | 69_fl_targets | legacy
+nl2.scoutcalc.* | nl-sims | legacy
 nxtMoonCfg | 92_gl_task_data | retired
 nxtSeenModules | 92_gl_task_data | retired
 nxtSnap | 92_gl_task_data | retired
@@ -1422,6 +1426,7 @@ nxtSnap | 92_gl_task_data | retired
         NL.fleetHwLabel = () => (NL.fleetGateLabel ? "Gateway" : "Galactic Highway");
         NL.fleetHwOff = true;
         NL.fleetGold = true;
+        NL.fdData = true;
         const gold = (c) => (NL.fleetGold ? c.replace(/rgba\(251,146,60,\.12\)/g, "color-mix(in srgb,var(--nl2-amber, #fbbf24) 12%,transparent)")
             .replace(/rgba\(251,146,60,\.55\)/g, "color-mix(in srgb,var(--nl2-amber, #fbbf24) 55%,transparent)").replace(/#fb923c/g, "var(--nl2-amber, #fbbf24)") : c);
         NL.fleetFuelRoom = true;
@@ -1453,8 +1458,15 @@ nxtSnap | 92_gl_task_data | retired
             const ATK = ["attack", "attack_moon", "raid"], reEsc = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
             let readAt = 0;
             NL.nextAttack = (t) => {
-                const c = NL.cache && NL.cache.latest(/^\/api\/fleet\/missions(\?|$)/);
-                if ((!c || Date.now() - c.at > 30000) && Date.now() - readAt > 30000 && NL.getJson) {
+                const dd = NL.fdData && NL.data;
+                const c = dd ? NL.data.get("missions") : NL.cache && NL.cache.latest(/^\/api\/fleet\/missions(\?|$)/);
+                if (dd) {
+                    if ((!c || c.age > 30000) && Date.now() - readAt > 30000) {
+                        readAt = Date.now();
+                        Promise.resolve(NL.data.need("missions", { maxAge: 30000 })).catch(() => { });
+                    }
+                }
+                else if ((!c || Date.now() - c.at > 30000) && Date.now() - readAt > 30000 && NL.getJson) {
                     readAt = Date.now();
                     Promise.resolve(NL.getJson("/api/fleet/missions")).catch(() => { });
                 }
@@ -3243,6 +3255,88 @@ nxtSnap | 92_gl_task_data | retired
             if (sets[k].re.test(p))
                 return k; return null; };
         return { sets, nameOf };
+    })();
+    NL.dataApi = true;
+    (function dataApi() {
+        const D = NL.data, sets = D.sets, flying = new Map(), net = { until: 0, backoff: 0 }, warned = new Set();
+        D.gap = 300;
+        let last = 0;
+        const esc = (p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const setOf = (name) => { const s = sets[name]; if (!s && !warned.has(name)) {
+            warned.add(name);
+            console.warn("[NL] data: \"" + name + "\" is not a registered dataset (07_data.js)");
+        } return s || null; };
+        const pathOf = (s, o) => { let p = s.path; if (p.includes(":id")) {
+            if (!o || o.id == null)
+                return null;
+            p = p.replace(":id", String(o.id));
+        } return p; };
+        const wrap = (c) => (c ? { data: c.data, at: c.at, age: Date.now() - c.at, path: c.path } : null);
+        const idOf = (s, path) => { const i = s.path.split("/").indexOf(":id"); return i < 0 ? null : +path.split("?")[0].split("/")[i]; };
+        D.get = (name, o) => {
+            const s = setOf(name), p = s && pathOf(s, o);
+            if (!p)
+                return null;
+            return wrap(NL.cache.latest(new RegExp("^" + esc(p) + (o && o.query ? esc(o.query) + "$" : "(\\?.*)?$"))));
+        };
+        D.all = (name) => { const s = setOf(name); return s ? NL.cache.all({ test: (p) => s.re.test(p.split("?")[0]) }).map(wrap).sort((a, b) => a.at - b.at) : []; };
+        D.on = (name, fn) => { const s = setOf(name); if (s)
+            NL.onData({ test: (p) => s.re.test(p.split("?")[0]) }, (path, data, at) => fn(data, { path, at, id: idOf(s, path) })); };
+        const nap = (ms) => new Promise((ok) => setTimeout(ok, ms));
+        const stored = async (name, o, url, j, t0) => {
+            let now = D.get(name, o);
+            for (let i = 0; i < 20 && (!now || now.at < t0); i++) {
+                await nap(5);
+                now = D.get(name, o);
+            }
+            if (!now || now.at < t0) {
+                NL._put(url, j);
+                now = D.get(name, o);
+            }
+            return now;
+        };
+        D.need = (name, o) => {
+            o = o || {};
+            const s = setOf(name), p = s && pathOf(s, o);
+            if (!p)
+                return Promise.resolve(null);
+            const c = D.get(name, o), max = o.maxAge != null ? o.maxAge : s.fresh;
+            const ok = !!c && (o.since != null ? c.at >= o.since : o.maxAge == null && !s.fresh ? true : c.age <= max);
+            const out = (x, fresh) => (x ? Object.assign(x, { fresh }) : null);
+            if (ok)
+                return Promise.resolve(out(c, true));
+            if (s.via !== "plain")
+                return Promise.resolve(out(c, false));
+            const url = p + (o.query || "");
+            if (NL.dataApi === false) {
+                const t1 = Date.now();
+                return Promise.resolve(NL.getJson(url, o.ctx)).then(async (j) => (j == null ? out(D.get(name, o), false) : out(await stored(name, o, url, j, t1), true)), () => out(c, false));
+            }
+            if (flying.has(url))
+                return flying.get(url);
+            if (Date.now() < net.until)
+                return Promise.resolve(out(c, false));
+            const wait = Math.max(0, last + D.gap - Date.now()), t0 = Date.now() + wait;
+            last = t0;
+            const pr = (async () => {
+                try {
+                    if (wait)
+                        await nap(wait);
+                    const j = await NL.getJson(url, { id: "data " + name, _net: net });
+                    if (j == null)
+                        return out(D.get(name, o), false);
+                    return out(await stored(name, o, url, j, t0), true);
+                }
+                catch (e) {
+                    return out(D.get(name, o), false);
+                }
+                finally {
+                    flying.delete(url);
+                }
+            })();
+            flying.set(url, pr);
+            return pr;
+        };
     })();
     NL.tableRules = true;
     {
@@ -15072,11 +15166,22 @@ nxtSnap | 92_gl_task_data | retired
                 const GROUND = new Set(["Garrison", "Storage Cloaking", "Defense Traps"]);
                 const RES = ["ore", "silicates", "hydrogen", "alloys"];
                 const stock = {};
+                const pbt = {};
                 if (NL.onData)
-                    NL.onData(/^\/api\/planets\/\d+$/, (path, d) => { const res = d && d.resourceSnapshot && d.resourceSnapshot.resources; if (res) {
-                        stock[path.split("/").pop()] = res;
-                        NL._kick && NL._kick();
-                    } });
+                    NL.onData(/^\/api\/planets\/\d+$/, (path, d) => {
+                        const res = d && d.resourceSnapshot && d.resourceSnapshot.resources, id = path.split("/").pop();
+                        if (d && Array.isArray(d.buildings)) {
+                            const m = {};
+                            d.buildings.forEach((b) => { const n = b && b.definition && b.definition.name; if (n && b.previewBuildTimeSeconds > 0)
+                                m[n] = +b.previewBuildTimeSeconds; });
+                            pbt[id] = m;
+                        }
+                        if (res)
+                            stock[id] = res;
+                        if (res || pbt[id])
+                            NL._kick && NL._kick();
+                    });
+                const pbtOf = (name) => { const h = NL.here && NL.here(), m = h && h.kind === "planet" ? pbt[String(h.id)] : null, v = m ? m[name] : null; return v > 0 ? v : null; };
                 const haveOf = (k) => { const h = NL.here && NL.here(), res = h && h.kind === "planet" ? stock[String(h.id)] : null, v = res ? res[k] : null; return v == null || !isFinite(+v) ? null : +v; };
                 const shortTip = (c) => { const h = haveOf(c.k); return h != null && h < c.v ? "Short " + NL.fmt(c.v - h) + " " + c.name + " (need " + NL.fmt(c.v) + ", have " + NL.fmt(h) + ")" : "Short of " + c.name + " (need " + NL.fmt(c.v) + ")"; };
                 NL.css("bu-tbl2", [
@@ -15192,7 +15297,7 @@ nxtSnap | 92_gl_task_data | retired
                         return { t, cls: /queued/i.test(t) ? "" : "nl2-t-pill-ok" };
                     }
                     if (card.querySelector(".building-action-area > .building-maxed"))
-                        return { t: "Max Level", cls: "nl2-t-pill-ok" };
+                        return { t: "Max Level", cls: "" };
                     const sd = card.querySelector(".building-action-area > .building-sentinel-disabled");
                     if (sd) {
                         const g = txt(sd), nm = txt(card.querySelector("h4.building-name"));
@@ -15206,12 +15311,30 @@ nxtSnap | 92_gl_task_data | retired
                     }
                     return null;
                 }
+                const SG_HP = [0, 500, 1000, 1500, 2000, 2500, 3780, 7620, 15300, 30660, 61380, 107460, 176580, 280260, 435780, 669060, 1018980, 1543860, 2331180, 3512160, 5283630];
+                const sgHp = (l) => { if (l < SG_HP.length)
+                    return SG_HP[Math.max(0, l)]; let v = SG_HP[20], inc = SG_HP[20] - SG_HP[19]; for (let i = 21; i <= l; i++) {
+                    inc *= 1.5;
+                    v += inc;
+                } return Math.round(v); };
+                const sgFx = (card, key) => {
+                    if (!/^shield generator$/i.test(key))
+                        return [];
+                    const lv = card.querySelector(".building-level"), m = /(\d+)\s*(?:→|->)\s*(\d+)/.exec((lv && (lv.getAttribute("data-nl2-bt-lv") || lv.textContent)) || "");
+                    if (!m)
+                        return [];
+                    const d = sgHp(+m[2]) - sgHp(+m[1]);
+                    if (!(d > 0))
+                        return [];
+                    const f = (n) => (NL.fmt ? NL.fmt(n, true) : String(n));
+                    return [{ t: "+" + f(d) + " shield HP", bad: false }, { t: "+" + f(Math.round(d / 10)) + "/h shield regen", bad: false }];
+                };
                 function rowOf(card) {
                     const h4 = card.querySelector("h4.building-name"), key = txt(h4);
                     const c2 = card.querySelector(":scope > .nl2-counters"), dmg = card.querySelector(":scope > .building-damage-banner");
                     const lvEl = card.querySelector(".building-level");
                     const fx = [...card.querySelectorAll(".building-effect > *")];
-                    const en = fx.find((x) => x.hasAttribute("data-nl2-bt-en")), fxs = fx.filter((x) => x !== en).map((x) => fxOf(x, key)).filter((f) => f.t), rest = fxs.map((f) => f.t);
+                    const en = fx.find((x) => x.hasAttribute("data-nl2-bt-en")), fxs = fx.filter((x) => x !== en).map((x) => fxOf(x, key)).filter((f) => f.t).concat(sgFx(card, key)), rest = fxs.map((f) => f.t);
                     const roi = card.querySelector(".building-action-area > .nl2-roi");
                     const roiC = roi ? (roi.classList.contains("nl2-g") ? "nl2-t-ok" : roi.classList.contains("nl2-y") ? "nl2-t-warn" : roi.classList.contains("nl2-r") ? "nl2-t-bad" : "") : "";
                     const costs = costsOf(card), by = {};
@@ -15219,7 +15342,7 @@ nxtSnap | 92_gl_task_data | retired
                     const rare = costs.filter((c) => !RES.includes(c.k));
                     const cd = card.querySelector(".qol-completion .countdown"), bt = card.querySelector(".building-costs > .build-time");
                     const st = statusOf(card);
-                    const vals = { level: lvEl ? (lvEl.getAttribute("data-nl2-bt-lv") || txt(lvEl).replace(/^lv\.?\s*/i, "")) : "\u2014", en: en ? txt(en) : "", roi: roi ? txt(roi).replace(/^ROI\s*/i, "") : "", time: cd ? txt(cd) : bt ? txt(bt) : st && /^queued$/i.test(st.t) ? "Waiting" : "" };
+                    const vals = { level: lvEl ? (lvEl.getAttribute("data-nl2-bt-lv") || txt(lvEl).replace(/^lv\.?\s*/i, "")) : "\u2014", en: en ? txt(en) : "", roi: roi ? txt(roi).replace(/^ROI\s*/i, "") : "", time: cd ? txt(cd) : bt ? txt(bt) : st && /^queued$/i.test(st.t) ? (pbtOf(key) && NL.fmtDur ? NL.fmtDur(pbtOf(key)) : "Waiting") : "" };
                     const tips = { name: [key, c2 ? txt(c2) : "", dmg ? txt(dmg) : ""].filter(Boolean).join("\n") }, cellCls = {}, sortVals = {}, sig = {};
                     let enBest = false;
                     if (en) {
@@ -29267,7 +29390,10 @@ nxtSnap | 92_gl_task_data | retired
                                     const mid = x.j && ((x.j.mission && x.j.mission.id) || x.j.missionId);
                                     if (mid != null && NL.ptgMissionType)
                                         NL.ptgMissionType(mid, b.missionType);
-                                    setTimeout(() => { get("/api/fleet/missions"); }, 1000);
+                                    setTimeout(() => { if (NL.fdData && NL.data)
+                                        NL.data.need("missions", { since: Date.now() });
+                                    else
+                                        get("/api/fleet/missions"); }, 1000);
                                     return { ok: true, message: (x.j && x.j.message) || "Fleet launched.", missionId: mid };
                                 }
                                 const c = x.j && CONFIRM[x.j.code];
@@ -29396,7 +29522,10 @@ nxtSnap | 92_gl_task_data | retired
                             }
                             if (NL.launched)
                                 NL.launched({ kind: "salvage", srcId: st.src, target: { kind: r.kind, id: r.id }, mission: "collect_debris", ships: (body.ships || []).map((y) => ({ key: y.shipDefId != null ? y.shipDefId : y.key, quantity: y.quantity })), missionId: (x.j && ((x.j.mission && x.j.mission.id) || x.j.missionId)) || null });
-                            setTimeout(() => { get("/api/fleet/missions"); }, 1000);
+                            setTimeout(() => { if (NL.fdData && NL.data)
+                                NL.data.need("missions", { since: Date.now() });
+                            else
+                                get("/api/fleet/missions"); }, 1000);
                             close();
                         }
                         catch (e) {
@@ -34277,6 +34406,8 @@ nxtSnap | 92_gl_task_data | retired
                 } });
                 window.addEventListener("popstate", () => NL._kick());
                 NL.watch(".cc-page > nav.cc-tabs", (nav) => {
+                    if (location.pathname !== "/command-center")
+                        return;
                     if (!nav.dataset.nl2Emt) {
                         nav.dataset.nl2Emt = "1";
                         nav.addEventListener("click", (e) => {
@@ -38664,6 +38795,44 @@ nxtSnap | 92_gl_task_data | retired
                 return switchTo(doc, name);
             }
             const panel = (doc) => doc.querySelector(".patrol-v2-panel");
+            function mute(w) {
+                if (!w || w.__nlMuted)
+                    return;
+                try {
+                    w.__nlMuted = true;
+                    const Base = w.BaseAudioContext || w.AudioContext || w.webkitAudioContext;
+                    const d = Base && Object.getOwnPropertyDescriptor(Base.prototype, "destination");
+                    if (d && d.get) {
+                        const real = d.get, silent = new w.WeakMap();
+                        Object.defineProperty(Base.prototype, "destination", { configurable: true, get() {
+                                let g = silent.get(this);
+                                if (!g) {
+                                    g = this.createGain();
+                                    g.gain.value = 0;
+                                    g.connect(real.call(this));
+                                    silent.set(this, g);
+                                }
+                                return g;
+                            } });
+                    }
+                    const M = w.HTMLMediaElement && w.HTMLMediaElement.prototype;
+                    if (M && M.play) {
+                        const play = M.play;
+                        M.play = function () { this.muted = true; this.volume = 0; return play.apply(this, arguments); };
+                    }
+                }
+                catch (e) { }
+            }
+            function muteWatch(f) {
+                let on = true;
+                const tick = () => { if (!on || !f.isConnected)
+                    return; try {
+                    mute(f.contentWindow);
+                }
+                catch (e) { } setTimeout(tick, 10); };
+                tick();
+                return () => { on = false; };
+            }
             function open() {
                 if (ready)
                     return ready;
@@ -38677,11 +38846,13 @@ nxtSnap | 92_gl_task_data | retired
                 fr.style.cssText = "position:fixed;left:-12000px;top:0;width:1280px;height:900px;border:0;opacity:0;pointer-events:none";
                 document.body.appendChild(fr);
                 const f = fr;
+                const stopMute = muteWatch(f);
                 startWatch();
                 ready = (async () => {
                     const doc = await until(() => f.contentDocument && f.contentDocument.body && btnOf(f.contentDocument, /^Patrol/) && f.contentDocument, LOAD_MS);
                     if (!doc)
                         return null;
+                    mute(f.contentWindow);
                     btnOf(doc, /^Patrol/).click();
                     const p = await until(() => panel(doc), LOAD_MS);
                     if (!p)
@@ -38693,6 +38864,10 @@ nxtSnap | 92_gl_task_data | retired
                     await W(300);
                     return doc;
                 })().catch(() => null);
+                ready.then(() => { stopMute(); try {
+                    mute(f.contentWindow);
+                }
+                catch (e) { } });
                 ready.then((d) => { if (!d && fr === f) {
                     failAt = Date.now();
                     close();
