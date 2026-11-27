@@ -2,6 +2,18 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.167 · Nov 27, 2026
+
+**⚙ Speed and memory**
+- The script keeps at most 300 saved game answers in memory, so a game tab left open all day no longer grows to gigabytes. Each planet's latest snapshot is always kept (GL-452)
+- Once per version, the script clears the leftover results of our own combat-sim runs from browser storage, about 500 KB (GL-452)
+
+**⛏ Mining and PVE**
+- The hidden copy of the Patrol form behind the Salvage Patrol readout now closes within a second of the dialog closing. There's never more than one, and one left idle for 3 minutes closes itself (FL-610)
+
+**🐞 Fixes**
+- The Buildings table shows Building or Queued again instead of an empty pill, after the 26 Nov game update (BU-049)
+
 ## v0.5.166 · Nov 27, 2026
 
 **⛏ Mining and PVE**
@@ -210,20 +222,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 - When browser storage is full, Nexus Legacy clears its own rebuildable caches and keeps saving, and shows a notice if it still can't (GL-399)
 - Sorting a table keeps your earlier sorts as tiebreakers (GL-400)
 - XP tip reads "Resets at 00:00 UTC" (GL-397)
-
-## v0.5.147 · Nov 21, 2026
-
-**🛡 Station Operations**
-- Defense tables use the shared table: sections sort and remember their state, one text button per row plus Scan, Salvage and Remove as icons in fixed slots, and planet names link to the planet (GL-352, GL-392, GL-393, GL-396, FL-490)
-
-**🪐 Planets**
-- Overview: after an Evacuate, the button becomes a red "Recall" showing time flown; two clicks recall the fleet (OV-024)
-- Fleet on Planet: the two row buttons are stacked (FL-526)
-- Research cost cells are no longer cut off (RE-043)
-- Resources tab: Total column and Bulk subtotals removed, overflow fixed (EM-044)
-
-**🛰 Fleet**
-- Fleets Available slot count updates the moment a fleet launches or lands (GL-394, GL-395)
-- Debris Phase and Trip time fill straight away instead of showing "—" for 20 to 30 seconds (FL-524)
-- Bio picklist rows are tinted (FL-525)
-- Reports Time and Transfer Routes columns fit the page (FL-527, FL-528)

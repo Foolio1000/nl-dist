@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.166
+// @version      0.5.167
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.166", features: [] };
+    const NL = window.__nl2 = { version: "0.5.167", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -25,11 +25,25 @@
         catch (e) {
             return null;
         } };
+        const KEEP = /^\/api\/planets(\/\d+(\/(fleet|shipyard))?)?$/;
+        const trim = () => {
+            const max = NL.teeMax == null ? 300 : NL.teeMax;
+            if (!(max > 0) || latest.size <= max)
+                return;
+            for (const k of latest.keys()) {
+                if (latest.size <= max)
+                    break;
+                if (!KEEP.test(k))
+                    latest.delete(k);
+            }
+        };
         const put = (path, data) => {
             if (!path || data == null || typeof data !== "object" || path.startsWith("/api/transport/"))
                 return;
             const at = Date.now();
+            latest.delete(path);
             latest.set(path, { path, data, at });
+            trim();
             for (const s of subs)
                 if (s.re.test(path)) {
                     try {
@@ -59,7 +73,7 @@
         NL.onWrite = (re, fn) => { wsubs.push({ re, fn }); };
         NL.cache = {
             latest(re) { let best = null; for (const v of latest.values())
-                if (re.test(v.path) && (!best || v.at > best.at))
+                if (re.test(v.path) && (!best || v.at >= best.at))
                     best = v; return best; },
             all(re) { return [...latest.values()].filter((v) => re.test(v.path)); },
         };
@@ -14892,9 +14906,10 @@
                 const pill = (t, cls, tip) => { const p = NL.h("span", { class: "nl2-t-pill" + (cls ? " " + cls : "") }, t); if (tip && NL.tip)
                     NL.tip(p, tip); return p; };
                 function statusOf(card) {
-                    const line = card.querySelector(".building-upgrading-line > span:not(.building-upgrading-separator):not(.qol-completion)");
-                    if (line) {
-                        const t = txt(line);
+                    const ul = card.querySelector(".building-upgrading-line");
+                    if (ul) {
+                        const sp = [...ul.querySelectorAll(":scope > span:not(.building-upgrading-separator):not(.qol-completion)")].find((x) => !x.matches(".game-glyph, .ui-icon, [class*=\"glyph\"]") && txt(x));
+                        const t = sp ? txt(sp) : ul.querySelector(".qol-completion, .countdown, time") ? "Building" : "Queued";
                         return { t, cls: /queued/i.test(t) ? "" : "nl2-t-pill-ok" };
                     }
                     if (card.querySelector(".building-action-area > .building-maxed"))
@@ -38304,7 +38319,9 @@
                     await W(100);
                 }
             }
-            let fr = null, ready = null, watch = 0, owner = null, queue = Promise.resolve(), failAt = 0;
+            let fr = null, ready = null, watch = 0, owner = null, queue = Promise.resolve(), failAt = 0, lastUse = 0;
+            const LABEL = "Patrol ratings", IDLE_MS = window.__nxsTestGap != null ? 4000 : 3 * 60000;
+            const strays = () => document.querySelectorAll("iframe[aria-label=\"" + LABEL + "\"]");
             const FAIL_MS = 5 * 60000;
             function close() {
                 clearInterval(watch);
@@ -38314,6 +38331,9 @@
                 ready = null;
                 owner = null;
                 orig = null;
+                for (const x of strays())
+                    if (x !== f)
+                        x.remove();
                 if (!f)
                     return;
                 if (back && doc && !onPlanet(doc, back))
@@ -38366,14 +38386,17 @@
             function open() {
                 if (ready)
                     return ready;
+                for (const x of strays())
+                    x.remove();
                 fr = document.createElement("iframe");
                 fr.src = "/fleet";
-                fr.setAttribute("aria-label", "Patrol ratings");
+                fr.setAttribute("aria-label", LABEL);
                 fr.tabIndex = -1;
                 fr.setAttribute("aria-hidden", "true");
                 fr.style.cssText = "position:fixed;left:-12000px;top:0;width:1280px;height:900px;border:0;opacity:0;pointer-events:none";
                 document.body.appendChild(fr);
                 const f = fr;
+                startWatch();
                 ready = (async () => {
                     const doc = await until(() => f.contentDocument && f.contentDocument.body && btnOf(f.contentDocument, /^Patrol/) && f.contentDocument, LOAD_MS);
                     if (!doc)
@@ -38395,12 +38418,11 @@
                 } });
                 return ready;
             }
-            function hold(el) {
-                owner = el || owner;
+            function startWatch() {
                 if (watch)
                     return;
-                watch = setInterval(() => { if (!owner || !owner.isConnected)
-                    close(); }, 2000);
+                watch = setInterval(() => { if (!owner || !owner.isConnected || Date.now() - lastUse > IDLE_MS)
+                    close(); }, 1000);
             }
             const setNum = (doc, inp, n) => {
                 const set = Object.getOwnPropertyDescriptor(doc.defaultView.HTMLInputElement.prototype, "value").set;
@@ -38473,8 +38495,13 @@
                 return out.cargo || out.esc ? out : null;
             }
             NL.patGame = {
-                rate: (q, el) => { if (el)
-                    hold(el); const r = queue.then(() => rate(q)).catch(() => null); queue = r; return r; },
+                rate: (q, el) => {
+                    const r = queue.then(() => { if (el)
+                        owner = el; if (!owner || !owner.isConnected)
+                        return null; lastUse = Date.now(); return rate(q); }).catch(() => null);
+                    queue = r;
+                    return r;
+                },
                 close,
                 _readOut: readOut,
                 _shipRow: shipRow,
@@ -42267,6 +42294,8 @@
                         exclude: NL.fl416 ? PAT_NO_SHIPS.filter((k) => k !== "hacker_ship") : PAT_NO_SHIPS,
                         cp: null,
                         estMore: NL.fl608 && NL.patGame ? async (st) => {
+                            if (!cfg.ov || !cfg.ov.isConnected)
+                                return { fl608: true, pending: true };
                             const ships = st.ships.filter((x) => st.act[x.key] > 0).map((x) => ({ name: x.name, key: x.key, n: st.act[x.key] }));
                             const seq = (cfg.pgSeq = (cfg.pgSeq || 0) + 1);
                             const got = NL.patGame.rate({ src: st.src, srcName: (S.planets.find((p) => p.id === st.src) || {}).name, ships, hours: L.hours, coverage: L.coverage }, cfg.ov)
@@ -47652,6 +47681,25 @@
             }
             return gone;
         };
+        NL.simSweep = true;
+        if (NL.simSweep !== false) {
+            try {
+                const mark = "nl2.simSweep.v", v = String(NL.version || "");
+                if (localStorage.getItem(mark) !== v) {
+                    const ks = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        if (/^__(res\d*|simres|FS\d*)/.test(k || ""))
+                            ks.push(k);
+                    }
+                    ks.forEach((k) => localStorage.removeItem(k));
+                    localStorage.setItem(mark, v);
+                    if (ks.length)
+                        console.warn("[NL] removed the game's sim scratch keys: " + ks.join(", "));
+                }
+            }
+            catch (e) { }
+        }
         if (NL.storeGuard !== false && Array.isArray(NL.storeEvictable)) {
             for (const k of ["nl2.zones.map", "nl2.gl-offense2.map", "nl2.gl-defense2.map", "nl2.gl.rankList", "nl2.fl-targets.ranks", "nl2.fl-spy-launch.ranks"])
                 if (!NL.storeEvictable.includes(k))

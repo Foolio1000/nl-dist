@@ -1,5 +1,22 @@
 # Release notes archive
 
+## v0.5.147 · Nov 21, 2026
+
+**🛡 Station Operations**
+- Defense tables use the shared table: sections sort and remember their state, one text button per row plus Scan, Salvage and Remove as icons in fixed slots, and planet names link to the planet (GL-352, GL-392, GL-393, GL-396, FL-490)
+
+**🪐 Planets**
+- Overview: after an Evacuate, the button becomes a red "Recall" showing time flown; two clicks recall the fleet (OV-024)
+- Fleet on Planet: the two row buttons are stacked (FL-526)
+- Research cost cells are no longer cut off (RE-043)
+- Resources tab: Total column and Bulk subtotals removed, overflow fixed (EM-044)
+
+**🛰 Fleet**
+- Fleets Available slot count updates the moment a fleet launches or lands (GL-394, GL-395)
+- Debris Phase and Trip time fill straight away instead of showing "—" for 20 to 30 seconds (FL-524)
+- Bio picklist rows are tinted (FL-525)
+- Reports Time and Transfer Routes columns fit the page (FL-527, FL-528)
+
 ## v0.5.146 · Nov 21, 2026
 
 **📊 Resources**
