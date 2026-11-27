@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.171
+// @version      0.5.172
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.171", features: [] };
+    const NL = window.__nl2 = { version: "0.5.172", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -14836,10 +14836,11 @@ nxtSnap | 92_gl_task_data | retired
                 const C = ".buildings-page > .bld-hero .bld-stat-chip[data-nl2-slots]";
                 NL.css("bu-slots-color", [
                     `${C} .chip-flag{display:none!important}`,
-                    `${C}[data-nl2-slots="full"]{border-color:rgba(239,68,68,.4)!important}`,
-                    `${C}[data-nl2-slots="full"] strong{color:rgb(239,68,68)!important}`,
-                    `${C}[data-nl2-slots="one"]{border-color:rgba(245,158,11,.4)!important}`,
-                    `${C}[data-nl2-slots="one"] strong{color:rgb(245,158,11)!important}`,
+                    `${C}[data-nl2-slots="full"]{border-color:color-mix(in srgb,var(--nl2-amber,#fbbf24) 40%,transparent)!important}`,
+                    `${C}[data-nl2-slots="full"] strong{color:var(--nl2-amber,#fbbf24)!important}`,
+                    ".buildings-page > .bld-hero .bld-stat-chip[data-nl2-bu-nochip]{display:none!important}",
+                    `${C}[data-nl2-slots="one"]{border-color:color-mix(in srgb,var(--nl2-amber,#fbbf24) 40%,transparent)!important}`,
+                    `${C}[data-nl2-slots="one"] strong{color:var(--text-primary,#f1f6ff)!important}`,
                     `${C}[data-nl2-slots="ok"]{border-color:var(--border-color,rgba(120,200,255,.12))!important}`,
                     `${C}[data-nl2-slots="ok"] strong{color:var(--text-primary,#f1f6ff)!important}`,
                 ].join(""));
@@ -14870,8 +14871,17 @@ nxtSnap | 92_gl_task_data | retired
                     catch (e) { }
                 } return m; };
                 const isSlots = (chip) => !!chip.querySelector(".lucide-layers") || [...chip.querySelectorAll(".ui-icon, .game-glyph")].some((g) => /\/slots\.(?:webp|png|svg)/i.test(maskOf(g)));
-                NL.watch(".buildings-page > .bld-hero .bld-stat-chip", (chip) => { if (isSlots(chip))
-                    mark(chip); });
+                NL.watch(".buildings-page > .bld-hero .bld-stat-chip", (chip) => {
+                    const sl = isSlots(chip) || /\bslots?\b/i.test(chip.textContent || "");
+                    if (sl)
+                        mark(chip);
+                    if (sl === chip.hasAttribute("data-nl2-bu-nochip")) {
+                        if (sl)
+                            chip.removeAttribute("data-nl2-bu-nochip");
+                        else
+                            chip.setAttribute("data-nl2-bu-nochip", "");
+                    }
+                });
             },
         });
         NL.feature({
@@ -15144,8 +15154,10 @@ nxtSnap | 92_gl_task_data | retired
                     const en = enIcon(sp) && !resImg(sp) && /^[+\-−]?\s*[\d.,]+(\/h)?$/.test((sp.textContent || "").trim());
                     setAttr(sp, "data-nl2-bt-en", en ? "" : null);
                 });
-                NL.watch(".buildings-page [class*=\"queue\"] :is(p, span, div)", (el) => {
-                    const hit = !el.children.length && /^current and queued work on this planet\.?$/i.test((el.textContent || "").trim());
+                const Q_HIDE = [/^current and queued work on this planet\.?$/i, /^construction queue$/i, /^queue\s*\d+\s*\/\s*\d+$/i];
+                const qTxt = (e) => (e && e.textContent || "").replace(/\s+/g, " ").trim();
+                NL.watch(".buildings-page [class*=\"queue\"] :is(p, span, div, h2, h3, h4, strong, button)", (el) => {
+                    const t = qTxt(el), hit = Q_HIDE.some((re) => re.test(t)) && !(el.parentElement && qTxt(el.parentElement) === t);
                     setAttr(el, "data-nl2-bt-qsub", hit ? "" : null);
                 });
                 NL.watch(".buildings-page[data-nl2-bt] .building-effect", (el) => {
@@ -15220,7 +15232,7 @@ nxtSnap | 92_gl_task_data | retired
                     return f;
                 };
                 const fxPill = (f) => {
-                    const p = NL.h("span", { class: "nl2-t-pill nl2-btt-fx " + (f.bad ? "nl2-t-pill-bad" : "nl2-t-pill-info") });
+                    const p = NL.h("span", { class: "nl2-t-pill nl2-btt-fx " + (f.bad ? "nl2-t-pill-amber" : "nl2-t-pill-info") });
                     if (f.src) {
                         const i = document.createElement("img");
                         i.src = f.src;
@@ -15354,7 +15366,7 @@ nxtSnap | 92_gl_task_data | retired
                         tips.en = en.getAttribute("data-nl2-tip") || "";
                         enBest = en.hasAttribute("data-nl2-en-best");
                         const t = txt(en);
-                        cellCls.en = /^\+\s*[\d.,]*[1-9]/.test(t) ? "nl2-t-ok" : /^[-\u2212]\s*[\d.,]*[1-9]/.test(t) ? "nl2-t-bad" : "";
+                        cellCls.en = /^\+\s*[\d.,]*[1-9]/.test(t) ? "nl2-t-ok" : /^[-\u2212]\s*[\d.,]*[1-9]/.test(t) ? "nl2-t-warn" : "";
                     }
                     if (roi) {
                         tips.roi = roi.getAttribute("data-nl2-tip") || roi.getAttribute("title") || "";
@@ -15364,7 +15376,7 @@ nxtSnap | 92_gl_task_data | retired
                     RES.forEach((k) => { const c = by[k]; if (c) {
                         sortVals[k] = c.v;
                         if (c.short) {
-                            cellCls[k] = "nl2-t-bad";
+                            cellCls[k] = "nl2-t-warn";
                             tips[k] = shortTip(c);
                         }
                     } sig[k] = c ? c.v + (c.short ? "!" + tips[k] : "") : "-"; });
@@ -23111,7 +23123,10 @@ nxtSnap | 92_gl_task_data | retired
                     if (Date.now() - ownReadAt < FRESH)
                         return;
                     ownReadAt = Date.now();
-                    NL.getJson("/api/fleet/missions", ctx).then(() => NL._kick());
+                    if (NL.pvpData !== false && NL.data && NL.data.need)
+                        NL.data.need("missions", { since: Date.now() }).then(() => NL._kick());
+                    else
+                        NL.getJson("/api/fleet/missions", ctx).then(() => NL._kick());
                 }
                 async function recall(m) {
                     busy = m.id;
@@ -23125,7 +23140,10 @@ nxtSnap | 92_gl_task_data | retired
                         recalled.add(m.id);
                         m.status = "returning";
                         ctx.log("recalled", m.id);
-                        NL.getJson("/api/fleet/missions", ctx).then(() => NL._kick()).catch(() => { });
+                        if (NL.pvpData !== false && NL.data && NL.data.need)
+                            NL.data.need("missions", { since: Date.now() }).then(() => NL._kick());
+                        else
+                            NL.getJson("/api/fleet/missions", ctx).then(() => NL._kick()).catch(() => { });
                     }
                     catch (e) {
                         err.set(m.id, "Recall failed: " + (e && e.message || e));
@@ -24574,7 +24592,12 @@ nxtSnap | 92_gl_task_data | retired
                             sent[tkey(r)] = { at: Date.now(), kind };
                             S.set("sent", sent);
                             NL._kick();
-                            setTimeout(() => { NL.getJson("/api/fleet/missions", ctx); }, 1000);
+                            setTimeout(() => {
+                                if (NL.pvpData !== false && NL.data && NL.data.need)
+                                    NL.data.need("missions", { since: Date.now() });
+                                else
+                                    NL.getJson("/api/fleet/missions", ctx);
+                            }, 1000);
                             return { ok: true, message: (stealth ? "Stealth Deploy" : "Spy mission") + " launched to " + r.name + "." };
                         }
                         catch (e) {
@@ -32852,9 +32875,14 @@ nxtSnap | 92_gl_task_data | retired
                     readARanks(false);
                     readCols(false);
                     if (V2) {
-                        const mc = NL.cache.latest(/^\/api\/fleet\/missions$/);
-                        if (!mc || Date.now() - mc.at > 60000)
-                            NL.getJson("/api/fleet/missions");
+                        const pd = NL.pvpData !== false && NL.data && NL.data.need;
+                        const mc = pd ? NL.data.get("missions") : NL.cache.latest(/^\/api\/fleet\/missions$/);
+                        if (!mc || Date.now() - mc.at > 60000) {
+                            if (pd)
+                                NL.data.need("missions", { maxAge: 60000 });
+                            else
+                                NL.getJson("/api/fleet/missions");
+                        }
                         else if (mc.data && Array.isArray(mc.data.missions)) {
                             D.miss = mc.data.missions;
                             keepMt(mc.data.missions);
@@ -32917,7 +32945,17 @@ nxtSnap | 92_gl_task_data | retired
                         const mid = el.getAttribute("data-nl2-mid");
                         if (left <= -3 && !landed.has(mid)) {
                             landed.add(mid);
-                            setTimeout(() => { NL.getJson("/api/fleet/spy-reports"); NL.getJson("/api/fleet/missions"); }, 0);
+                            setTimeout(() => {
+                                if (NL.pvpData !== false && NL.data && NL.data.need) {
+                                    const t = Date.now();
+                                    NL.data.need("spyReports", { since: t });
+                                    NL.data.need("missions", { since: t });
+                                }
+                                else {
+                                    NL.getJson("/api/fleet/spy-reports");
+                                    NL.getJson("/api/fleet/missions");
+                                }
+                            }, 0);
                         }
                     }
                 }

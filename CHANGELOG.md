@@ -2,6 +2,16 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.172 · Nov 27, 2026
+
+**🏗 Buildings**
+- The Buildings banner shows only the Slots chip. It turns gold when the slots are full, and "one slot left" shows as plain text with a faint gold border (BU-057, BU-058)
+- Energy use and short costs are gold instead of red. Cancel, Demolish and ROI stay red (BU-057)
+- The queue bar no longer shows its "Construction Queue" title or the "Queue n/n" badge (BU-059)
+
+**⚙ Behind the scenes**
+- Spy launches, Recall in Espionage and the Targets page read through the shared data helper, with the same number of reads as before (GL-471, third part)
+
 ## v0.5.171 · Nov 27, 2026
 
 **🏗 Buildings**
@@ -200,16 +210,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **⚙️ Other**
 - The attack line counts only working ships; damaged ships in Repair or Maintain don't count (GL-409)
-
-## v0.5.152 · Nov 22, 2026
-
-**🛰 Fleet**
-- Surveys: the "Oldest available anomaly" pill is hidden, and Delete is a red trash icon (FL-564, FL-565)
-- Bulk need no longer misses a fleet read that finishes just as it checks (FL-563)
-
-**🪐 Planets**
-- Gather Fleets: a box frames the ship count cells (SH-076)
-
-**⚙️ Other**
-- The attack line ignores a leader vessel that is refitting or repairing (GL-405)
-- The "Trader: summon ready" badge clears right after you summon, and artifact or research changes update their badges at once (GL-406, GL-407)

@@ -1,5 +1,18 @@
 # Release notes archive
 
+## v0.5.152 · Nov 22, 2026
+
+**🛰 Fleet**
+- Surveys: the "Oldest available anomaly" pill is hidden, and Delete is a red trash icon (FL-564, FL-565)
+- Bulk need no longer misses a fleet read that finishes just as it checks (FL-563)
+
+**🪐 Planets**
+- Gather Fleets: a box frames the ship count cells (SH-076)
+
+**⚙️ Other**
+- The attack line ignores a leader vessel that is refitting or repairing (GL-405)
+- The "Trader: summon ready" badge clears right after you summon, and artifact or research changes update their badges at once (GL-406, GL-407)
+
 ## v0.5.151 · Nov 22, 2026
 
 **🛰 Fleet**
