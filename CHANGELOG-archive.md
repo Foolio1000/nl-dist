@@ -1,5 +1,22 @@
 # Release notes archive
 
+## v0.5.151 · Nov 22, 2026
+
+**🛰 Fleet**
+- Genesis tab tidied: the header sits on one row, with Active and Reports section heads (FL-551, FL-552)
+- Genesis: Simulate works again, finished Core runs show in Reports, and a base's Scouted reports hide once it has a Victory (FL-554, FL-560, FL-555)
+- Launch dialogs show an orange countdown bar when one of your attacks is heading to the same target (FL-561)
+- Spy reports group ships by class and show a Resources total (FL-562)
+- The PVP Spy button works again (FL-558)
+- On S0, the Table View box shows even without a supply panel (FL-559)
+
+**🪐 Planets**
+- Weapon and armor types are plain text again, with no colours (GL-403)
+- Fleet on Planet's weapon and armor fixed, and table chevrons stay quiet (SH-075)
+
+**🌙 Moons**
+- A phalanx scan that finds nothing now says so (MO-068)
+
 ## v0.5.150 · Nov 22, 2026
 
 **🚑 Hotfix**

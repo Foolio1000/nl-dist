@@ -2,6 +2,14 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.171 · Nov 27, 2026
+
+**🏗 Buildings**
+- The Table View box sits in the Buildings tab bar, and the queue section's subtitle is gone, so the list starts higher on the page (BU-056)
+
+**⚙ Behind the scenes**
+- Evacuate, Recall and Transfer read your fleets back through the shared data helper after a send, so each send triggers only one refresh (GL-471, second part)
+
 ## v0.5.170 · Nov 27, 2026
 
 **🏗 Buildings**
@@ -205,20 +213,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 **⚙️ Other**
 - The attack line ignores a leader vessel that is refitting or repairing (GL-405)
 - The "Trader: summon ready" badge clears right after you summon, and artifact or research changes update their badges at once (GL-406, GL-407)
-
-## v0.5.151 · Nov 22, 2026
-
-**🛰 Fleet**
-- Genesis tab tidied: the header sits on one row, with Active and Reports section heads (FL-551, FL-552)
-- Genesis: Simulate works again, finished Core runs show in Reports, and a base's Scouted reports hide once it has a Victory (FL-554, FL-560, FL-555)
-- Launch dialogs show an orange countdown bar when one of your attacks is heading to the same target (FL-561)
-- Spy reports group ships by class and show a Resources total (FL-562)
-- The PVP Spy button works again (FL-558)
-- On S0, the Table View box shows even without a supply panel (FL-559)
-
-**🪐 Planets**
-- Weapon and armor types are plain text again, with no colours (GL-403)
-- Fleet on Planet's weapon and armor fixed, and table chevrons stay quiet (SH-075)
-
-**🌙 Moons**
-- A phalanx scan that finds nothing now says so (MO-068)

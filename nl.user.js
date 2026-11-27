@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.170
+// @version      0.5.171
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.170", features: [] };
+    const NL = window.__nl2 = { version: "0.5.171", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -14951,6 +14951,7 @@ nxtSnap | 92_gl_task_data | retired
                 NL.css("bu-table", [
                     ".nl2-bt-cb{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font:500 13.6px Rajdhani,\"Exo 2\",sans-serif;color:#c0cce0;cursor:pointer;user-select:none;white-space:nowrap;text-transform:none;letter-spacing:0;align-self:center;padding:0 8px}",
                     ".nl2-bt-cb input{margin:0;cursor:pointer}",
+                    ".buildings-page [data-nl2-bt-qsub]{display:none!important}",
                     "nav.bld-tabs[data-nl2-bt-nav]{display:flex;align-items:center}",
                     P + ".buildings-grid{display:flex!important;flex-direction:column!important;gap:0!important}",
                     P + ".building-card{display:grid!important;grid-template-columns:" + GRID + "!important;grid-template-rows:auto!important;align-items:center!important;column-gap:6px;min-height:0!important;height:auto!important;padding:3px 8px!important;margin:0!important;border-width:0 0 1px!important;border-radius:0!important;position:relative;box-sizing:border-box}",
@@ -15142,6 +15143,10 @@ nxtSnap | 92_gl_task_data | retired
                 NL.watch(".buildings-page .building-effect > *", (sp) => {
                     const en = enIcon(sp) && !resImg(sp) && /^[+\-−]?\s*[\d.,]+(\/h)?$/.test((sp.textContent || "").trim());
                     setAttr(sp, "data-nl2-bt-en", en ? "" : null);
+                });
+                NL.watch(".buildings-page [class*=\"queue\"] :is(p, span, div)", (el) => {
+                    const hit = !el.children.length && /^current and queued work on this planet\.?$/i.test((el.textContent || "").trim());
+                    setAttr(el, "data-nl2-bt-qsub", hit ? "" : null);
                 });
                 NL.watch(".buildings-page[data-nl2-bt] .building-effect", (el) => {
                     const cut = el.scrollWidth > el.clientWidth + 1;
@@ -20931,7 +20936,17 @@ nxtSnap | 92_gl_task_data | retired
                                 if (!res.ok)
                                     return { ok: false, message: (j && (j.error || j.message)) || ("The game refused the transfer (HTTP " + res.status + ").") };
                                 evSave(Number(state.sourceId), j, before);
-                                setTimeout(async () => { await read("/api/fleet/missions"); await read("/api/planets/" + state.sourceId + "/fleet"); }, 1000);
+                                setTimeout(async () => {
+                                    if (NL.flData !== false && NL.data && NL.data.need) {
+                                        const t = Date.now();
+                                        await NL.data.need("missions", { since: t });
+                                        await NL.data.need("planetFleet", { id: state.sourceId, since: t });
+                                    }
+                                    else {
+                                        await read("/api/fleet/missions");
+                                        await read("/api/planets/" + state.sourceId + "/fleet");
+                                    }
+                                }, 1000);
                                 return { ok: true, message: "Evacuating to " + ((state.target && state.target.label) || "the target").replace(/ · .*$/, "") + ".", bio: supplyId != null && supplyId === Number(state.sourceId) };
                             }
                             catch (e) {
@@ -21193,7 +21208,7 @@ nxtSnap | 92_gl_task_data | retired
                     catch (err) {
                         return { ok: false, message: "Could not reach the game: " + err.message };
                     }
-                    setTimeout(() => { read("/api/fleet/missions").then(() => NL._kick()); }, 1000);
+                    setTimeout(() => { (NL.flData !== false && NL.data && NL.data.need ? NL.data.need("missions", { since: Date.now() }) : read("/api/fleet/missions")).then(() => NL._kick()); }, 1000);
                     if (!res || !res.ok)
                         return { ok: false, message: (res && res.data && (res.data.error || res.data.message)) || "The game refused the recall (HTTP " + (res && res.status) + ")." };
                     return { ok: true, message: "Recalled. The fleet is on its way home." };
@@ -21206,6 +21221,7 @@ nxtSnap | 92_gl_task_data | retired
         });
         const FLW_RES = { ore: "Ore", silicates: "Sil", hydrogen: "H\u2082", alloys: "Alloy", cryo_ice: "Cryo", plasma_core: "Plasma", bio_extract: "Bio", quantum_dust: "QD", dark_matter: "DM", antimatter: "AM" };
         NL.flwRes = FLW_RES;
+        NL.flData = true;
         const FL_SPD = [[20, "fast"], [12, "mid"], [0, "slow"]];
         NL.feature({
             id: "fl-dispatch-speed",
@@ -26862,7 +26878,17 @@ nxtSnap | 92_gl_task_data | retired
                                 const j = await res.json().catch(() => null);
                                 if (!res.ok)
                                     return { ok: false, message: (j && (j.error || j.message)) || ("The game refused the transfer (HTTP " + res.status + ").") };
-                                setTimeout(async () => { await read("/api/fleet/missions"); await read("/api/planets/" + s.sourceId + "/fleet"); }, 1000);
+                                setTimeout(async () => {
+                                    if (NL.flData !== false && NL.data && NL.data.need) {
+                                        const t = Date.now();
+                                        await NL.data.need("missions", { since: t });
+                                        await NL.data.need("planetFleet", { id: s.sourceId, since: t });
+                                    }
+                                    else {
+                                        await read("/api/fleet/missions");
+                                        await read("/api/planets/" + s.sourceId + "/fleet");
+                                    }
+                                }, 1000);
                                 return { ok: true, message: "Transfer sent to " + ((s.target && s.target.label) || "the target") + "." };
                             }
                             catch (e) {
@@ -50530,8 +50556,14 @@ nxtSnap | 92_gl_task_data | retired
                 });
                 NL.watch(".buildings-page", (pg) => {
                     const src = pg.querySelector(".nl2-bt-cb"), grid = pg.querySelector(".buildings-grid");
-                    hideSrc(src, !!(src && grid));
                     let row = pg.querySelector(".nl2-tstd-ctl[data-k=\"bu\"]");
+                    if (NL.buTvInTabs !== false) {
+                        hideSrc(src, false);
+                        if (row)
+                            row.remove();
+                        return;
+                    }
+                    hideSrc(src, !!(src && grid));
                     if (!src || !grid) {
                         if (row)
                             row.remove();
