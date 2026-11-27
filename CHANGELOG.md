@@ -2,6 +2,21 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.169 · Nov 27, 2026
+
+**🏗 Buildings**
+- Buildings rows have more room and separator lines. A queued row's Time reads "Waiting", resource numbers line up, and every status pill is full width (BU-053)
+
+**🎨 Look**
+- Warning buttons and highlights are gold instead of light orange everywhere: Bring missing resources, Pause, the attack bar, "Launch anyway" and the short ship box (GL-469)
+
+**⚙ Behind the scenes**
+- Browser storage now has one home and a list of every key the script saves (GL-441)
+- The game-answer cache is no longer saved again in full on every change, which cuts storage writes (GL-460)
+
+**🐞 Fixes**
+- On NF2, building energy shows in the Energy column again instead of Effect, along with the RSS per energy hover and the cheapest-energy highlight (BU-052)
+
 ## v0.5.168 · Nov 27, 2026
 
 **🏗 Buildings**
@@ -205,16 +220,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🪐 Planets**
 - Bulk need retries a failed fuel estimate and explains on hover when it can't (FL-548)
-
-## v0.5.149 · Nov 21, 2026
-
-**🛰 Fleet**
-- Stations: Make route checks the game first, so no more duplicate routes; default amounts are 24,000 with Options to change them; distance colours from green (near) to red (far) (FL-536, FL-541, FL-537)
-- Genesis: Battle report on a deleted report shows a message instead of a dead page, and those buttons turn grey; new Damaged column; Mass line in the attack dialog (FL-539, FL-540, FL-543, FL-544)
-- The game's hidden error box no longer shows a red bar on Fleet tabs (FL-538)
-- Dispatch speed colours work again (FL-542)
-- Launch dialogs show one focus highlight instead of two (FL-545)
-- PVP targets: Player, Alliance, Military, Planet first; the Spy report link works while spies are in flight (FL-546, FL-547)
-
-**⚙️ Other**
-- Smaller caches, so browser storage stays well under the limit (GL-401)

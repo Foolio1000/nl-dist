@@ -1,5 +1,18 @@
 # Release notes archive
 
+## v0.5.149 · Nov 21, 2026
+
+**🛰 Fleet**
+- Stations: Make route checks the game first, so no more duplicate routes; default amounts are 24,000 with Options to change them; distance colours from green (near) to red (far) (FL-536, FL-541, FL-537)
+- Genesis: Battle report on a deleted report shows a message instead of a dead page, and those buttons turn grey; new Damaged column; Mass line in the attack dialog (FL-539, FL-540, FL-543, FL-544)
+- The game's hidden error box no longer shows a red bar on Fleet tabs (FL-538)
+- Dispatch speed colours work again (FL-542)
+- Launch dialogs show one focus highlight instead of two (FL-545)
+- PVP targets: Player, Alliance, Military, Planet first; the Spy report link works while spies are in flight (FL-546, FL-547)
+
+**⚙️ Other**
+- Smaller caches, so browser storage stays well under the limit (GL-401)
+
 ## v0.5.148 · Nov 21, 2026
 
 **🛰 Fleet**

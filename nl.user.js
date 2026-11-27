@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.168
+// @version      0.5.169
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.168", features: [] };
+    const NL = window.__nl2 = { version: "0.5.169", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -238,6 +238,286 @@
     };
     NL.cargoOf = (f, d) => { const n = (v) => Number(v) || 0; if (!d)
         return 0; const bonus = n(f && f.cargoBonus) + (d.key === "transport_shuttle" ? n(f && f.shuttleCargoBonus) : 0); return Math.floor(n(d.cargoCapacity) * (1 + bonus)); };
+    NL.storeB = true;
+    NL.storeKeys = `
+nl2.on.* | 04_registry | own
+nl2.opt.* | 04_registry | own
+nl2.errlog | 04_registry | own
+nl2.defOffSeen | 04_registry | own
+nl2.setopen.* | 04_registry | own
+nl2.em-tabs.todo | 03_ui | own
+nl2.rss-weights | 13_gl_update | own
+nl2.gl.* | 10_global | own
+nl2.gl.rankList | 10_global | copy | clear
+nl2.gl.pickerOrder | 19_gl_planet_order | own
+nl2.gl.yards | 71_em_shq | own
+nl2.gl-dst.done | 17_gl_dst | own
+nl2.gl-rank7d.* | 19_gl_rank7d | own
+nl2.gl-defense2.map | 18_gl_defense2 | copy | clear cap=350000
+nl2.gl-offense2.map | 18_gl_offense2 | copy | clear cap=350000
+nl2:moondock | 10_global | own
+nl2.zone.planet | 06_transport | copy | clear
+nl2.zones.* | 63_fl_spy_launch | own
+nl2.zones.map | 63_fl_spy_launch | copy | clear cap=500000
+nl2.ga-table.* | 63_fl_spy_launch | own
+nl2.ga-table.sysinfo2 | 63_fl_spy_launch | copy | clear cap=1500000
+nl2.ga-table.sysinfo | 63_fl_spy_launch | retired
+nl2.ga-enemies.* | 88_ga_enemies | own
+nl2.colonies.* | 69_fl_targets | own
+nl2.colonies.ci | 69_fl_targets | copy | clear cap=1000000
+nl2.fl-targets.* | 69_fl_targets | own
+nl2.fl-targets.ranks | 69_fl_targets | copy | clear
+nl2.fl-targets.ci | 69_fl_targets | retired
+nl2.fl-spy-launch.ranks | 63_fl_spy_launch | copy | clear
+nl2.fl-spy-launch.ci | 63_fl_spy_launch | retired
+nl2.fl-salvage.* | 69_fl_attack | own
+nl2.fl-unsupplied.* | 69_fl_unsupplied | own
+nl2.fl-pirates3.hiddenCamps | 69_fl_pirates | own
+nl2.fl.evac.* | 60_fleet | own
+nl2.fleet.hw.* | 05_fleet | own
+nl2.fleet.shut.* | 05_fleet | own
+nl2.fleet.tpl.* | 05_fleet | own
+nl2-fleet-src:* | 05_fleet | own
+nl2.bu-roi.* | 30_buildings | own
+nl2.bu-storage.* | 30_buildings | own
+nl2.bu-storage.snap | 30_buildings | copy
+nl2.re-compare.* | 40_research | own
+nl2.sh-gather.* | 52_sh_gather | own
+nl2.sh-facility.* | 54_sh_facility | own
+nl2.sh.moonShip | 50_shipyard | own
+nl2.tbl.* | 97_tbl_render | own
+nl2.nl2.tbl.emres.* | 71_em_resources | own
+nl2.mo-thr.* | 84_mo_thresholds | own
+nl2.mo.phMe.* | 84_mo_phalanx | own
+nl2.mo.zone | 80_moons | own
+nl2.moScanSort | 92_gl_task_data | own
+nl2.ou.* | 85_outposts | own
+nl2.pve-fold.* | 91_gl_pve_fold | own
+nl2.stn.* | 91_fl_stations | own
+nl2.simSweep.v | 92_gl_task_data | own
+nl2.debCollectLog | 90_pve | own
+nl2.digSet | 90_pve | own
+nl2.digSrc | 90_pve | own
+nl2.genGone.* | 69_fl_genesis | own
+nl2.genSeen.* | 69_fl_genesis | own
+nl2.genRetreat | 90_pve | own
+nl2.genScoutShips | 90_pve | own
+nl2.genesisLog.* | 90_pve | own
+nl2.genesisWork.* | 90_pve | own
+nl2.ruinLog.* | 90_pve | own
+nl2.salvageLog.* | 90_pve | own
+nl2.shipDefNames | 90_pve | copy
+nl2.mtExc | 90_pve | own
+nl2.mtMult | 90_pve | own
+nl2.mtMultBy | 90_pve | own
+nl2.mtOne | 90_pve | own
+nl2.mtSort | 90_pve | own
+nl2.ru.one | 90_pve | own
+nl2.ruSort | 90_pve | own
+nl2.svSort | 90_pve | own
+nxsMapCache | 90_pve | copy | cap=300000
+nxsMissionsLast | 90_pve | copy
+nxsPlanetsLast | 90_pve | copy
+nxsReportsLast | 90_pve | copy
+nxsCampCache | 90_pve | copy
+nxsCampsLast | 90_pve | copy
+nxsDebrisLast | 90_pve | copy
+nxsWhCache | 90_pve | copy
+nxsWhLast | 90_pve | copy
+nxsScanRepLast | 90_pve | copy
+nxsExpLast | 90_pve | copy
+nxsPatLast | 90_pve | copy
+nxsRuinLast | 90_pve | copy
+nxsRuins | 90_pve | copy
+nxsStnReadings | 90_pve | copy
+nxsCampFilters | 90_pve | own
+nxsDebCarry | 90_pve | own
+nxsDebrisDebug | 90_pve | own
+nxsDebrisFilters | 90_pve | own
+nxsDebrisHide | 90_pve | own
+nxsExpAccess | 90_pve | own
+nxsExpDur | 90_pve | own
+nxsExpMis | 90_pve | own
+nxsExpSeen | 90_pve | own
+nxsFleetFilters | 90_pve | own
+nxsFleetLog | 90_pve | own
+nxsInvBad | 90_pve | own
+nxsInvDebug | 90_pve | own
+nxsInvFilters | 90_pve | own
+nxsInvLog | 90_pve | own
+nxsInvSeen | 90_pve | own
+nxsInvTemplates | 90_pve | own
+nxsLastSrc | 90_pve | own
+nxsLoadLog | 90_pve | own
+nxsLossIgnore | 90_pve | own
+nxsMineCycles | 90_pve | own
+nxsMineEff | 90_pve | own
+nxsMineFull | 90_pve | own
+nxsMinePlan | 69_fl_mine_times | own
+nxsMinePred | 90_pve | own
+nxsMineRange | 90_pve | own
+nxsMineRich | 90_pve | own
+nxsMineTabRes | 90_pve | own
+nxsMineType | 90_pve | own
+nxsPatPlanet | 90_pve | own
+nxsPcSeen | 90_pve | own
+nxsRuinCool | 90_pve | own
+nxsRuinCool420 | 90_pve | own
+nxsRuinSrc | 90_pve | own
+nxsRuinSurveyed | 90_pve | own
+nxsRuinXeno | 90_pve | own
+nxsSalvageDebug | 90_pve | own
+nxsScanDone | 90_pve | own
+nxsScanPos | 90_pve | own
+nxsSurvFilters | 90_pve | own
+nxsSurveyRange | 90_pve | own
+nxsUnderOpen | 90_pve | own
+nxsWhCargo | 90_pve | own
+nxsWhFilters | 90_pve | own
+nxsWhHide | 90_pve | own
+nxsWhMis | 90_pve | own
+nxsWhStages | 90_pve | own
+nxsWorkDur | 90_pve | own
+nxsWorkRate | 90_pve | own
+nxsWorkRateSeen | 90_pve | own
+nxsWorkSeen | 90_pve | own
+nxsXenoCfg | 90_pve | own
+nxtCache | 92_gl_task_data | copy | clear cap=300000
+nxtOutpostTimes | 92_gl_task_data | own
+nxtScanHours | 92_gl_task_data | own
+nxtScanned | 92_gl_task_data | own
+nxtMoonCfg | 92_gl_task_data | retired
+nxtSeenModules | 92_gl_task_data | retired
+nxtSnap | 92_gl_task_data | retired
+`.trim().split("\n").map((l) => {
+        const p = l.split("|").map((x) => x.trim()), fl = p[3] || "", cap = /cap=(\d+)/.exec(fl);
+        return { k: p[0], mod: p[1], kind: p[2], clear: /\bclear\b/.test(fl), cap: cap ? +cap[1] : 0 };
+    });
+    NL.storeInfo = (key) => {
+        let best = null;
+        for (const e of NL.storeKeys) {
+            if (e.k === key)
+                return e;
+            if (e.k.endsWith("*") && key.startsWith(e.k.slice(0, -1)) && (!best || e.k.length > best.k.length))
+                best = e;
+        }
+        if (!best) {
+            const m = /^nl2\.([^.]+)\./.exec(key);
+            if (m && (NL.features || []).some((f) => f.id === m[1]))
+                best = { k: "nl2." + m[1] + ".*", mod: "feature " + m[1], kind: "own", clear: false, cap: 0 };
+        }
+        return best;
+    };
+    NL.storeReport = () => {
+        const rows = [], unknown = [];
+        let used = 0, ours = 0;
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i), n = k.length + (localStorage.getItem(k) || "").length;
+                used += n;
+                if (!/^(nl2[.:]|nl2-fleet-src:|nx[st][A-Z])/.test(k))
+                    continue;
+                ours += n;
+                const e = NL.storeInfo(k);
+                if (!e)
+                    unknown.push(k);
+                rows.push({ key: k, chars: n, kind: e ? e.kind : "unknown", mod: e ? e.mod : "", cap: e ? e.cap : 0, over: !!(e && e.cap && n > e.cap) });
+            }
+        }
+        catch (e) { }
+        rows.sort((a, b) => b.chars - a.chars);
+        return { used, ours, keys: rows, unknown, over: rows.filter((r) => r.over).map((r) => r.key) };
+    };
+    const storeWarned = new Set();
+    const storeOver = (key, str) => {
+        if (storeWarned.has(key))
+            return;
+        const e = NL.storeInfo(key), why = !e ? "is not in the key registry (NL.storeKeys)" : e.cap && str.length > e.cap ? "is " + str.length + " chars, over its " + e.cap + " cap" : "";
+        if (why) {
+            storeWarned.add(key);
+            console.warn("[NL] storage: " + key + " " + why);
+        }
+    };
+    NL.store = function (prefix) {
+        return {
+            get(k, def) { try {
+                const v = localStorage.getItem("nl2." + prefix + k);
+                return v == null ? def : JSON.parse(v);
+            }
+            catch (e) {
+                return def;
+            } },
+            set(k, v) { return NL.storeSet("nl2." + prefix + k, JSON.stringify(v)); },
+        };
+    };
+    NL.storeSafe = true;
+    NL.storeEvictable = ["nl2.ga-table.sysinfo", "nxtCache"];
+    NL.storeUse = () => { let n = 0; try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            n += k.length + (localStorage.getItem(k) || "").length;
+        }
+    }
+    catch (e) { } return n; };
+    NL.storeEvict = (keep) => {
+        const ks = NL.storeEvictable.filter((k) => k !== keep).map((k) => { let v = null; try {
+            v = localStorage.getItem(k);
+        }
+        catch (e) { } return [k, v ? v.length : 0]; })
+            .filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]);
+        ks.forEach(([k]) => { try {
+            localStorage.removeItem(k);
+        }
+        catch (e) { } });
+        return ks.map((x) => x[0]);
+    };
+    NL.storeFull = false;
+    NL.storeBigMax = 1000000;
+    NL.storeSet = (key, str) => {
+        if (NL.storeB !== false)
+            storeOver(key, str);
+        try {
+            localStorage.setItem(key, str);
+            return true;
+        }
+        catch (e) {
+            if (NL.storeSafe === false)
+                return false;
+            const quota = e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014);
+            if (quota && NL.storeBigMax > 0 && str.length > NL.storeBigMax) {
+                try {
+                    localStorage.removeItem(key);
+                }
+                catch (e2) { }
+                console.warn("[NL] storage: not saved " + key + " (" + str.length + " chars, over the " + NL.storeBigMax + " single-value cap)");
+                return false;
+            }
+            if (quota) {
+                const gone = NL.storeEvict(key);
+                try {
+                    localStorage.setItem(key, str);
+                    if (gone.length)
+                        console.warn("[NL] storage full: cleared caches " + gone.join(", "));
+                    return true;
+                }
+                catch (e2) { }
+            }
+            if (!NL.storeFull) {
+                NL.storeFull = true;
+                console.warn("[NL] storage full: could not save " + key + " (" + str.length + " chars; " + NL.storeUse() + " used)");
+                try {
+                    const t = document.createElement("div");
+                    t.className = "nl2-store-toast";
+                    t.textContent = "Browser storage full, saving paused. Nexus Legacy could not save its data.";
+                    t.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483646;background:color-mix(in srgb,var(--nl2-amber,#fbbf24) 15%,transparent);border:1px solid color-mix(in srgb,var(--nl2-amber,#fbbf24) 55%,transparent);color:var(--nl2-amber,#fbbf24);padding:10px 18px;border-radius:6px;font-size:15px;backdrop-filter:blur(4px)";
+                    (document.body || document.documentElement).appendChild(t);
+                    setTimeout(() => t.remove(), 8000);
+                }
+                catch (e3) { }
+            }
+            return false;
+        }
+    };
     NL.tipsOn = true;
     NL.tipAmber = true;
     NL.tipSteady = true;
@@ -552,84 +832,6 @@
         window.addEventListener("scroll", hide, true);
     }
     NL.instance = location.hostname.split(".")[0];
-    NL.store = function (prefix) {
-        return {
-            get(k, def) { try {
-                const v = localStorage.getItem("nl2." + prefix + k);
-                return v == null ? def : JSON.parse(v);
-            }
-            catch (e) {
-                return def;
-            } },
-            set(k, v) { return NL.storeSet("nl2." + prefix + k, JSON.stringify(v)); },
-        };
-    };
-    NL.storeSafe = true;
-    NL.storeEvictable = ["nl2.ga-table.sysinfo", "nxtCache"];
-    NL.storeUse = () => { let n = 0; try {
-        for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            n += k.length + (localStorage.getItem(k) || "").length;
-        }
-    }
-    catch (e) { } return n; };
-    NL.storeEvict = (keep) => {
-        const ks = NL.storeEvictable.filter((k) => k !== keep).map((k) => { let v = null; try {
-            v = localStorage.getItem(k);
-        }
-        catch (e) { } return [k, v ? v.length : 0]; })
-            .filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]);
-        ks.forEach(([k]) => { try {
-            localStorage.removeItem(k);
-        }
-        catch (e) { } });
-        return ks.map((x) => x[0]);
-    };
-    NL.storeFull = false;
-    NL.storeBigMax = 1000000;
-    NL.storeSet = (key, str) => {
-        try {
-            localStorage.setItem(key, str);
-            return true;
-        }
-        catch (e) {
-            if (NL.storeSafe === false)
-                return false;
-            const quota = e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014);
-            if (quota && NL.storeBigMax > 0 && str.length > NL.storeBigMax) {
-                try {
-                    localStorage.removeItem(key);
-                }
-                catch (e2) { }
-                console.warn("[NL] storage: not saved " + key + " (" + str.length + " chars, over the " + NL.storeBigMax + " single-value cap)");
-                return false;
-            }
-            if (quota) {
-                const gone = NL.storeEvict(key);
-                try {
-                    localStorage.setItem(key, str);
-                    if (gone.length)
-                        console.warn("[NL] storage full: cleared caches " + gone.join(", "));
-                    return true;
-                }
-                catch (e2) { }
-            }
-            if (!NL.storeFull) {
-                NL.storeFull = true;
-                console.warn("[NL] storage full: could not save " + key + " (" + str.length + " chars; " + NL.storeUse() + " used)");
-                try {
-                    const t = document.createElement("div");
-                    t.className = "nl2-store-toast";
-                    t.textContent = "Browser storage full, saving paused. Nexus Legacy could not save its data.";
-                    t.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483646;background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.55);color:#fb923c;padding:10px 18px;border-radius:6px;font-size:15px;backdrop-filter:blur(4px)";
-                    (document.body || document.documentElement).appendChild(t);
-                    setTimeout(() => t.remove(), 8000);
-                }
-                catch (e3) { }
-            }
-            return false;
-        }
-    };
     NL.btnOutline = true;
     NL.css("btn-colours", NL.btnOutline === false
         ? ["green:#bbf7d0:#86efac:#166534", "red:#fecaca:#fca5a5:#991b1b", "blue:#bfdbfe:#93c5fd:#1e40af"].map((c) => {
@@ -642,10 +844,10 @@
             return `${sel("")}{background:rgba(${rgb},.12)!important;border:1px solid rgba(${rgb},.55)!important;color:${txt}!important;box-shadow:none!important;text-shadow:none!important}` + `${sel(":hover:not([disabled]):not(.disabled)")}{background:rgba(${rgb},.2)!important}`
                 + `${sel("[disabled]")},${sel(".disabled")}{background:rgba(120,130,150,.12)!important;border-color:#2a3446!important;color:#6b7686!important;opacity:1!important}`;
         }).join("\n"));
-    NL.css("btn-amber", ".nl2-c-amber{background:rgba(251,146,60,.12)!important;border:1px solid rgba(251,146,60,.55)!important;color:#fb923c!important;box-shadow:none!important;text-shadow:none!important}"
-        + ".nl2-c-amber:hover:not([disabled]):not(.disabled){background:rgba(251,146,60,.2)!important}"
+    NL.css("btn-amber", ".nl2-c-amber{background:color-mix(in srgb,var(--nl2-amber) 12%,transparent)!important;border:1px solid color-mix(in srgb,var(--nl2-amber) 55%,transparent)!important;color:var(--nl2-amber)!important;box-shadow:none!important;text-shadow:none!important}"
+        + ".nl2-c-amber:hover:not([disabled]):not(.disabled){background:color-mix(in srgb,var(--nl2-amber) 20%,transparent)!important}"
         + ".nl2-c-amber[disabled],.nl2-c-amber.disabled{background:rgba(120,130,150,.12)!important;border-color:#2a3446!important;color:#6b7686!important;opacity:1!important}");
-    NL.css("btn-solid", [["green", "74,222,128"], ["ok", "74,222,128"], ["red", "248,113,113"], ["blue", "56,189,248"], ["purple", "168,85,247"], ["amber", "251,146,60"]].map(([k, rgb]) => {
+    NL.css("btn-solid", [["green", "74,222,128"], ["ok", "74,222,128"], ["red", "248,113,113"], ["blue", "56,189,248"], ["purple", "168,85,247"], ["amber", "251,191,36"]].map(([k, rgb]) => {
         const c = ".nl2-c-solid.nl2-c-" + k, over = (a) => `linear-gradient(rgba(${a}),rgba(${a})),var(--bg-card,rgb(8,16,32))!important`;
         return `${c}{background:${over(rgb + ",.12")}}${c}:hover:not([disabled]):not(.disabled){background:${over(rgb + ",.2")}}` + `${c}[disabled],${c}.disabled{background:${over("120,130,150,.12")}}`;
     }).join("\n"));
@@ -659,7 +861,7 @@
             return [];
         } };
         const put = (a) => { try {
-            localStorage.setItem(KEY, JSON.stringify(a));
+            NL.storeSet(KEY, JSON.stringify(a));
         }
         catch (e) { } fire(); };
         const fire = () => { for (const fn of subs.slice()) {
@@ -1219,6 +1421,9 @@
         NL.fleetGateLabel = true;
         NL.fleetHwLabel = () => (NL.fleetGateLabel ? "Gateway" : "Galactic Highway");
         NL.fleetHwOff = true;
+        NL.fleetGold = true;
+        const gold = (c) => (NL.fleetGold ? c.replace(/rgba\(251,146,60,\.12\)/g, "color-mix(in srgb,var(--nl2-amber, #fbbf24) 12%,transparent)")
+            .replace(/rgba\(251,146,60,\.55\)/g, "color-mix(in srgb,var(--nl2-amber, #fbbf24) 55%,transparent)").replace(/#fb923c/g, "var(--nl2-amber, #fbbf24)") : c);
         NL.fleetFuelRoom = true;
         const hCap = (st) => {
             const h = st.resources && st.resources.hydrogen, fuel = st.est && st.est.fuel != null ? Number(st.est.fuel) : null;
@@ -1273,8 +1478,8 @@
             NL.atkCountdown = (el, t, opt) => {
                 opt = opt || {};
                 if (NL.css)
-                    NL.css("fl-atkbar", ".nl2-atkbar{margin:8px 0;padding:7px 12px;border:1px solid rgba(251,146,60,.55);background:rgba(251,146,60,.12);border-radius:6px;color:#fb923c;font-size:13px;line-height:1.45}"
-                        + ".nl2-atkbar[hidden]{display:none!important}.nl2-atkbar b{font-weight:700}.nl2-atkbar .nl2-atkbar-rel{color:#fff;font-weight:600}.nl2-atkbar .nl2-atkbar-ok{color:var(--nl2-info, #38bdf8);font-weight:700}.nl2-atkbar .nl2-atkbar-bad{color:#fb923c;font-weight:700}");
+                    NL.css("fl-atkbar", gold(".nl2-atkbar{margin:8px 0;padding:7px 12px;border:1px solid rgba(251,146,60,.55);background:rgba(251,146,60,.12);border-radius:6px;color:#fb923c;font-size:13px;line-height:1.45}"
+                        + ".nl2-atkbar[hidden]{display:none!important}.nl2-atkbar b{font-weight:700}.nl2-atkbar .nl2-atkbar-rel{color:#fff;font-weight:600}.nl2-atkbar .nl2-atkbar-ok{color:var(--nl2-info, #38bdf8);font-weight:700}.nl2-atkbar .nl2-atkbar-bad{color:#fb923c;font-weight:700}"));
                 let last = null, seen = false, iv = 0;
                 const paint = () => {
                     if (!el.isConnected) {
@@ -1321,7 +1526,7 @@
         NL.noShipsRed = true;
         const SPEEDS = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10];
         NL.fleetSpeeds = SPEEDS.slice();
-        const css = () => NL.css("fleet", `
+        const css = () => NL.css("fleet", gold(`
     .nl2-fleet-ov{position:fixed;inset:0;background:rgba(2,6,14,.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px}
     .nl2-fleet{width:min(520px,calc(100vw - 24px));max-height:92vh;overflow:auto;box-sizing:border-box;background:var(--bg-card,rgba(8,16,32,.98));border:1px solid rgba(56,189,248,.3);border-radius:10px;box-shadow:0 12px 48px rgba(0,0,0,.6);color:var(--text-primary,#f1f6ff);font-family:Rajdhani,"Exo 2",sans-serif;font-size:14px;font-weight:500;padding:12px 14px}
     .nl2-fleet-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
@@ -1380,7 +1585,7 @@
     .nl2-fleet-btn{background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.55);color:var(--nl2-info, #38bdf8);border-radius:4px;padding:5px 10px;font:inherit;cursor:pointer}
     .nl2-fleet-btn.nl2-sec{background:none;color:var(--text-muted,#c0cce0);border-color:rgba(120,200,255,.12)}
     .nl2-fleet-btn[disabled]{opacity:.45;cursor:default}
-    [data-nl2-busy]{opacity:.6;cursor:progress!important}`);
+    [data-nl2-busy]{opacity:.6;cursor:progress!important}`));
         const cssFit = () => NL.css("fleet-fit", `.nl2-fleet{overflow-x:hidden}
     .nl2-fleet .nl2-fleet-qty{padding:0 4px;min-height:26px;box-sizing:border-box;flex:none}
     .nl2-fleet .nl2-fleet-qty input{width:72px!important;height:24px!important;min-height:0!important;padding:0 2px!important;font-size:14px!important;line-height:24px!important;margin:0!important}
@@ -2064,12 +2269,8 @@
                             next.est = est;
                             fuelRoom(next);
                         }
-                        if (NL.fleetCombat && o.lastSource) {
-                            try {
-                                localStorage.setItem("nl2-fleet-src:" + o.lastSource, String(id));
-                            }
-                            catch (e) { }
-                        }
+                        if (NL.fleetCombat && o.lastSource)
+                            NL.storeSet("nl2-fleet-src:" + o.lastSource, String(id));
                         Object.assign(st, { rareOpen: null, heldKeys: next.heldKeys, sourceId: next.sourceId, ships: next.ships, resources: next.resources, mission: next.mission, leader: next.leader, only: next.only, short: next.short, est, estPending: false });
                         msg.textContent = "";
                         draw();
@@ -2954,14 +3155,7 @@
                     if (z) {
                         zLoad()[k] = { at: Date.now(), z };
                         const js = JSON.stringify(zAll);
-                        if (NL.storeSet)
-                            NL.storeSet(ZKEY, js);
-                        else {
-                            try {
-                                localStorage.setItem(ZKEY, js);
-                            }
-                            catch (e) { }
-                        }
+                        NL.storeSet(ZKEY, js);
                     }
                     return z;
                 })().finally(() => zBusy.delete(k));
@@ -3059,7 +3253,7 @@
                 if (v == null && old) {
                     v = localStorage.getItem(old);
                     if (v != null)
-                        localStorage.setItem(GL_KEY(k), v);
+                        NL.storeSet(GL_KEY(k), v);
                 }
                 v = JSON.parse(v);
                 return v == null ? d : v;
@@ -3069,7 +3263,7 @@
             }
         };
         const glSave = (k, v) => { try {
-            localStorage.setItem(GL_KEY(k), JSON.stringify(v));
+            NL.storeSet(GL_KEY(k), JSON.stringify(v));
         }
         catch (e) { } };
         const glEsc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
@@ -7064,7 +7258,7 @@
                     return;
                 rssAll = j.weights;
                 try {
-                    localStorage.setItem("nl2.rss-weights", JSON.stringify({ at: Date.now(), version: j.version, weights: j.weights }));
+                    NL.storeSet("nl2.rss-weights", JSON.stringify({ at: Date.now(), version: j.version, weights: j.weights }));
                 }
                 catch (e) { }
                 for (const fn of rssSubs) {
@@ -9728,8 +9922,10 @@
                                 add = true;
                             }
                         }
-                        if (add)
+                        if (add) {
+                            arr.splice(0, Math.max(0, arr.length - 200));
                             localStorage.setItem(k, JSON.stringify(arr));
+                        }
                     }
                     catch (e) { }
                 }
@@ -12166,10 +12362,7 @@
                 if (!ids.length)
                     return;
                 rank = new Map(ids.map((id, i) => [id, i]));
-                try {
-                    localStorage.setItem("nl2.gl.pickerOrder", JSON.stringify(ids));
-                }
-                catch (e) { }
+                NL.storeSet("nl2.gl.pickerOrder", JSON.stringify(ids));
             };
             NL.onData(/^\/api\/planets$/, (p, d) => take(d));
             const fresh = () => { if (!rank) {
@@ -12335,7 +12528,7 @@
                     const lk = Number(localStorage.getItem("nl2.gl-rank7d.lock")) || 0;
                     if (Date.now() - lk < 120000)
                         return;
-                    localStorage.setItem("nl2.gl-rank7d.lock", String(Date.now()));
+                    NL.storeSet("nl2.gl-rank7d.lock", String(Date.now()));
                 }
                 catch (e) { }
                 busy = true;
@@ -14634,10 +14827,7 @@
                     catch (err) {
                         return;
                     }
-                    setTimeout(() => { try {
-                        localStorage.setItem(KEY, "1");
-                    }
-                    catch (err) { } }, 0);
+                    setTimeout(() => { NL.storeSet(KEY, "1"); }, 0);
                 }, true);
             },
         });
@@ -14852,9 +15042,11 @@
                     }
                     catch (e) { }
                 } return m; };
-                const enIcon = (sp) => !!sp.querySelector("svg") || [...sp.querySelectorAll(".ui-icon, .game-glyph")].some((g) => !/\/(stat(?!Energy)[A-Za-z]*|wpn[A-Za-z]*|armor[A-Za-z]*)\.(?:webp|png|svg)/i.test(enMask(g)));
+                const enImg = (sp) => { const i = sp.querySelector("img.game-resource-icon"); return !!i && /energy|power/i.test((i.getAttribute("alt") || "") + " " + (i.getAttribute("src") || "")); };
+                const resImg = (sp) => !!sp.querySelector("img.game-resource-icon") && !enImg(sp);
+                const enIcon = (sp) => enImg(sp) || !!sp.querySelector("svg") || [...sp.querySelectorAll(".ui-icon, .game-glyph")].some((g) => !/\/(stat(?!Energy)[A-Za-z]*|wpn[A-Za-z]*|armor[A-Za-z]*)\.(?:webp|png|svg)/i.test(enMask(g)));
                 NL.watch(".buildings-page .building-effect > *", (sp) => {
-                    const en = enIcon(sp) && !sp.querySelector("img.game-resource-icon") && /^[+\-−]?\s*[\d.,]+(\/h)?$/.test((sp.textContent || "").trim());
+                    const en = enIcon(sp) && !resImg(sp) && /^[+\-−]?\s*[\d.,]+(\/h)?$/.test((sp.textContent || "").trim());
                     setAttr(sp, "data-nl2-bt-en", en ? "" : null);
                 });
                 NL.watch(".buildings-page[data-nl2-bt] .building-effect", (el) => {
@@ -14895,6 +15087,8 @@
                     ".nl2-btt-det{display:flex;align-items:center;gap:16px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}",
                     ".nl2-btt-det .nl2-btt-opt{display:inline-flex;align-items:center;gap:8px}",
                     ".nl2-t-pill.nl2-btt-st{display:block;box-sizing:border-box;width:100%;text-align:center}",
+                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:7px;padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,.06)}",
+                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td .nl2-t-in{vertical-align:middle}",
                 ].join(""));
                 const on = () => NL.btTbl !== false && !!(NL.table && NL.table.mount);
                 const txt = (el) => (el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "");
@@ -14990,7 +15184,6 @@
                 }
                 const pill = (t, cls, tip) => { const p = NL.h("span", { class: "nl2-t-pill" + (cls ? " " + cls : "") }, t); if (tip && NL.tip)
                     NL.tip(p, tip); return p; };
-                const BUSY_RE = /^(building|queued)$/i;
                 function statusOf(card) {
                     const ul = card.querySelector(".building-upgrading-line");
                     if (ul) {
@@ -15026,7 +15219,7 @@
                     const rare = costs.filter((c) => !RES.includes(c.k));
                     const cd = card.querySelector(".qol-completion .countdown"), bt = card.querySelector(".building-costs > .build-time");
                     const st = statusOf(card);
-                    const vals = { level: lvEl ? (lvEl.getAttribute("data-nl2-bt-lv") || txt(lvEl).replace(/^lv\.?\s*/i, "")) : "\u2014", en: en ? txt(en) : "", roi: roi ? txt(roi).replace(/^ROI\s*/i, "") : "", time: cd ? txt(cd) : bt ? txt(bt) : "" };
+                    const vals = { level: lvEl ? (lvEl.getAttribute("data-nl2-bt-lv") || txt(lvEl).replace(/^lv\.?\s*/i, "")) : "\u2014", en: en ? txt(en) : "", roi: roi ? txt(roi).replace(/^ROI\s*/i, "") : "", time: cd ? txt(cd) : bt ? txt(bt) : st && /^queued$/i.test(st.t) ? "Waiting" : "" };
                     const tips = { name: [key, c2 ? txt(c2) : "", dmg ? txt(dmg) : ""].filter(Boolean).join("\n") }, cellCls = {}, sortVals = {}, sig = {};
                     let enBest = false;
                     if (en) {
@@ -15058,7 +15251,7 @@
                     const row = { key, enBest, vals, tips, cellCls, sortVals, sig, btn, by, rare, fx: rest, fxs, hid: card.classList.contains("nl2-hidden-card"), link: () => { const c = cardOf(key), h = c && c.querySelector("h4.building-name"); if (h)
                             h.click(); } };
                     if (st)
-                        row.span = { from: "ore", to: "rare", cell: () => pill(st.t, st.cls + (BUSY_RE.test(st.t) ? " nl2-btt-st" : ""), st.tip) }, sig._span = st.t + st.cls;
+                        row.span = { from: "ore", to: "rare", cell: () => pill(st.t, st.cls + " nl2-btt-st", st.tip) }, sig._span = st.t + st.cls;
                     const det = detailOf(card, key);
                     if (det) {
                         row.detail = det;
@@ -15279,8 +15472,10 @@
                     }
                     catch (e) { }
                 } return m; };
-                const enIcon = (sp) => !!sp.querySelector("svg") || [...sp.querySelectorAll(".ui-icon, .game-glyph")].some((g) => !/\/(stat(?!Energy)[A-Za-z]*|wpn[A-Za-z]*|armor[A-Za-z]*)\.(?:webp|png|svg)/i.test(maskOf(g)));
-                const chipOf = (card) => [...card.querySelectorAll(".building-effect > *")].find((sp) => enIcon(sp) && !sp.querySelector("img.game-resource-icon")
+                const enImg = (sp) => { const i = sp.querySelector("img.game-resource-icon"); return !!i && /energy|power/i.test((i.getAttribute("alt") || "") + " " + (i.getAttribute("src") || "")); };
+                const resImg = (sp) => !!sp.querySelector("img.game-resource-icon") && !enImg(sp);
+                const enIcon = (sp) => enImg(sp) || !!sp.querySelector("svg") || [...sp.querySelectorAll(".ui-icon, .game-glyph")].some((g) => !/\/(stat(?!Energy)[A-Za-z]*|wpn[A-Za-z]*|armor[A-Za-z]*)\.(?:webp|png|svg)/i.test(maskOf(g)));
+                const chipOf = (card) => [...card.querySelectorAll(".building-effect > *")].find((sp) => enIcon(sp) && !resImg(sp)
                     && /^\+\s*[\d.,]+$/.test((sp.textContent || "").trim()));
                 NL.watch(".buildings-page .buildings-grid", (g) => {
                     const on = !!g.closest(".buildings-page[data-nl2-bt]");
@@ -16232,7 +16427,7 @@
                     ".nl2-retb .nl2-retb-br{display:inline-block;width:18px;height:18px;border-radius:4px;text-align:center;font-size:11px;line-height:18px;font-weight:700;margin-right:7px;vertical-align:1px}",
                     ".nl2-retb .nl2-retb-br.nl2-m{background:#3a1520;color:#ff6b7f;border:1px solid #6a2535}.nl2-retb .nl2-retb-br.nl2-e{background:#3a2a10;color:#f5b83d;border:1px solid #6a4a18}.nl2-retb .nl2-retb-br.nl2-s{background:#10243a;color:#6fb0ff;border:1px solid #1e4f7a}",
                     ".nl2-retb button.nl2-retb-btn{width:104px;box-sizing:border-box;padding:4px 8px;border-radius:6px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.55);color:var(--nl2-ok,#4ade80)}",
-                    ".nl2-retb button.nl2-retb-btn.nl2-bring{background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.55);color:#fb923c;font-weight:600}",
+                    ".nl2-retb button.nl2-retb-btn.nl2-bring{background:color-mix(in srgb,var(--nl2-amber,#fbbf24) 12%,transparent);border-color:color-mix(in srgb,var(--nl2-amber,#fbbf24) 55%,transparent);color:var(--nl2-amber,#fbbf24);font-weight:600}",
                     ".nl2-retb button.nl2-retb-btn:disabled{background:rgba(120,130,150,.12);border-color:#2a3446;color:#6b7686;cursor:default}",
                     ".nl2-retb .nl2-retb-btnph{display:inline-block;width:104px;text-align:center;color:#8a96a6}",
                     ".nl2-retb .nl2-retb-hide{display:flex;align-items:center;justify-content:center;cursor:pointer}.nl2-retb .nl2-retb-hide input{margin:0;cursor:pointer}",
@@ -18815,10 +19010,7 @@
                     catch (err) {
                         return;
                     }
-                    setTimeout(() => { try {
-                        localStorage.setItem(KEY, "1");
-                    }
-                    catch (err) { } }, 0);
+                    setTimeout(() => { NL.storeSet(KEY, "1"); }, 0);
                 }, true);
             },
         });
@@ -20068,7 +20260,7 @@
                     const unhide = (id) => { try {
                         const m = JSON.parse(localStorage.getItem("nxsWhHide") || "{}") || {};
                         delete m[String(id)];
-                        localStorage.setItem("nxsWhHide", JSON.stringify(m));
+                        NL.storeSet("nxsWhHide", JSON.stringify(m));
                     }
                     catch (e) { } NL._kick(); };
                     const hidRow = (r, i) => NL.h("tr", { class: "nl2-flw-run" + (i % 2 ? "" : " nl2-z") }, NL.h("td", null, pill(r.cls)), NL.h("td", { class: "nl2-flw-nw" }, NL.h("span", { class: "nl2-flw-ar" }, ""), sysLink(r.sysId, r.sys)), NL.h("td", null, r.lim ? fmtN(num(String(r.used).replace(/,/g, ""))) + " / " + fmtN(num(String(r.lim).replace(/,/g, ""))) : dash()), NL.h("td", null, r.exp ? cdCell("", r.exp) : dash()), NL.h("td", null, r.near ? r.near.name : dash()), NL.h("td", null, r.near ? Math.round(r.near.dist) + " ly" : dash()), NL.h("td", { class: "nl2-flw-nw" + x265Cls }, NL.h("button", { type: "button", class: "nl2-flw-enter nl2-x260-un", title: "Show this wormhole in the table again", onclick: () => unhide(r.wo.id) }, "Unhide")), NL.h("td", null, ""));
@@ -29379,7 +29571,7 @@
       .nl2-fdb button.nl2-fdb-b{font:600 13px Rajdhani,"Exo 2",sans-serif;border-radius:5px;height:24px;width:110px;padding:1px 6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;
         background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.5)}
       .nl2-fdb button.nl2-fdb-b.nl2-fdb-red{background:rgba(239,68,68,.12);color:#fca5a5;border-color:rgba(239,68,68,.5)}
-      .nl2-fdb button.nl2-fdb-b.nl2-fdb-amb{background:rgba(251,146,60,.12);color:#fb923c;border-color:rgba(251,146,60,.55)}      
+      .nl2-fdb button.nl2-fdb-b.nl2-fdb-amb{background:color-mix(in srgb,var(--nl2-amber) 12%,transparent);color:var(--nl2-amber);border-color:color-mix(in srgb,var(--nl2-amber) 55%,transparent)}      
       .nl2-fdb button.nl2-fdb-ic{background:none;border:0;color:#8fb3d9;cursor:pointer;padding:0 4px;vertical-align:middle;font-size:14px}
       .nl2-fdb button.nl2-fdb-ic svg{width:16px;height:16px}
       .nl2-fdb button.nl2-fdb-rf{font:600 13px Rajdhani,"Exo 2",sans-serif;background:rgba(56,189,248,.1);color:#7dd3fc;border:1px solid rgba(56,189,248,.4);border-radius:5px;height:24px;width:84px;cursor:pointer}
@@ -29903,7 +30095,7 @@
                     return null;
                 } };
                 const seenPut = (v) => { try {
-                    localStorage.setItem(SEEN_KEY, JSON.stringify(v));
+                    NL.storeSet(SEEN_KEY, JSON.stringify(v));
                 }
                 catch (e) { } };
                 const coreRuns = () => (core && Array.isArray(core.history) ? core.history : []).filter((h) => h && h.id != null && (h.outcome || h.phase === "done"))
@@ -30011,7 +30203,7 @@
                         const m = GONE_TIP;
                         if (t && t > goneCut()) {
                             try {
-                                localStorage.setItem(GONE_KEY, JSON.stringify(t));
+                                NL.storeSet(GONE_KEY, JSON.stringify(t));
                             }
                             catch (e) { }
                             const bx = tab.querySelector(".nl2-fgen");
@@ -30273,7 +30465,7 @@
                     for (const k of ks.sort((a, b) => num(all[a].at) - num(all[b].at)).slice(0, ks.length - MAX))
                         delete all[k];
                 try {
-                    localStorage.setItem(PLAN_KEY, JSON.stringify(all));
+                    NL.storeSet(PLAN_KEY, JSON.stringify(all));
                 }
                 catch (e) { }
             };
@@ -30420,7 +30612,7 @@
                 return {};
             } };
             const write = (o) => { try {
-                localStorage.setItem(KEY, JSON.stringify(o));
+                NL.storeSet(KEY, JSON.stringify(o));
             }
             catch (e) { } };
             const api = {
@@ -34533,7 +34725,7 @@
                 NL.css("em-res", `
       .nl2-emres{width:1100px;max-width:100%}
       .nl2-emres table.nl2-t-tbl th,.nl2-emres table.nl2-t-tbl td{padding-left:4px;padding-right:4px}   
-      .nl2-emres .nl2-emres-short{color:var(--nl2-warn,#fb923c);font-weight:700}
+      .nl2-emres .nl2-emres-short{color:var(--nl2-amber);font-weight:700}
       .nl2-emres table.nl2-t-tbl td,.nl2-emres table.nl2-t-tbl th{font-variant-numeric:tabular-nums}
       .nl2-emres table.nl2-t-tbl thead th .nl2-t-ic{width:20px;height:20px}
       .nl2-emres .nl2-emres-ord{color:var(--nl2-dim,#8aa3c0);font-size:13px;line-height:16px}
@@ -34564,7 +34756,7 @@
       .nl2-emx td.nl2-shq-c .nl2-shq-l{font-size:13.6px}
       .nl2-emx td.nl2-shq-c .nl2-shq-f{font-size:11.5px;color:#8fb3d9}
       .nl2-emx td.nl2-shq-est{font-style:italic}
-      .nl2-emx td.nl2-shq-warn .nl2-shq-l,.nl2-emx td.nl2-shq-warn .nl2-shq-f{color:#fb923c;font-weight:700}
+      .nl2-emx td.nl2-shq-warn .nl2-shq-l,.nl2-emx td.nl2-shq-warn .nl2-shq-f{color:var(--nl2-amber);font-weight:700}
       .nl2-shq-ctl{display:flex;align-items:center;gap:6px;margin-right:12px;font-size:13.6px;color:var(--nl2-onart);white-space:nowrap}
       .nl2-shq-ctl[hidden]{display:none!important}
       .nl2-emx tr.nl2-shq td.nl2-shq-go{cursor:pointer}
@@ -36344,10 +36536,7 @@
                 catch (e) {
                     return "";
                 } };
-                const lsSet = (k, v) => { try {
-                    localStorage.setItem(k, v);
-                }
-                catch (e) { } };
+                const lsSet = (k, v) => NL.storeSet(k, v);
                 const txt = (el, sel) => { const x = el.querySelector(sel); return x ? x.textContent.trim() : ""; };
                 const ownNames = () => {
                     const s = new Set(((NL._g && NL._g.moons) || []).map((m) => m.name));
@@ -38213,7 +38402,7 @@
                 const st = geSaved() || {};
                 st.colonyExtras = { ...(st.colonyExtras || {}), enemies: { players, alliances } };
                 try {
-                    localStorage.setItem(GE_KEY, JSON.stringify(st));
+                    NL.storeSet(GE_KEY, JSON.stringify(st));
                 }
                 catch (e) { }
             }
@@ -38376,7 +38565,7 @@
                 const st = geSaved(), e = st && st.colonyExtras && st.colonyExtras.enemies;
                 if (e && Array.isArray(e.players) && e.players.some(geIsMk)) {
                     e.players = e.players.filter((p) => !geIsMk(p));
-                    localStorage.setItem(GE_KEY, JSON.stringify(st));
+                    NL.storeSet(GE_KEY, JSON.stringify(st));
                 }
             }
             catch (e) { }
@@ -38867,10 +39056,7 @@
                 catch (e) {
                     return d;
                 } };
-                const lsSet = (k, v) => { try {
-                    localStorage.setItem(k, JSON.stringify(v));
-                }
-                catch (e) { } };
+                const lsSet = (k, v) => { NL.storeSet(k, JSON.stringify(v)); };
                 const GAP_MS = window.__nxsTestGap != null ? +window.__nxsTestGap : 5000, OPEN_GAP = window.__nxsTestGap != null ? +window.__nxsTestGap : 1000, READ_TIMEOUT = window.__nxsTestReadTimeout != null ? +window.__nxsTestReadTimeout : 15000, SLOW_RE = /^\/api\/(planets$|research|outposts|moons\/owned|station-operations|fleet\/(mining|pirate|expedition|patrol)-reports)/;
                 let userRead = false, soloChain = Promise.resolve(), soloLast = 0, soloBlock = 0, soloBackoff = 0;
                 const U = (fn) => { userRead = true; try {
@@ -42138,7 +42324,7 @@
                     if (!added)
                         return;
                     try {
-                        localStorage.setItem(key, JSON.stringify(log.slice(-SALV_LOG_MAX)));
+                        NL.storeSet(key, JSON.stringify(log.slice(-SALV_LOG_MAX)));
                     }
                     catch (e) { }
                 }
@@ -42173,7 +42359,7 @@
                             delete w.battles[id];
                         }
                     try {
-                        localStorage.setItem(GEN_WORK_KEY, JSON.stringify(w));
+                        NL.storeSet(GEN_WORK_KEY, JSON.stringify(w));
                     }
                     catch (e) { }
                 };
@@ -42229,7 +42415,7 @@
                     }
                     if (added)
                         try {
-                            localStorage.setItem(GEN_LOG_KEY, JSON.stringify(log.slice(-SALV_LOG_MAX)));
+                            NL.storeSet(GEN_LOG_KEY, JSON.stringify(log.slice(-SALV_LOG_MAX)));
                         }
                         catch (e) { }
                 }
@@ -47785,7 +47971,7 @@
                             ks.push(k);
                     }
                     ks.forEach((k) => localStorage.removeItem(k));
-                    localStorage.setItem(mark, v);
+                    NL.storeSet(mark, v);
                     if (ks.length)
                         console.warn("[NL] removed our sim scratch keys: " + ks.join(", "));
                 }
@@ -47816,37 +48002,59 @@
                 const WANT = /^\/api\/(planets(\/(\d+(\/(fleet|shipyard))?))?|outposts|artifacts|research|leadership|moons\/(owned|\d+)|fleet\/(bounties|missions|supply)|command-center\/fleet-overview)$/;
                 const rawFetch = window.fetch.bind(window);
                 let onIngest = () => { }, ingestTimer = 0, saveTimer = 0;
-                function persistCache() {
-                    clearTimeout(saveTimer);
-                    saveTimer = setTimeout(() => {
-                        try {
-                            if (NL.storeBuildA === false) {
-                                const js = JSON.stringify(CACHE);
-                                if (js.length < 2500000)
-                                    localStorage.setItem(CACHE_KEY, js);
-                                return;
-                            }
-                            const now = Date.now(), parts = [];
-                            let n = 2;
-                            for (const ck of Object.keys(CACHE).filter((k) => CACHE[k] && now - CACHE[k].at < SAVE_AGE).sort((a, b) => CACHE[b].at - CACHE[a].at)) {
-                                const one = JSON.stringify(ck) + ":" + JSON.stringify(CACHE[ck]);
-                                if (n + one.length + 1 > SAVE_MAX)
-                                    continue;
-                                parts.push(one);
-                                n += one.length + 1;
-                            }
-                            if (!parts.length) {
-                                localStorage.removeItem(CACHE_KEY);
-                                return;
-                            }
-                            const js = "{" + parts.join(",") + "}";
-                            if (NL.storeSet)
+                const SER = {};
+                let serFull = 0;
+                NL._tdSer = 0;
+                function saveCache(full) {
+                    try {
+                        if (NL.storeBuildA === false) {
+                            const js = JSON.stringify(CACHE);
+                            if (js.length < 2500000)
                                 NL.storeSet(CACHE_KEY, js);
-                            else
-                                localStorage.setItem(CACHE_KEY, js);
+                            return;
                         }
-                        catch (e) { }
-                    }, 1500);
+                        const now = Date.now(), parts = [], lean = NL.storeB !== false && !full && now - serFull < 60000;
+                        if (!lean)
+                            serFull = now;
+                        let n = 2;
+                        for (const ck of Object.keys(SER))
+                            if (!CACHE[ck])
+                                delete SER[ck];
+                        for (const ck of Object.keys(CACHE).filter((k) => CACHE[k] && now - CACHE[k].at < SAVE_AGE).sort((a, b) => CACHE[b].at - CACHE[a].at)) {
+                            let one;
+                            if (lean && SER[ck] && SER[ck].c === CACHE[ck])
+                                one = SER[ck].js;
+                            else {
+                                one = JSON.stringify(ck) + ":" + JSON.stringify(CACHE[ck]);
+                                NL._tdSer++;
+                                if (NL.storeB !== false)
+                                    SER[ck] = { c: CACHE[ck], js: one };
+                            }
+                            if (n + one.length + 1 > SAVE_MAX)
+                                continue;
+                            parts.push(one);
+                            n += one.length + 1;
+                        }
+                        if (!parts.length) {
+                            localStorage.removeItem(CACHE_KEY);
+                            return;
+                        }
+                        NL.storeSet(CACHE_KEY, "{" + parts.join(",") + "}");
+                    }
+                    catch (e) { }
+                }
+                let saveDirty = false;
+                function persistCache() {
+                    saveDirty = true;
+                    clearTimeout(saveTimer);
+                    saveTimer = setTimeout(() => { saveDirty = false; saveCache(false); }, 1500);
+                }
+                if (NL.storeB !== false) {
+                    const flush = () => { if (!saveDirty && Date.now() - serFull < 1500)
+                        return; clearTimeout(saveTimer); saveDirty = false; saveCache(true); };
+                    window.addEventListener("pagehide", flush);
+                    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden")
+                        flush(); });
                 }
                 function ingest(path, j) {
                     if (!j)
@@ -47984,10 +48192,7 @@
                     catch (e) {
                         return d;
                     } };
-                    const lsSet = (k, v) => { try {
-                        localStorage.setItem(k, JSON.stringify(v));
-                    }
-                    catch (e) { } };
+                    const lsSet = (k, v) => { NL.storeSet(k, JSON.stringify(v)); };
                     const dur = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; return h ? h + "h " + m + "m" : m ? m + "m " + x + "s" : x + "s"; };
                     const costHtml = (c) => RES.filter(([k]) => num(c[k]) > 0).map(([k, n]) => n + " " + fmt(c[k])).join(" \u00B7 ") || "\u2014";
                     const shortOf = (cost, have) => Object.fromEntries(RES.map(([k]) => [k, Math.max(0, Math.ceil(num(cost[k]) - num(have[k])))]).filter(([, v]) => v > 0));
@@ -49071,6 +49276,7 @@
                             md.moon[field] = stamp;
                         if (ce && ce.data && ce.data.moon) {
                             ce.data.moon[field] = stamp;
+                            delete SER["/api/moons/" + r.m.id];
                             persistCache();
                         }
                         for (const [t] of SCAN_TYPES)
@@ -50283,7 +50489,7 @@ table.nl2-t-tbl td.nl2-t-act>button{width:var(--nl2-t-btnw,110px);padding:0 8px;
 table.nl2-t-tbl td.nl2-t-act>button{cursor:pointer;border-radius:6px;border:1px solid rgba(148,163,184,.5);background:rgba(148,163,184,.12);color:#cbd5e1}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-ok{border-color:rgba(74,222,128,.55);background:rgba(74,222,128,.12);color:var(--nl2-ok,#4ade80)}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-bad{border-color:rgba(248,113,113,.55);background:rgba(248,113,113,.12);color:var(--nl2-bad,#f87171)}
-table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-amber{border-color:rgba(251,146,60,.55);background:rgba(251,146,60,.12);color:#fb923c}   
+table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-amber{border-color:color-mix(in srgb,var(--nl2-amber,#fbbf24) 55%,transparent);background:color-mix(in srgb,var(--nl2-amber,#fbbf24) 12%,transparent);color:var(--nl2-amber,#fbbf24)}   
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-info{border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.12);color:var(--nl2-info,#38bdf8)}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-b-purple,table.nl2-t-tbl tr.nl2-t-det button.nl2-t-b-purple,table.nl2-t-tbl .nl2-t-ctl button.nl2-t-b-purple{border-color:rgba(168,85,247,.55);background:rgba(168,85,247,.12);color:#c084fc}
 table.nl2-t-tbl td.nl2-t-act>button.nl2-t-bwrap{white-space:normal;height:auto;min-height:24px;padding-top:2px;padding-bottom:2px;line-height:1.2;overflow:visible;text-overflow:clip;vertical-align:middle}
