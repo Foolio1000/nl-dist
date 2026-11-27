@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.165
+// @version      0.5.166
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.165", features: [] };
+    const NL = window.__nl2 = { version: "0.5.166", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -38281,7 +38281,7 @@
         }
     }
     {
-        NL.fl608 = false;
+        NL.fl608 = true;
         (function () {
             const W = (ms) => new Promise((r) => setTimeout(r, ms));
             const LOAD_MS = window.__nxsTestGap != null ? 3000 : 30000;
@@ -38306,8 +38306,62 @@
             }
             let fr = null, ready = null, watch = 0, owner = null, queue = Promise.resolve(), failAt = 0;
             const FAIL_MS = 5 * 60000;
-            function close() { clearInterval(watch); watch = 0; if (fr)
-                fr.remove(); fr = null; ready = null; owner = null; }
+            function close() {
+                clearInterval(watch);
+                watch = 0;
+                const f = fr, back = orig, doc = f && f.contentDocument;
+                fr = null;
+                ready = null;
+                owner = null;
+                orig = null;
+                if (!f)
+                    return;
+                if (back && doc && !onPlanet(doc, back))
+                    switchTo(doc, back).finally(() => f.remove());
+                else
+                    f.remove();
+            }
+            let orig = null;
+            const swBtn = (doc) => doc.querySelector(".planet-switcher-btn");
+            const nameAfter = (doc) => { const t = txt(swBtn(doc)); const i = t.indexOf("]"); return i >= 0 ? t.slice(i + 1) : t; };
+            const onPlanet = (doc, name) => { const t = nameAfter(doc); return t.startsWith(name) && t.charAt(name.length) !== "-"; };
+            const itemName = (b) => { const t = txt(b); const i = t.indexOf("["); return (i >= 0 ? t.slice(0, i) : t).trim(); };
+            async function dropItems(doc) {
+                if (!doc.querySelector(".planet-switcher-dropdown")) {
+                    const b = swBtn(doc);
+                    if (!b)
+                        return [];
+                    b.click();
+                }
+                const dd = await until(() => doc.querySelector(".planet-switcher-dropdown"), 3000);
+                return dd ? [...dd.querySelectorAll(".ps-item-select")] : [];
+            }
+            async function switchTo(doc, name) {
+                const it = (await dropItems(doc)).find((b) => itemName(b) === name);
+                if (!it) {
+                    const b = swBtn(doc);
+                    if (b && doc.querySelector(".planet-switcher-dropdown"))
+                        b.click();
+                    return false;
+                }
+                const was = [...doc.querySelectorAll(".patrol-v2-ship")].map(txt).join("|");
+                it.click();
+                if (!(await until(() => onPlanet(doc, name), 5000)))
+                    return false;
+                await until(() => [...doc.querySelectorAll(".patrol-v2-ship")].map(txt).join("|") !== was, 2500);
+                return true;
+            }
+            async function pick(doc, name) {
+                if (!name)
+                    return true;
+                if (onPlanet(doc, name))
+                    return true;
+                if (!orig) {
+                    const names = (await dropItems(doc)).map(itemName).filter((n) => onPlanet(doc, n)).sort((a, b) => b.length - a.length);
+                    orig = names[0] || null;
+                }
+                return switchTo(doc, name);
+            }
             const panel = (doc) => doc.querySelector(".patrol-v2-panel");
             function open() {
                 if (ready)
@@ -38388,7 +38442,7 @@
                     close();
                     return null;
                 }
-                if (NL.patGame.pick && !(await NL.patGame.pick(doc, q.src)))
+                if (!(await pick(doc, q.srcName)))
                     return null;
                 const cov = COV[q.coverage] && btnOf(p, COV[q.coverage]);
                 if (cov)
@@ -38422,7 +38476,6 @@
                 rate: (q, el) => { if (el)
                     hold(el); const r = queue.then(() => rate(q)).catch(() => null); queue = r; return r; },
                 close,
-                pick: null,
                 _readOut: readOut,
                 _shipRow: shipRow,
             };
@@ -42216,7 +42269,7 @@
                         estMore: NL.fl608 && NL.patGame ? async (st) => {
                             const ships = st.ships.filter((x) => st.act[x.key] > 0).map((x) => ({ name: x.name, key: x.key, n: st.act[x.key] }));
                             const seq = (cfg.pgSeq = (cfg.pgSeq || 0) + 1);
-                            const got = NL.patGame.rate({ src: st.src, ships, hours: L.hours, coverage: L.coverage }, cfg.ov)
+                            const got = NL.patGame.rate({ src: st.src, srcName: (S.planets.find((p) => p.id === st.src) || {}).name, ships, hours: L.hours, coverage: L.coverage }, cfg.ov)
                                 .then((g) => (g ? Object.assign({ fl608: true }, g) : { fl608: true, unavail: true }));
                             got.then((m) => { if (seq !== cfg.pgSeq)
                                 return; st.more = m; if (cfg.pgEl && cfg.pgEl.isConnected)

@@ -2,6 +2,11 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.166 · Nov 27, 2026
+
+**⛏ Mining and PVE**
+- The Salvage Patrol readout now uses the game's own ratings for Cargo and escort, worked out by a hidden copy of the game's Patrol form. If the game can't rate the fleet, the readout says "Rating unavailable" instead of guessing (FL-608)
+
 ## v0.5.165 · Nov 27, 2026
 
 **🏠 Command Center**
@@ -222,16 +227,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 - Debris Phase and Trip time fill straight away instead of showing "—" for 20 to 30 seconds (FL-524)
 - Bio picklist rows are tinted (FL-525)
 - Reports Time and Transfer Routes columns fit the page (FL-527, FL-528)
-
-## v0.5.146 · Nov 21, 2026
-
-**📊 Resources**
-- Resources tab: Subtotal rows on a grey fill (EM-041), a Total column that adds each row's resources, rare included (EM-042), and a Bulk Carriers column with have / need per planet (EM-043)
-
-**🛰 Fleet dialogs**
-- No layout shift: while fuel and travel recalculate, the last values stay on screen dimmed, and lines keep their space so the Launch button doesn't move (FL-523)
-- Carrier hangars hold 15 + Carrier Operations level fighters, not 16 + level (FL-522)
-
-**🔧 Fixes**
-- Fleet on Planet sections collapse again (SH-074)
-- The Fleet Slots pill text is centred in its fixed width (GL-390)
