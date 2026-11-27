@@ -1,5 +1,13 @@
 # Release notes archive
 
+## v0.5.153 · Nov 22, 2026
+
+**🛰 Fleet**
+- The send dialog reads the source planet's fleet fresh, so it no longer says "0 of N needed" when ships are there (GL-408)
+
+**⚙️ Other**
+- The attack line counts only working ships; damaged ships in Repair or Maintain don't count (GL-409)
+
 ## v0.5.152 · Nov 22, 2026
 
 **🛰 Fleet**

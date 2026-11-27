@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.172
+// @version      0.5.173
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.172", features: [] };
+    const NL = window.__nl2 = { version: "0.5.173", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -35834,6 +35834,8 @@ nxtSnap | 92_gl_task_data | retired
                 localStorage.removeItem("nl2.mo.zone");
             }
             catch (e) { }
+            if (NL.moData === undefined)
+                NL.moData = true;
             if (NL.moCaps === undefined)
                 NL.moCaps = true;
             const moCapRule = async (pid) => (NL.moCaps !== false && (await moZone(pid)) === "sentinel" ? "Capitals can't enter Sentinel space" : null);
@@ -35932,7 +35934,17 @@ nxtSnap | 92_gl_task_data | retired
                             if (a)
                                 called[id] = a;
                             NL._kick();
-                            setTimeout(async () => { await read("/api/fleet/missions"); await read("/api/planets/" + state.sourceId + "/fleet"); }, 1000);
+                            setTimeout(async () => {
+                                if (NL.moData !== false && NL.data && NL.data.need) {
+                                    const t = Date.now();
+                                    await NL.data.need("missions", { since: t });
+                                    await NL.data.need("planetFleet", { id: state.sourceId, since: t });
+                                }
+                                else {
+                                    await read("/api/fleet/missions");
+                                    await read("/api/planets/" + state.sourceId + "/fleet");
+                                }
+                            }, 1000);
                             const t = (CALL_FOR[state.mission] || CALL_FOR.collect).title;
                             return { ok: true, message: "Ships on the way to " + name + (a ? ", arriving " + clock(a) : "") + ". Press " + t + " when they land." };
                         }
@@ -36020,7 +36032,17 @@ nxtSnap | 92_gl_task_data | retired
                             const j = await res.json().catch(() => null);
                             if (!res.ok)
                                 return { ok: false, message: (j && (j.error || j.message)) || ("The game refused the transfer (HTTP " + res.status + ").") };
-                            setTimeout(async () => { await read("/api/fleet/missions"); await read("/api/moons/" + id + "/fleet"); }, 1000);
+                            setTimeout(async () => {
+                                if (NL.moData !== false && NL.data && NL.data.need) {
+                                    const t = Date.now();
+                                    await NL.data.need("missions", { since: t });
+                                    await NL.data.need("moonFleet", { id, since: t });
+                                }
+                                else {
+                                    await read("/api/fleet/missions");
+                                    await read("/api/moons/" + id + "/fleet");
+                                }
+                            }, 1000);
                             return { ok: true, message: o.label + " to " + ((state.target && state.target.label) || "the planet") + "." };
                         }
                         catch (e) {
@@ -37450,7 +37472,17 @@ nxtSnap | 92_gl_task_data | retired
                                 const j = await r.json().catch(() => null);
                                 if (!r.ok)
                                     return { ok: false, message: (j && (j.error || j.message)) || ("The game refused the Collect (HTTP " + r.status + ").") };
-                                setTimeout(async () => { await read("/api/fleet/missions"); await read("/api/planets/" + state.sourceId + "/fleet"); }, 1000);
+                                setTimeout(async () => {
+                                    if (NL.moData !== false && NL.data && NL.data.need) {
+                                        const t = Date.now();
+                                        await NL.data.need("missions", { since: t });
+                                        await NL.data.need("planetFleet", { id: state.sourceId, since: t });
+                                    }
+                                    else {
+                                        await read("/api/fleet/missions");
+                                        await read("/api/planets/" + state.sourceId + "/fleet");
+                                    }
+                                }, 1000);
                                 ouPending[op.id] = Date.now();
                                 return { ok: true, message: "Collect fleet sent to " + (op.name || "the outpost") + "." };
                             }

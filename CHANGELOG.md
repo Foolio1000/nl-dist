@@ -2,6 +2,11 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.173 · Nov 27, 2026
+
+**⚙ Behind the scenes**
+- After Call Ships, moon Evacuate and Outposts Collect, the script reads your fleets back through the shared data helper, so each send triggers only one refresh (GL-471, fourth part)
+
 ## v0.5.172 · Nov 27, 2026
 
 **🏗 Buildings**
@@ -202,11 +207,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🪐 Planets**
 - Buildings: hovering a short cost shows exactly what is missing (BU-048)
-
-## v0.5.153 · Nov 22, 2026
-
-**🛰 Fleet**
-- The send dialog reads the source planet's fleet fresh, so it no longer says "0 of N needed" when ships are there (GL-408)
-
-**⚙️ Other**
-- The attack line counts only working ships; damaged ships in Repair or Maintain don't count (GL-409)
