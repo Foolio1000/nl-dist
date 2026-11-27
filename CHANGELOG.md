@@ -2,6 +2,14 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.165 · Nov 27, 2026
+
+**🏠 Command Center**
+- Command Center's own tabs (To Do, Resources, Buildings and Research) are back. They went missing when the 26 Nov game update added an icon to each tab (EM-061)
+
+**🛒 Market**
+- On a hub card that lists no resources, the game's Pickup button is hidden, since there is nothing to pick up (GL-449)
+
 ## v0.5.164 · Nov 26, 2026
 
 **🏠 Command Center**
@@ -227,12 +235,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 **🔧 Fixes**
 - Fleet on Planet sections collapse again (SH-074)
 - The Fleet Slots pill text is centred in its fixed width (GL-390)
-
-## v0.5.145 · Nov 20, 2026
-
-**🪐 Planets**
-- Overview Evacuate lines show what you have against what you need ("Cargo 1.3M / 1.21M"), with exact values on hover (FL-521)
-- Outpost detail header buttons have solid backgrounds, so the image behind them no longer shows through (OU-017)
-
-**🛰 Fleet**
-- Routes buttons on Transfer and Stations: Edit green, Pause blue, Resume orange, Delete red (FL-520)

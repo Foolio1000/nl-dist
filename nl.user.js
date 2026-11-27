@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.164
+// @version      0.5.165
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.164", features: [] };
+    const NL = window.__nl2 = { version: "0.5.165", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -27509,7 +27509,8 @@
             init(ctx) {
                 NL.css("gl-rare-deliver", ".hub-deliver-modal .nl2-rd-note{margin-right:auto;align-self:center;font-weight:600;color:#9fd3ff}.hub-deliver-modal .nl2-rd-note.nl2-rd-short{color:#f87171}"
                     + ".market-hub-card-header .nl2-rd-btn{margin-left:auto;padding:2px 8px;font-family:inherit;font-size:.75rem;font-weight:600;line-height:normal;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}"
-                    + ".market-hub-card-header button+.nl2-rd-btn{margin-left:4px}.market-hub-card-header .nl2-rd-btn+button{margin-left:4px!important}");
+                    + ".market-hub-card-header button+.nl2-rd-btn{margin-left:4px}.market-hub-card-header .nl2-rd-btn+button{margin-left:4px!important}"
+                    + ".market-hub-card-header button[data-nl2-gl449]{display:none!important}.market-hub-card-header button[data-nl2-gl449]+.nl2-rd-btn{margin-left:auto}");
                 let pending = 0, busy = false;
                 let sup = null, supAt = 0;
                 NL.onData(/^\/api\/fleet\/supply(\?|$)/, (p, d) => { if (d && d.supplyPlanet) {
@@ -27536,11 +27537,21 @@
                     }
                     return sup && sup.name ? String(sup.name).trim() : "";
                 }
+                NL.gl449 = true;
                 NL.watch(".market-hub-card", (card) => {
                     for (const x of card.querySelectorAll(".market-hub-card-header button:not(.nl2-rd-btn)")) {
                         const t = x.textContent.trim(), c = t === "Pickup" ? "nl2-hub-pickup nl2-c-blue" : t === "Deliver" ? "nl2-hub-deliver nl2-c-green" : "";
                         if (c && !x.classList.contains(c.split(" ")[1]))
                             x.classList.add(...c.split(" "));
+                        if (t === "Pickup" && NL.gl449 !== false) {
+                            const has = [...card.children].some((el) => !el.classList.contains("market-hub-card-header") && /[1-9][\d,.]*\s*available/i.test(el.textContent || ""));
+                            if (has === x.hasAttribute("data-nl2-gl449")) {
+                                if (has)
+                                    x.removeAttribute("data-nl2-gl449");
+                                else
+                                    x.setAttribute("data-nl2-gl449", "");
+                            }
+                        }
                     }
                     if (card.querySelector(".nl2-rd-btn"))
                         return;
@@ -33942,7 +33953,7 @@
                     }
                 }
                 let entered = false, gameSearch = "";
-                const labelOf = (b) => ((b.querySelector("span") || b).textContent || "").trim();
+                const labelOf = (b) => ((b.querySelector("span:not(.ui-icon)") || b).textContent || "").trim();
                 function restore(nav) {
                     if (entered)
                         return;
@@ -38270,6 +38281,154 @@
         }
     }
     {
+        NL.fl608 = false;
+        (function () {
+            const W = (ms) => new Promise((r) => setTimeout(r, ms));
+            const LOAD_MS = window.__nxsTestGap != null ? 3000 : 30000;
+            const txt = (e) => ((e && e.textContent) || "").replace(/\s+/g, " ").trim();
+            const btnOf = (root, re) => [...root.querySelectorAll("button")].find((b) => re.test(txt(b)));
+            async function until(fn, ms) {
+                const t0 = Date.now();
+                for (;;) {
+                    let v = null;
+                    try {
+                        v = fn();
+                    }
+                    catch (e) {
+                        v = null;
+                    }
+                    if (v)
+                        return v;
+                    if (Date.now() - t0 > ms)
+                        return null;
+                    await W(100);
+                }
+            }
+            let fr = null, ready = null, watch = 0, owner = null, queue = Promise.resolve(), failAt = 0;
+            const FAIL_MS = 5 * 60000;
+            function close() { clearInterval(watch); watch = 0; if (fr)
+                fr.remove(); fr = null; ready = null; owner = null; }
+            const panel = (doc) => doc.querySelector(".patrol-v2-panel");
+            function open() {
+                if (ready)
+                    return ready;
+                fr = document.createElement("iframe");
+                fr.src = "/fleet";
+                fr.setAttribute("aria-label", "Patrol ratings");
+                fr.tabIndex = -1;
+                fr.setAttribute("aria-hidden", "true");
+                fr.style.cssText = "position:fixed;left:-12000px;top:0;width:1280px;height:900px;border:0;opacity:0;pointer-events:none";
+                document.body.appendChild(fr);
+                const f = fr;
+                ready = (async () => {
+                    const doc = await until(() => f.contentDocument && f.contentDocument.body && btnOf(f.contentDocument, /^Patrol/) && f.contentDocument, LOAD_MS);
+                    if (!doc)
+                        return null;
+                    btnOf(doc, /^Patrol/).click();
+                    const p = await until(() => panel(doc), LOAD_MS);
+                    if (!p)
+                        return null;
+                    const salv = btnOf(p, /^Salvage/);
+                    if (!salv)
+                        return null;
+                    salv.click();
+                    await W(300);
+                    return doc;
+                })().catch(() => null);
+                ready.then((d) => { if (!d && fr === f) {
+                    failAt = Date.now();
+                    close();
+                } });
+                return ready;
+            }
+            function hold(el) {
+                owner = el || owner;
+                if (watch)
+                    return;
+                watch = setInterval(() => { if (!owner || !owner.isConnected)
+                    close(); }, 2000);
+            }
+            const setNum = (doc, inp, n) => {
+                const set = Object.getOwnPropertyDescriptor(doc.defaultView.HTMLInputElement.prototype, "value").set;
+                set.call(inp, String(n));
+                inp.dispatchEvent(new doc.defaultView.Event("input", { bubbles: true }));
+                inp.dispatchEvent(new doc.defaultView.Event("change", { bubbles: true }));
+            };
+            const reEsc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const shipRow = (doc, name) => [...doc.querySelectorAll(".patrol-v2-ship")].find((r) => new RegExp("^" + reEsc(name) + "\\s*\\d").test(txt(r)));
+            const rowAvail = (r) => { const m = /\/\s*([\d,]+)/.exec(txt(r)); return m ? +m[1].replace(/,/g, "") : 0; };
+            const CARGO = { short: "low", enough: "enough", excess: "excess" };
+            const ESC = [[/^No combat escort selected/i, "none"], [/^The escort may not be enough/i, "weak"], [/^The escort looks solid/i, "ordinary"]];
+            const COV = { orbital: /^Orbital/, system: /^System/, route: /^Route/ };
+            function readOut(doc) {
+                const rows = [...doc.querySelectorAll(".patrol-v2-cap-row")].map(txt);
+                const cRow = rows.find((t) => /^Cargo/.test(t)), dRow = rows.find((t) => /^System depletion/.test(t));
+                const cargoText = cRow ? cRow.replace(/^Cargo/, "").trim() : "";
+                const box = doc.querySelector(".mining-escort-warning");
+                const bt = txt(box), hit = ESC.find(([re]) => re.test(bt));
+                const title = hit ? bt.match(hit[0])[0] : "";
+                const body = hit ? bt.slice(title.length).replace(/A rough estimate of the selected escort, not a battle forecast\.?/i, "").trim() : "";
+                return {
+                    cargo: CARGO[cargoText.toLowerCase()] || null,
+                    cargoText: cargoText && cargoText !== "\u2014" ? cargoText : "",
+                    depl: dRow ? dRow.replace(/^System depletion/, "").trim().replace(/^—$/, "") : "",
+                    esc: hit ? hit[1] : null,
+                    escTitle: title,
+                    escBody: body,
+                };
+            }
+            async function rate(q) {
+                if (!ready && Date.now() - failAt < FAIL_MS)
+                    return null;
+                const doc = await open();
+                if (!doc || !q || !Array.isArray(q.ships))
+                    return null;
+                const p = panel(doc);
+                if (!p) {
+                    close();
+                    return null;
+                }
+                if (NL.patGame.pick && !(await NL.patGame.pick(doc, q.src)))
+                    return null;
+                const cov = COV[q.coverage] && btnOf(p, COV[q.coverage]);
+                if (cov)
+                    cov.click();
+                const hb = q.hours && btnOf(p, new RegExp("^" + Number(q.hours) + "h$"));
+                if (hb)
+                    hb.click();
+                const words = (k) => String(k || "").split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+                const want = q.ships.filter((x) => x && (x.name || x.key) && x.n > 0).map((x) => ({ names: [x.name, words(x.key)].filter(Boolean), n: x.n }));
+                const hit = (r, w) => w.names.some((k) => new RegExp("^" + reEsc(k) + "\\s*\\d", "i").test(txt(r)));
+                for (const r of doc.querySelectorAll(".patrol-v2-ship")) {
+                    const inp = r.querySelector("input[type=number]");
+                    if (!inp)
+                        continue;
+                    const wi = want.findIndex((w) => hit(r, w));
+                    const n = wi >= 0 ? want[wi].n : 0;
+                    if (wi >= 0)
+                        want.splice(wi, 1);
+                    if (n > rowAvail(r))
+                        return null;
+                    if (String(inp.value) !== String(n))
+                        setNum(doc, inp, n);
+                }
+                if (want.length)
+                    return null;
+                await W(150);
+                const out = readOut(doc);
+                return out.cargo || out.esc ? out : null;
+            }
+            NL.patGame = {
+                rate: (q, el) => { if (el)
+                    hold(el); const r = queue.then(() => rate(q)).catch(() => null); queue = r; return r; },
+                close,
+                pick: null,
+                _readOut: readOut,
+                _shipRow: shipRow,
+            };
+        })();
+    }
+    {
         NL.tplInline = true;
         NL.stnFresh = true;
         NL.fl382 = true;
@@ -42054,11 +42213,20 @@
                         target: { mode: "salvage", coverage: L.coverage, durationHours: L.hours },
                         exclude: NL.fl416 ? PAT_NO_SHIPS.filter((k) => k !== "hacker_ship") : PAT_NO_SHIPS,
                         cp: null,
-                        estMore: NL.fl417 ? async (st, ships) => {
+                        estMore: NL.fl608 && NL.patGame ? async (st) => {
+                            const ships = st.ships.filter((x) => st.act[x.key] > 0).map((x) => ({ name: x.name, key: x.key, n: st.act[x.key] }));
+                            const seq = (cfg.pgSeq = (cfg.pgSeq || 0) + 1);
+                            const got = NL.patGame.rate({ src: st.src, ships, hours: L.hours, coverage: L.coverage }, cfg.ov)
+                                .then((g) => (g ? Object.assign({ fl608: true }, g) : { fl608: true, unavail: true }));
+                            got.then((m) => { if (seq !== cfg.pgSeq)
+                                return; st.more = m; if (cfg.pgEl && cfg.pgEl.isConnected)
+                                cfg.pgEl.innerHTML = patReadoutHtml(m, L.hours); });
+                            return Promise.race([got, new Promise((r) => setTimeout(() => r({ fl608: true, pending: true }), 300))]);
+                        } : NL.fl417 ? async (st, ships) => {
                             const r = await NL.postJson("/api/fleet/patrol/bands", { ships, sourcePlanetId: st.src, attachLeader: false }, PAT_BANDS_NET);
                             return r && r.ok ? r.data : null;
                         } : undefined,
-                        estAbove: NL.fl417 && NL.patReadout && NL.fleetCombat ? (el, st) => { el.innerHTML = patReadoutHtml(st.more, L.hours); } : undefined,
+                        estAbove: NL.fl417 && NL.patReadout && NL.fleetCombat ? (el, st) => { cfg.pgEl = el; el.innerHTML = patReadoutHtml(st.more, L.hours); } : undefined,
                         estNote: NL.fl417 && !(NL.patReadout && NL.fleetCombat && NL.fl427) ? (st) => {
                             const b = st.more, sv = b && b.salvage, d = sv && Array.isArray(sv.durations) ? sv.durations.find((x) => num(x.hours) === L.hours) : null;
                             if (!b)
@@ -42234,7 +42402,31 @@
                 const PAT_DEPL = { fresh: ["Untouched", "Nearby systems are untouched: finds are full-sized.", "ok"], thinned: ["Thinned", "Your salvage crews have already combed these systems today: finds will be smaller.", "amber"], worked: ["Thinned", "Your salvage crews have already combed these systems today: finds will be smaller.", "amber"], depleted: ["Depleted", "Your crews have stripped these systems bare today: finds will be much smaller.", "bad"] };
                 const PAT_ESC = { none: ["No combat escort selected", "If pirates intercept the fleet, it gives up the holds without a fight.", "bad"], weak: ["The escort may not be enough", "A strong pirate band could take both the haul and the ships.", "amber"], ordinary: ["The escort looks solid", "Pirates vary; there are no guarantees.", "plain"] };
                 const patBand = (b) => { const k = String(b || "").toLowerCase(); return /none|^$/.test(k) ? [0, "bad"] : /weak|low|thin/.test(k) ? [33, "amber"] : /strong|high|heavy|max/.test(k) ? [100, "ok"] : [66, "info"]; };
+                const PAT_CARGO = { low: ["An average haul may not fit in the holds.", "amber"], enough: ["The holds fit a usual haul in this zone.", "ok"], excess: ["Far more hold space than a haul in this zone needs. Extra cargo ships add no loot, and the pirates who come are stronger.", "amber"] };
+                function patReadout608(g, hours) {
+                    let h = "<div class=\"nl2-pro\"><div class=\"nl2-pro-h\">Capability Readout</div>";
+                    if (g.pending)
+                        return h + "<div class=\"nl2-pro-hint\">Asking the game for its ratings\u2026</div></div>";
+                    if (g.unavail)
+                        return h + "<div class=\"nl2-pro-hint\">Rating unavailable: the game's patrol form could not rate this fleet.</div></div>";
+                    const C = PAT_CARGO[g.cargo];
+                    h += "<div class=\"nl2-pro-r nl2-pro-r2\"><span class=\"nl2-pro-k\">Cargo</span><span><span class=\"nl2-pro-" + (C ? C[1] : "plain") + "t\">" + esc(g.cargoText || "\u2014") + "</span>"
+                        + (C ? "<div class=\"nl2-pro-hint\">" + esc(C[0]) + "</div>" : "") + "</span></div>";
+                    if (g.depl) {
+                        const D = PAT_DEPL[String(g.depl).toLowerCase()] || Object.values(PAT_DEPL).find((x) => x[0] === g.depl) || [g.depl, "", "plain"];
+                        h += "<div class=\"nl2-pro-r nl2-pro-r2\"><span class=\"nl2-pro-k\">System depletion</span><span><span class=\"nl2-pro-" + D[2] + "t\">" + esc(D[0]) + "</span>"
+                            + (D[1] ? "<div class=\"nl2-pro-hint\">" + num(hours) + "h: " + esc(D[1]) + "</div>" : "") + "</span></div>";
+                    }
+                    h += "</div>";
+                    if (g.esc) {
+                        const E = PAT_ESC[g.esc];
+                        h += "<div class=\"nl2-pro-esc nl2-pro-esc-" + E[2] + "\"><b>" + esc(g.escTitle || E[0]) + "</b><div class=\"nl2-pro-hint\">" + esc(g.escBody || E[1]) + " A rough estimate of the selected escort, not a battle forecast.</div></div>";
+                    }
+                    return h;
+                }
                 function patReadoutHtml(b, hours) {
+                    if (b && b.fl608)
+                        return patReadout608(b, hours);
                     if (!b)
                         return "<div class=\"nl2-pro\"><div class=\"nl2-pro-h\">Capability Readout</div><div class=\"nl2-pro-hint\">Working out the readout\u2026</div></div>";
                     const sv = b.salvage || {}, ds = Array.isArray(sv.durations) ? sv.durations : [], cur = ds.find((x) => num(x.hours) === num(hours)) || null;
@@ -46618,7 +46810,7 @@
     .sidebar-badge.nxs-attn:empty{display:none!important}
     .nxs-hdronly .nxs-head{margin-bottom:0}
     .nxs-capped td{opacity:.45}
-    .nxs-xdig{margin:4px 0 6px;font-size:12px}.nl2-fleet-row:has(> .nl2-fleet-d [data-prt][data-off]),.nl2-fleet-row:has([data-prt][data-off]){display:none!important}.nl2-pro{margin:8px 0 10px;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(255,255,255,.03);font-size:13px}.nl2-pro-h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--nl2-head);margin-bottom:8px;font-weight:600}.nl2-pro-r{display:grid;grid-template-columns:120px 1fr 110px;align-items:center;gap:10px;margin:6px 0}.nl2-pro-top{align-items:start}.nl2-pro-k{color:var(--nl2-dim)}.nl2-pro-v{text-align:right;color:var(--nl2-text)}.nl2-pro-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}.nl2-pro-bar i{display:block;height:100%}.nl2-pro-ok{background:var(--nl2-ok)}.nl2-pro-amber{background:var(--nl2-amber)}.nl2-pro-bad{background:var(--nl2-bad)}.nl2-pro-info{background:var(--nl2-info)}.nl2-pro-dw{grid-column:2 / 4}.nl2-pro-d{display:grid;grid-template-columns:repeat(auto-fit,minmax(60px,1fr));gap:6px}.nl2-pro-dc{border:1px solid rgba(255,255,255,.10);border-radius:4px;padding:5px 6px;text-align:center;font-size:12px}.nl2-pro-dc b{display:block;color:var(--nl2-text);font-weight:600}.nl2-pro-dc.nl2-pro-sel{border-color:var(--nl2-info)}.nl2-pro-okt{color:var(--nl2-ok)}.nl2-pro-ambert{color:var(--nl2-amber)}.nl2-pro-badt{color:var(--nl2-bad)}.nl2-pro-plaint{color:var(--nl2-text)}.nl2-pro-hint{color:var(--nl2-dim);font-size:12px;margin-top:4px}.nl2-pro-esc{margin:0 0 10px;padding:8px 12px;border-left:3px solid var(--nl2-dim);border-radius:4px;background:rgba(255,255,255,.03);font-size:13px}.nl2-pro-esc-amber{border-left-color:var(--nl2-amber)}.nl2-pro-esc-amber b{color:var(--nl2-amber)}.nl2-pro-esc-bad{border-left-color:var(--nl2-bad)}.nl2-pro-esc-bad b{color:var(--nl2-bad)}.nl2-fleet-above .nl2-pro{border:0;padding:0;background:none;margin:0 0 10px}.nl2-fleet-above .nl2-pro-esc{margin:0}@media (max-width:520px){.nl2-pro-r{grid-template-columns:90px 1fr 80px}}.nl2-mt2-rr{display:inline-flex;align-items:center;gap:6px}.nl2-mt2-r{width:64px;text-align:right}.nl2-mt2-tpl{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}.nxs-gcore{margin-left:8px}
+    .nxs-xdig{margin:4px 0 6px;font-size:12px}.nl2-fleet-row:has(> .nl2-fleet-d [data-prt][data-off]),.nl2-fleet-row:has([data-prt][data-off]){display:none!important}.nl2-pro{margin:8px 0 10px;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(255,255,255,.03);font-size:13px}.nl2-pro-h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--nl2-head);margin-bottom:8px;font-weight:600}.nl2-pro-r{display:grid;grid-template-columns:120px 1fr 110px;align-items:center;gap:10px;margin:6px 0}.nl2-pro-top{align-items:start}.nl2-pro-r2{grid-template-columns:120px 1fr;align-items:start}.nl2-pro-k{color:var(--nl2-dim)}.nl2-pro-v{text-align:right;color:var(--nl2-text)}.nl2-pro-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}.nl2-pro-bar i{display:block;height:100%}.nl2-pro-ok{background:var(--nl2-ok)}.nl2-pro-amber{background:var(--nl2-amber)}.nl2-pro-bad{background:var(--nl2-bad)}.nl2-pro-info{background:var(--nl2-info)}.nl2-pro-dw{grid-column:2 / 4}.nl2-pro-d{display:grid;grid-template-columns:repeat(auto-fit,minmax(60px,1fr));gap:6px}.nl2-pro-dc{border:1px solid rgba(255,255,255,.10);border-radius:4px;padding:5px 6px;text-align:center;font-size:12px}.nl2-pro-dc b{display:block;color:var(--nl2-text);font-weight:600}.nl2-pro-dc.nl2-pro-sel{border-color:var(--nl2-info)}.nl2-pro-okt{color:var(--nl2-ok)}.nl2-pro-ambert{color:var(--nl2-amber)}.nl2-pro-badt{color:var(--nl2-bad)}.nl2-pro-plaint{color:var(--nl2-text)}.nl2-pro-hint{color:var(--nl2-dim);font-size:12px;margin-top:4px}.nl2-pro-esc{margin:0 0 10px;padding:8px 12px;border-left:3px solid var(--nl2-dim);border-radius:4px;background:rgba(255,255,255,.03);font-size:13px}.nl2-pro-esc-amber{border-left-color:var(--nl2-amber)}.nl2-pro-esc-amber b{color:var(--nl2-amber)}.nl2-pro-esc-bad{border-left-color:var(--nl2-bad)}.nl2-pro-esc-bad b{color:var(--nl2-bad)}.nl2-fleet-above .nl2-pro{border:0;padding:0;background:none;margin:0 0 10px}.nl2-fleet-above .nl2-pro-esc{margin:0}@media (max-width:520px){.nl2-pro-r{grid-template-columns:90px 1fr 80px}.nl2-pro-r2{grid-template-columns:90px 1fr}}.nl2-mt2-rr{display:inline-flex;align-items:center;gap:6px}.nl2-mt2-r{width:64px;text-align:right}.nl2-mt2-tpl{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}.nxs-gcore{margin-left:8px}
     .nxs-xpick{display:flex;gap:6px;flex-wrap:wrap}.nxs-xpick .nxs-btn{height:26px;line-height:24px;padding:0 12px;font-size:12px}.nxs-xpick .nxs-btn.nxs-on{background:rgba(34,195,221,.4);border-color:#22c3dd;color:#fff}
     .nxs-minebar{position:sticky;top:0;z-index:4;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:#0c2033;border:1px solid #2f4d66;border-radius:8px}
     .nxs-minebar .nxs-btn{flex:1 1 30%}
