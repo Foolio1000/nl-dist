@@ -1,5 +1,13 @@
 # Release notes archive
 
+## v0.5.155 · Nov 22, 2026
+
+**🚀 Performance**
+- Big tables no longer freeze while they redraw: a 2,000-row table now redraws in a blink instead of about 27 seconds, and the Galaxy table finishes loading (GL-410)
+
+**🪐 Planets**
+- Recycling compare shows the cost difference with the right sign and colour (RE-046)
+
 ## v0.5.154 · Nov 22, 2026
 
 **🪐 Planets**

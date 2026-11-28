@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.174
+// @version      0.5.175
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.174", features: [] };
+    const NL = window.__nl2 = { version: "0.5.175", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -55,11 +55,17 @@
                 }
         };
         NL._put = put;
-        const tx = (path, method, data) => { try {
+        const tx = (path, method, data, drop) => { try {
             if (NL._txTee)
-                NL._txTee(path, method, data);
+                NL._txTee(path, method, data, drop);
         }
         catch (e) { } };
+        const txWant = (path) => { try {
+            return !NL._txWant || NL._txWant(path);
+        }
+        catch (e) {
+            return true;
+        } };
         const wsubs = [];
         const wrote = (path, method) => { for (const s of wsubs)
             if (s.re.test(path)) {
@@ -105,8 +111,16 @@
                             wrote(wpath.split("?")[0], method); }).catch(() => { });
                     const tpath = rel(typeof input === "string" ? input : input && input.url);
                     if (tpath && tpath.startsWith("/api/transport/"))
-                        p.then((r) => { if (r && r.ok)
-                            r.clone().json().catch(() => null).then((d) => tx(tpath, method, d)); }).catch(() => { });
+                        p.then((r) => {
+                            if (!r || !r.ok || !txWant(tpath))
+                                return;
+                            const c = r.clone();
+                            tx(tpath, method, () => c.json().catch(() => null), () => { try {
+                                if (c.body)
+                                    c.body.cancel();
+                            }
+                            catch (e) { } });
+                        }).catch(() => { });
                 }
                 catch (e) { }
                 return p;
@@ -133,14 +147,14 @@
                     this.addEventListener("load", () => {
                         if (this.status < 200 || this.status >= 300)
                             return;
-                        let d = null;
-                        try {
-                            d = typeof this.response === "object" && this.response ? this.response : JSON.parse(this.responseText);
+                        if (!txWant(tpath))
+                            return;
+                        tx(tpath, wm, () => { try {
+                            return typeof this.response === "object" && this.response ? this.response : JSON.parse(this.responseText);
                         }
                         catch (e) {
-                            d = null;
-                        }
-                        tx(tpath, wm, d);
+                            return null;
+                        } });
                     });
             }
             catch (e) { }
@@ -3068,16 +3082,15 @@ nxtSnap | 92_gl_task_data | retired
             return p;
         };
         const txWarned = new Set();
+        const hitOf = (s, route) => { try {
+            return s.re instanceof RegExp ? (s.re.lastIndex = 0, s.re.test(route)) : String(s.re) === route;
+        }
+        catch (e) {
+            return false;
+        } };
         const fire = (route, reply, meta) => {
-            for (const s of txSubs) {
-                let hit = false;
-                try {
-                    hit = s.re instanceof RegExp ? (s.re.lastIndex = 0, s.re.test(route)) : String(s.re) === route;
-                }
-                catch (e) {
-                    hit = false;
-                }
-                if (hit) {
+            for (const s of txSubs)
+                if (hitOf(s, route)) {
                     try {
                         s.fn(route, reply, meta);
                     }
@@ -3085,28 +3098,70 @@ nxtSnap | 92_gl_task_data | retired
                         console.warn("[NL] onTransport handler failed", route, e);
                     }
                 }
-            }
         };
         NL._fireTransport = (route, reply, meta) => fire(String(route), reply == null ? null : reply, meta || { act: false, method: String(route).split(" ")[0], op: null });
-        NL._txTee = (path, method, data) => {
+        NL.txLazy = true;
+        NL._txStat = { seen: 0, parsed: 0, decoded: 0, skipped: 0 };
+        const ctxNow = new Map();
+        const TX_RE = /^\/api\/transport\/r\/([^/?]+)\/([^/?]+)/;
+        const routeNow = (id, op) => {
+            const c = tctx && tctx.id === id ? tctx : ctxNow.get(id), t = opTable;
+            if (!c || !t || t.length !== c.ops.length)
+                return undefined;
+            const i = c.ops.indexOf(op);
+            return i >= 0 ? t[i][0] + " " + t[i][1] : null;
+        };
+        NL._txWant = (path) => {
+            if (NL.txLazy === false)
+                return true;
+            if (path.split("?")[0] === "/api/transport/bootstrap")
+                return true;
+            if (!txSubs.length)
+                return false;
+            const m = TX_RE.exec(path);
+            if (!m)
+                return false;
+            const route = routeNow(decodeURIComponent(m[1]), decodeURIComponent(m[2]));
+            if (route === undefined)
+                return true;
+            return route !== null && txSubs.some((s) => hitOf(s, route));
+        };
+        NL._txTee = (path, method, data, drop) => {
+            const lazy = typeof data === "function";
+            const body = () => { NL._txStat.parsed++; return Promise.resolve(lazy ? data() : data).catch(() => null); };
+            const skip = () => { NL._txStat.skipped++; if (drop) {
+                try {
+                    drop();
+                }
+                catch (e) { }
+            } };
+            NL._txStat.seen++;
             if (path.split("?")[0] === "/api/transport/bootstrap") {
-                if (data && data.id && data.moduleUrl)
-                    boots.set(String(data.id), String(data.moduleUrl));
-                if (boots.size > 8)
-                    boots.delete(boots.keys().next().value);
+                body().then((d) => {
+                    if (d && d.id && d.moduleUrl)
+                        boots.set(String(d.id), String(d.moduleUrl));
+                    if (boots.size > 8)
+                        boots.delete(boots.keys().next().value);
+                });
                 return;
             }
-            if (!txSubs.length)
+            const m = TX_RE.exec(path);
+            if (!txSubs.length || !m) {
+                skip();
                 return;
-            const m = /^\/api\/transport\/r\/([^/?]+)\/([^/?]+)/.exec(path);
-            if (!m)
-                return;
+            }
             const id = decodeURIComponent(m[1]), op = decodeURIComponent(m[2]);
             (async () => {
                 const [c, t] = await Promise.all([ctxFor(id), loadOpTable()]);
+                if (c) {
+                    ctxNow.set(id, c);
+                    if (ctxNow.size > 4)
+                        ctxNow.delete(ctxNow.keys().next().value);
+                }
                 const i = c ? c.ops.indexOf(op) : -1;
                 const row = t && c && t.length === c.ops.length && i >= 0 ? t[i] : null;
                 if (!row) {
+                    skip();
                     if (!txWarned.has(id)) {
                         txWarned.add(id);
                         console.debug("[NL] onTransport: could not map", id, op);
@@ -3114,9 +3169,17 @@ nxtSnap | 92_gl_task_data | retired
                     return;
                 }
                 const route = row[0] + " " + row[1];
+                if (NL.txLazy !== false && !txSubs.some((s) => hitOf(s, route))) {
+                    skip();
+                    return;
+                }
+                const d = await body();
                 let reply = null;
                 try {
-                    reply = data && typeof data === "object" ? c.codec.decode(data) : null;
+                    if (d && typeof d === "object") {
+                        NL._txStat.decoded++;
+                        reply = c.codec.decode(d);
+                    }
                 }
                 catch (e) {
                     reply = null;
@@ -12398,6 +12461,21 @@ nxtSnap | 92_gl_task_data | retired
                     return;
                 const st = ctx.store, tvSt = NL.store("gl-crew-table.");
                 const tvOn = () => tvSt.get("tv", true) !== false;
+                NL.watch(".leadership-page", (page) => {
+                    const at = st.get("reopen", 0);
+                    if (!at)
+                        return;
+                    const tab = [...page.querySelectorAll("button, a, [role=tab]")].find((b) => !b.closest(".leadership-tab-panel") && /^\s*crew\s*$/i.test(b.textContent || ""));
+                    if (Date.now() - at > 30000) {
+                        st.set("reopen", 0);
+                        return;
+                    }
+                    if (!tab)
+                        return;
+                    st.set("reopen", 0);
+                    if (!page.querySelector(".leadership-crew-roster"))
+                        tab.click();
+                });
                 const f = () => Object.assign({ q: "", role: "", grade: "", scope: "owned", soldOnly: false, hideSold: false }, st.get("f", null) || {});
                 const setF = (k, v) => { const o = f(); o[k] = v; st.set("f", o); paint(); };
                 let mods = {}, roleCnt = {}, marked = new Set(), elig = new Map(), marksAt = 0;
@@ -12421,6 +12499,15 @@ nxtSnap | 92_gl_task_data | retired
                     roleCnt = rc;
                     NL._kick();
                 });
+                let lsDue = null, lsSeen = 0;
+                NL.onData(/^\/api\/leadership(\?|$)/, (p, d, at) => { lsSeen = Math.max(lsSeen, at || Date.now()); });
+                NL.onWrite(/^\/api\/leadership\/modules\//, () => {
+                    const at = Date.now();
+                    if (lsDue)
+                        return;
+                    lsDue = setTimeout(() => { lsDue = null; if (!(lsSeen > at))
+                        NL.getJson("/api/leadership", ctx); }, 2500);
+                });
                 NL.onData(/^\/api\/artifacts\/inventory-marks\?(.*&)?kind=crew(&|$)/, (p, d, at) => {
                     if (!d || !Array.isArray(d.markedIds))
                         return;
@@ -12430,7 +12517,6 @@ nxtSnap | 92_gl_task_data | retired
                     paint();
                 });
                 const fiberKey = (el) => { const k = Object.keys(el).find((x) => x.startsWith("__reactFiber")); const fb = k && el[k]; return fb && fb.key != null ? String(fb.key) : ""; };
-                const RAR = { specialist: "common", veteran: "rare", savant: "epic", genius: "legendary" };
                 const GN = ["specialist", "veteran", "savant", "genius"], cap = (s) => s[0].toUpperCase() + s.slice(1);
                 const GR = { genius: 4, savant: 3, veteran: 2, specialist: 1 };
                 NL.css("gl-crew-one", `
@@ -12444,20 +12530,12 @@ nxtSnap | 92_gl_task_data | retired
       .nl2-crone-top input[type=text],.nl2-crone-top select{height:28px}
       .nl2-crone-top select{width:170px}
       .nl2-crone-top select.nl2-crone-gr{width:130px}
-      .nl2-crone-top .nl2-crone-btn{height:28px;box-sizing:border-box;border:1px solid rgba(56,189,248,.55);border-radius:6px;background:rgba(56,189,248,.12);color:var(--nl2-info,#38bdf8);font:600 13px Rajdhani,"Exo 2",sans-serif;padding:0 10px}
       .nl2-crone-top input[type=text]{width:170px}
       .nl2-crone-top label{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;font:500 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
       .nl2-crone-top label input{margin:0;cursor:pointer}
       .nl2-crone-seg{display:inline-flex;border:1px solid rgba(120,200,255,.25);border-radius:6px;overflow:hidden}
       .nl2-crone-seg>button{height:26px;padding:0 10px;border:0;background:none;color:var(--nl2-text,#d9e6f7);font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer}
       .nl2-crone-seg>button[data-on]{background:rgba(56,189,248,.18);color:var(--nl2-info,#38bdf8)}
-      .nl2-crone-btn{cursor:pointer;white-space:nowrap}
-      .nl2-crone-sell{position:relative}
-      .nl2-crone-sell>.nl2-t-menu{right:0;top:32px;min-width:190px}
-      .nl2-crone-sell>.nl2-t-menu>.nl2-crone-mh{color:var(--nl2-dim,#8aa3c0);font-size:12px;cursor:default}
-      .nl2-crone-sell>.nl2-t-menu>.nl2-crone-mh:hover{background:none}
-      .nl2-crone-sell>.nl2-t-menu>hr{border:0;border-top:1px solid rgba(255,255,255,.08);margin:4px 0}
-      .nl2-crone-sell>.nl2-t-menu>div[data-off]{color:var(--nl2-dim,#8aa3c0);cursor:default}
       .nl2-t-pill.nl2-crone-fx{margin:2px 4px 2px 0;max-width:none}
       .nl2-crone table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:4px;padding-bottom:4px}
       .nl2-crone td input.nl2-crone-cb{margin:0;width:15px;height:15px;cursor:pointer;vertical-align:middle}
@@ -12497,6 +12575,28 @@ nxtSnap | 92_gl_task_data | retired
                     refresh();
                     paint();
                     return ok;
+                };
+                const exactAs = (r) => r.id != null && !unBtn(r) && !r.slotted && (mods[r.k] || []).length > 1;
+                const equip = async (r) => {
+                    if (busy)
+                        return;
+                    busy = true;
+                    paint();
+                    let res = null;
+                    try {
+                        res = await NL.postJson("/api/leadership/modules/equip", { moduleId: r.id }, ctx);
+                    }
+                    catch (e) {
+                        ctx.err(e);
+                    }
+                    busy = false;
+                    if (res && res.ok) {
+                        st.set("reopen", Date.now());
+                        location.reload();
+                        return;
+                    }
+                    console.warn("[NL] gl-crew-one: equip failed", r.id, res && res.status);
+                    paint();
                 };
                 const refresh = () => {
                     const at = Date.now();
@@ -12538,7 +12638,9 @@ nxtSnap | 92_gl_task_data | retired
                 };
                 const cardRows = (sec) => {
                     const out = [];
+                    let ci = 0;
                     for (const card of sec.querySelectorAll(".leadership-crew-grid > .leadership-crew-card")) {
+                        ci++;
                         const copy = card.querySelector(".leadership-crew-card-copy");
                         if (!copy)
                             continue;
@@ -12553,13 +12655,17 @@ nxtSnap | 92_gl_task_data | retired
                         }).filter(Boolean);
                         const btn = copy.querySelector(":scope > .leadership-crew-action .leadership-inline-action");
                         const hint = copy.querySelector(".leadership-crew-action-hint");
-                        const k = fiberKey(card), owned = card.classList.contains("owned");
-                        const cps = owned ? (mods[k] && mods[k].length ? mods[k] : [{ id: null, slotted: /assigned to slot/i.test((copy.firstElementChild || {}).textContent || "") }]) : [{ id: null, slotted: false, unowned: true }];
+                        const k = fiberKey(card) || "card" + ci, owned = card.classList.contains("owned");
+                        const live = /assigned to slot/i.test((copy.firstElementChild || {}).textContent || "");
+                        let cps = owned ? (mods[k] && mods[k].length ? mods[k].map((c) => ({ id: c.id, slotted: live && c.slotted })) : [{ id: null, slotted: live }]) : [{ id: null, slotted: false, unowned: true }];
+                        if (owned && live && !cps.some((c) => c.slotted))
+                            cps = cps.map((c, n) => ({ id: c.id, slotted: n === 0 }));
                         cps.forEach((cp, i) => out.push({ k, i, card, btn, hint: hint ? hint.textContent.trim() : "", name, full, role, grade, fx, owned, id: cp.id, slotted: cp.slotted, unowned: !!cp.unowned }));
                     }
                     return out;
                 };
-                const unBtn = (r) => r.btn && /unassign/i.test(r.btn.textContent || "");
+                const unBtn = (r) => !!r.btn && /unassign/i.test(r.btn.textContent || "");
+                const canAct = (r) => !!r.btn && r.btn.isConnected && !r.btn.disabled && !r.btn.closest(".leadership-crew-action.blocked");
                 const sold = (r) => r.id != null && marked.has(r.id);
                 const canSell = (r) => r.id != null && !r.slotted && elig.has(r.id) && !busy;
                 const shown = (r, o) => {
@@ -12576,16 +12682,14 @@ nxtSnap | 92_gl_task_data | retired
                         if (!(r.full + " " + r.role + " " + r.fx.join(" ")).toLowerCase().includes(q))
                             return false;
                     }
-                    if (o.soldOnly && !sold(r))
-                        return false;
                     if (o.hideSold && sold(r))
                         return false;
                     return true;
                 };
-                let T = null, host = null, top = null, rowsAll = [], rowsShown = [], ui = {};
+                let T = null, host = null, top = null, rowsAll = [], rowsShown = [], ui = {}, liveCnt = {};
                 const buildTop = (title) => {
                     top = NL.h("div", { class: "nl2-crone-top" });
-                    ui.h2 = NL.h("h2", null, title || "Bridge Assignments");
+                    ui.h2 = NL.h("h2", null, "Crew");
                     ui.q = NL.h("input", { type: "text", placeholder: "Search crew" });
                     ui.q.addEventListener("input", () => setF("q", ui.q.value));
                     ui.role = NL.h("select");
@@ -12598,45 +12702,8 @@ nxtSnap | 92_gl_task_data | retired
                         return b;
                     }));
                     const cb = (k, txt) => { const i = NL.h("input", { type: "checkbox" }); i.addEventListener("change", () => setF(k, i.checked)); const s = NL.h("span", null, txt); return { lab: NL.h("label", null, i, s), i, s }; };
-                    ui.so = cb("soldOnly", "Sold only");
-                    ui.hs = cb("hideSold", "Hide sold");
-                    ui.sellBtn = NL.h("button", { type: "button", class: "nl2-crone-btn" }, "Sell \u25BE");
-                    ui.sell = NL.h("span", { class: "nl2-crone-sell" }, ui.sellBtn);
-                    ui.sellBtn.addEventListener("click", (e) => { e.stopPropagation(); ui.menu ? closeMenu() : openMenu(); });
-                    top.append(ui.h2, ui.q, ui.role, ui.grade, ui.seg, ui.so.lab, ui.hs.lab, ui.sell);
-                };
-                const closeMenu = () => { if (ui.menu) {
-                    ui.menu.remove();
-                    ui.menu = null;
-                } };
-                document.addEventListener("click", (e) => { if (ui.menu && !ui.sell.contains(e.target))
-                    closeMenu(); }, true);
-                const openMenu = () => {
-                    const owned = rowsAll.filter((r) => r.id != null && !r.slotted);
-                    const pick = (rows, test) => rows.filter((r) => { const e = elig.get(r.id); return e && !marked.has(r.id) && test(e); }).map((r) => r.id);
-                    const items = [["h", "Mark for Transfer to the Guild"]].concat(GN.map((g) => ["Mark all " + cap(g), pick(owned, (e) => e.rarity === RAR[g] && !e.manualOnly), true]))
-                        .concat([["hr"], ["Mark shown rows", pick(rowsShown.filter((r) => r.id != null && !r.slotted), (e) => !e.manualOnly), true], ["Mark duplicates", pick(owned, (e) => !!e.duplicate), true], ["hr"], ["Clear all marks", [...marked], false], ["Refresh marks", null]]);
-                    const m = NL.h("div", { class: "nl2-t-menu" });
-                    for (const [l, ids, on] of items) {
-                        if (l === "h") {
-                            m.appendChild(NL.h("div", { class: "nl2-crone-mh" }, ids));
-                            continue;
-                        }
-                        if (l === "hr") {
-                            m.appendChild(NL.h("hr"));
-                            continue;
-                        }
-                        const n = ids ? ids.length : -1;
-                        const d = NL.h("div", n === 0 || busy ? { "data-off": "" } : null, l + (n >= 0 ? " (" + n + ")" : ""));
-                        d.addEventListener("click", (e) => { e.stopPropagation(); if (d.hasAttribute("data-off"))
-                            return; closeMenu(); if (ids)
-                            mark(ids, on);
-                        else
-                            refresh(); });
-                        m.appendChild(d);
-                    }
-                    ui.menu = m;
-                    ui.sell.appendChild(m);
+                    ui.hs = cb("hideSold", "Hide sell");
+                    top.append(ui.h2, ui.q, ui.role, ui.grade, ui.seg, ui.hs.lab);
                 };
                 const sellCell = (r) => {
                     if (r.id == null)
@@ -12662,24 +12729,27 @@ nxtSnap | 92_gl_task_data | retired
                         top,
                         cols: [
                             { k: "name", l: "Name", w: 190, cell: (r) => r.name },
-                            { k: "role", l: "Role", w: 230, cell: (r) => (r.role ? r.role + " (" + (roleCnt[r.role] || 0) + ")" : "") },
+                            { k: "role", l: "Role", w: 230, cell: (r) => (r.role ? r.role + " (" + (liveCnt[r.role] || 0) + ")" : "") },
                             { k: "grade", l: "Grade", w: 120, cell: (r) => (r.grade ? cap(r.grade) + " (" + GR[r.grade] + ")" : "") },
                             { k: "fx", l: "Effects", w: "flex", wrap: true, cell: (r) => { const s = NL.h("span", { "data-nl2-ex": "Leader > Crew effect pills" }, ...r.fx.map((t) => NL.h("span", { class: "nl2-t-pill nl2-t-pill-info nl2-crone-fx" }, t))); return s; } },
                             { k: "sell", l: "Sell", w: 56, after: true, cell: (r) => sellCell(r) },
                         ],
                         actions: { w: 100, list: [{
                                     k: "as",
-                                    label: (r) => (r.slotted ? "Unassign" : "Assign"),
-                                    show: (r) => !!r.btn && !r.unowned && (r.slotted ? unBtn(r) : !unBtn(r)),
-                                    enabled: (r) => !!r.btn && r.btn.isConnected && !r.btn.disabled && !r.btn.closest(".leadership-crew-action.blocked"),
+                                    label: (r) => (unBtn(r) ? "Unassign" : "Assign"),
+                                    show: (r) => !!r.btn && !r.unowned && (r.slotted || !unBtn(r)),
+                                    enabled: (r) => canAct(r),
+                                    cls: (r) => (!canAct(r) ? "" : unBtn(r) ? "nl2-t-b-amber" : "nl2-t-b-ok"),
                                     tip: (r) => r.hint,
-                                    run: (r) => { if (r.btn && r.btn.isConnected)
+                                    run: (r) => { if (exactAs(r))
+                                        equip(r);
+                                    else if (r.btn && r.btn.isConnected)
                                         r.btn.click(); },
                                 }] },
                     });
                     sec.appendChild(host);
                 };
-                const unmountT = () => { closeMenu(); tried = {}; if (T) {
+                const unmountT = () => { tried = {}; if (T) {
                     try {
                         T.destroy();
                     }
@@ -12713,10 +12783,8 @@ nxtSnap | 92_gl_task_data | retired
                     const parts = [];
                     if (on && sm)
                         parts.push(["Crew slots", sm[1] + "/" + sm[2]]);
-                    if (on && (mk || marksAt))
-                        parts.push(["Marked", mk ? mk[1] : String(marked.size)]);
-                    if (on && hp)
-                        parts.push(["Hiring points", hp[1]]);
+                    void mk;
+                    void hp;
                     const sig = JSON.stringify(parts), s = ban.querySelector(".nl2-crban-s");
                     if (s.dataset.sig !== sig) {
                         s.dataset.sig = sig;
@@ -12752,6 +12820,12 @@ nxtSnap | 92_gl_task_data | retired
                         return;
                     const o = f();
                     rowsAll = cardRows(sec);
+                    liveCnt = {};
+                    for (const r of rowsAll)
+                        if (r.slotted && r.role)
+                            liveCnt[r.role] = (liveCnt[r.role] || 0) + 1;
+                    if (!rowsAll.length)
+                        liveCnt = roleCnt;
                     if (document.activeElement !== ui.q && ui.q.value !== o.q)
                         ui.q.value = o.q;
                     const roles = [...new Set(Object.values(ROLE))].sort();
@@ -12763,21 +12837,27 @@ nxtSnap | 92_gl_task_data | retired
                         ui.grade.value = o.grade;
                     for (const b of ui.seg.children)
                         NL.setAttr(b, "data-on", b.getAttribute("data-v") === o.scope ? "" : null);
-                    ui.so.i.checked = !!o.soldOnly;
                     ui.hs.i.checked = !!o.hideSold;
-                    const nSold = rowsAll.filter(sold).length, hsT = "Hide sold (" + nSold + ")";
+                    const nSold = rowsAll.filter(sold).length, hsT = "Hide sell (" + nSold + ")";
                     if (ui.hs.s.textContent !== hsT)
                         ui.hs.s.textContent = hsT;
                     rowsShown = rowsAll.filter((r) => shown(r, o));
                     rowsShown.sort((a, b) => (GR[b.grade] || 0) - (GR[a.grade] || 0) || a.name.localeCompare(b.name) || (a.k > b.k ? 1 : a.k < b.k ? -1 : 0) || a.i - b.i);
-                    T.update(rowsShown.map((r) => ({
-                        key: r.k + "#" + (r.id != null ? r.id : r.i),
-                        _r: r,
-                        ...r,
-                        sortVals: { name: r.name.toLowerCase(), role: r.role.toLowerCase(), grade: GR[r.grade] || 0, fx: r.fx.length, sell: sold(r) ? 1 : 0 },
-                        tips: { name: r.full !== r.name ? r.full : "" },
-                        sig: { fx: r.fx.join("|"), sell: [r.id, sold(r), canSell(r)].join("|"), role: r.role + (roleCnt[r.role] || 0) },
-                    })));
+                    const usedK = new Set();
+                    T.update(rowsShown.map((r) => {
+                        let rk = r.k + "#" + (r.id != null ? r.id : "c" + r.i);
+                        while (usedK.has(rk))
+                            rk += "+";
+                        usedK.add(rk);
+                        return {
+                            key: rk,
+                            _r: r,
+                            ...r,
+                            sortVals: { name: r.name.toLowerCase(), role: r.role.toLowerCase(), grade: GR[r.grade] || 0, fx: r.fx.length, sell: sold(r) ? 1 : 0 },
+                            tips: { name: r.full !== r.name ? r.full : "" },
+                            sig: { fx: r.fx.join("|"), sell: [r.id, sold(r), canSell(r)].join("|"), role: r.role + (liveCnt[r.role] || 0) },
+                        };
+                    }));
                 };
                 NL.watch(".leadership-crew-roster", (sec) => {
                     const on = tvOn();
@@ -15588,6 +15668,7 @@ nxtSnap | 92_gl_task_data | retired
             },
         });
         NL.btTbl = true;
+        NL.buRoiBest = true;
         NL.feature({
             id: "bu-tbl2",
             set: "Buildings",
@@ -15860,7 +15941,7 @@ nxtSnap | 92_gl_task_data | retired
                             { k: "level", l: "Level", w: 72 },
                             { k: "en", l: "Energy", w: 64, cell: (r) => (r.enBest ? NL.h("span", { class: "nl2-t-pill nl2-t-pill-ok" }, r.vals.en) : r.vals.en) },
                             { k: "fx", l: "Effect", w: "flex", wrap: true, cell: (r) => (r.fxs.length ? NL.h("span", null, ...r.fxs.map(fxPill)) : "\u2014") },
-                            { k: "roi", l: "ROI", w: 60 },
+                            { k: "roi", l: "ROI", w: NL.buRoiBest !== false ? 74 : 60, cell: (r) => (r.roiBest ? pill(r.vals.roi, ({ "nl2-t-ok": "nl2-t-pill-ok", "nl2-t-warn": "nl2-t-pill-amber", "nl2-t-bad": "nl2-t-pill-bad" })[r.cellCls.roi] || "nl2-t-pill-info", r.tips.roi) : r.vals.roi) },
                             resCol("ore", "Ore"),
                             resCol("silicates", "Silicates"),
                             resCol("hydrogen", "Hydrogen"),
@@ -15941,6 +16022,16 @@ nxtSnap | 92_gl_task_data | retired
                         else
                             plain.push(row);
                     });
+                    if (NL.buRoiBest !== false) {
+                        const dur = (t) => { let n = 0, any = false; String(t || "").replace(/(\d+(?:\.\d+)?)\s*([dhms])/g, (m, v, u) => { any = true; n += v * { d: 86400, h: 3600, m: 60, s: 1 }[u]; }); return any && n > 0 ? n : null; };
+                        const res = [];
+                        grid.querySelectorAll(":scope > .building-card").forEach((card) => { if (secOf(card) === 0 && !card.classList.contains("nl2-hidden-card"))
+                            res.push(txt(card.querySelector("h4.building-name"))); });
+                        const cand = groups[0].concat(plain).filter((r) => res.includes(r.key)).map((r) => [r, dur(r.vals.roi)]).filter((x) => x[1] != null);
+                        const best = cand.length >= 2 ? cand.reduce((a, b) => (b[1] < a[1] ? b : a))[0] : null;
+                        groups[0].concat(plain).forEach((r) => { r.roiBest = r === best; if (r.roiBest)
+                            r.sig.roi += "|best"; });
+                    }
                     const secs = [];
                     if (plain.length)
                         secs.push({ id: "all", tone: "sky", rows: plain });
@@ -17182,14 +17273,14 @@ nxtSnap | 92_gl_task_data | retired
                     RE_SLOTS.forEach((k) => {
                         if (k !== "other") {
                             const c = by[k];
-                            box.appendChild(c ? NL.h("span", { class: c.s ? "nl2-r" : "", "data-nl2-tip": c.tip }, c.n) : NL.h("span", { class: "nl2-dim" }, "\u2014"));
+                            box.appendChild(c ? NL.h("span", { class: c.s ? "nl2-y" : "", "data-nl2-tip": c.tip }, c.n) : NL.h("span", { class: "nl2-dim" }, "\u2014"));
                             return;
                         }
                         if (!rare.length) {
                             box.appendChild(NL.h("span", { class: "nl2-dim" }, "\u2014"));
                             return;
                         }
-                        box.appendChild(NL.h("span", { class: "nl2-retb-oth" }, ...rare.map((c) => NL.h("div", { class: c.s ? "nl2-r" : "", "data-nl2-tip": c.tip }, NL.h("img", { class: "game-resource-icon nl2-retb-ic", src: "/images/resources/" + c.k + ".webp", alt: "" }), c.n))));
+                        box.appendChild(NL.h("span", { class: "nl2-retb-oth" }, ...rare.map((c) => NL.h("div", { class: c.s ? "nl2-y" : "", "data-nl2-tip": c.tip }, NL.h("img", { class: "game-resource-icon nl2-retb-ic", src: "/images/resources/" + c.k + ".webp", alt: "" }), c.n))));
                     });
                     return box;
                 }
@@ -17292,7 +17383,7 @@ nxtSnap | 92_gl_task_data | retired
                     else if (needs.length) {
                         r.st = "Needs (" + needs.length + ")";
                         r.tip = "Needs: " + needs.join(", ");
-                        r.stc = "nl2-r";
+                        r.stc = "nl2-y";
                         r.act = short || cardBring ? "bring" : "lvl-off";
                     }
                     else if (short || cardBring) {
@@ -17403,7 +17494,7 @@ nxtSnap | 92_gl_task_data | retired
                     if (NL.tableRules !== false)
                         tr.appendChild(td("nl2-retb-cost nl2-retb-c2", costSlots(r)));
                     else
-                        tr.appendChild(td("nl2-retb-cost", ...(r.cost.length ? r.cost.map((c) => NL.h("span", Object.assign({ class: c.s ? "nl2-r" : "" }, c.tip ? { "data-nl2-tip": c.tip } : {}), c.t)) : [NL.h("span", { class: "nl2-dim" }, "\u2014")])));
+                        tr.appendChild(td("nl2-retb-cost", ...(r.cost.length ? r.cost.map((c) => NL.h("span", Object.assign({ class: c.s ? "nl2-y" : "" }, c.tip ? { "data-nl2-tip": c.tip } : {}), c.t)) : [NL.h("span", { class: "nl2-dim" }, "\u2014")])));
                     if (r.maxed || r.underway)
                         tr.appendChild(td("", "\u2014"));
                     else {
@@ -17480,7 +17571,7 @@ nxtSnap | 92_gl_task_data | retired
                                     const rr = r.d.cost.filter((c) => !RE_SLOTS.includes(c.k));
                                     if (!rr.length)
                                         return "\u2014";
-                                    return NL.h("span", null, ...rr.map((c) => { const n = NL.table.iconNum(resImg(c.k), c.n, { tip: c.tip }); const d = NL.h("div", { class: c.s ? "nl2-t-bad" : "" }, n); return d; }));
+                                    return NL.h("span", null, ...rr.map((c) => { const n = NL.table.iconNum(resImg(c.k), c.n, { tip: c.tip }); const d = NL.h("div", { class: c.s ? "nl2-t-warn" : "" }, n); return d; }));
                                 } },
                             { k: "time", l: "Time", w: 70 },
                             { k: "roi", l: "ROI", w: 64 },
@@ -17563,7 +17654,7 @@ nxtSnap | 92_gl_task_data | retired
                         tips[k] = c.tip;
                         sortVals[k] = c.v;
                         if (c.s && !none)
-                            cellCls[k] = "nl2-t-bad";
+                            cellCls[k] = "nl2-t-warn";
                     } });
                     sortVals.time = tv ? d.sec : null;
                     const sg = {};
@@ -23487,6 +23578,7 @@ nxtSnap | 92_gl_task_data | retired
         });
     }
     {
+        NL.pvpData = true;
         NL.feature({
             id: "fl-spy-recall",
             set: "Fleet",
@@ -28961,6 +29053,7 @@ nxtSnap | 92_gl_task_data | retired
         NL.flExpLaunch = true;
         NL.flPatLaunch = true;
         NL.flPatCap = true;
+        NL.bdData = true;
         const FT_OPTS = [
             ["fl-trim.whbattle", "Reports: mark wormhole battles read"],
             ["fl-trim.mining", "Reports: mark Mining Complete read"],
@@ -29164,7 +29257,12 @@ nxtSnap | 92_gl_task_data | retired
                     NL.badgeAct({ path: /^\/api\/fleet\/expedition$/, mission: /^expedition$/ }, () => {
                         expP.add();
                         paint();
-                        setTimeout(() => NL.getJson("/api/fleet/missions", ctx), 1500);
+                        setTimeout(() => {
+                            if (NL.bdData !== false && NL.data && NL.data.need)
+                                NL.data.need("missions", { since: Date.now() });
+                            else
+                                NL.getJson("/api/fleet/missions", ctx);
+                        }, 1500);
                         setTimeout(paint, 121000);
                     });
                 if (NL.flPatLaunch)
@@ -38390,6 +38488,15 @@ nxtSnap | 92_gl_task_data | retired
             walk(el[k].return, 0);
             return P ? { P, F: F || {} } : null;
         }
+        NL.gaSweepProps = true;
+        let gaPS = { sweep: -1, pr: null };
+        function gaPropsSweep() {
+            if (NL.gaSweepProps === false)
+                return gaProps();
+            if (gaPS.sweep !== NL.sweeps || NL.sweeps == null)
+                gaPS = { sweep: NL.sweeps, pr: gaProps() };
+            return gaPS.pr;
+        }
         function gaItem(kind, m, extra) {
             return { kind, name: m.name || m.planetName || m.stationName || m.richestFieldName || m.systemName || "", system: m.systemName || "", systemId: gaNum(m.systemId), x: gaNum(m.systemX != null ? m.systemX : m.x), y: gaNum(m.systemY != null ? m.systemY : m.y), zone: GA_ZONE(m.securityZone), detail: extra || "" };
         }
@@ -38713,7 +38820,7 @@ nxtSnap | 92_gl_task_data | retired
                         area.appendChild(panel);
                         lastSig = "";
                     }
-                    const pr = gaProps();
+                    const pr = gaPropsSweep();
                     if (!pr) {
                         if (!panel.firstChild)
                             panel.append(NL.h("div", { class: "nl2-ga-empty" }, "Waiting for the map\u2026"));
@@ -38884,6 +38991,7 @@ nxtSnap | 92_gl_task_data | retired
                 window.addEventListener("resize", place);
                 NL.onRoute((path) => { if (path !== "/galaxy")
                     close(); });
+                let last = { key: [], on: [], amber: false, shw: null };
                 NL.watch(".galaxy-page .galaxy-command-toolbar", (tb) => {
                     let b = tb.querySelector(":scope > .nl2-ga-fbtn"), chips = tb.querySelector(":scope > .nl2-ga-chips");
                     if (!b) {
@@ -38892,8 +39000,13 @@ nxtSnap | 92_gl_task_data | retired
                         tb.prepend(b, chips);
                     }
                     btnEl = b;
-                    const pr = gaProps(), on = pr ? gaActive(pr.P) : [];
-                    const amber = on.some((a) => a.narrow), shw = amber ? gaShowing(pr.P, pr.F) : null;
+                    const pr = gaPropsSweep(), P = pr && pr.P, F = pr && pr.F;
+                    const key = P ? [P, P.systems, P.activeFieldTypes, P.planetFilterMatches, F.fieldMarkers, F.activeFieldTypes, F.planetFilterMatches] : [];
+                    if (NL.gaSweepProps === false || key.length !== last.key.length || key.some((x, i) => x !== last.key[i])) {
+                        const on0 = P ? gaActive(P) : [], amb = on0.some((a) => a.narrow);
+                        last = { key, on: on0, amber: amb, shw: amb ? gaShowing(P, F) : null };
+                    }
+                    const { on, amber, shw } = last;
                     const sig = on.map((a) => a.label).join("\u0001") + "|" + !!menu + "|" + amber + "|" + (shw ? shw.n + "/" + shw.m : "");
                     if (b.dataset.sig === sig)
                         return;

@@ -2,6 +2,26 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.175 · Nov 28, 2026
+
+**🌌 Galaxy**
+- The Galaxy map should feel much faster. The script no longer decodes the game's map replies, and it only looks at the ones it actually uses (GL-475)
+- The Filters toolbar and Table view share one pass over the map instead of two each, and they skip work when nothing changed (GA-011)
+
+**👑 Leader**
+- The crew table's buttons show what you can do: green Assign, gold Unassign, and grey when the game won't allow a change. They update right away (GL-473)
+- Changing one crew row no longer affects another row with the same name. With two or more copies, Assign goes to the exact copy you clicked, and the page reloads to show it (GL-473)
+- The table title reads "Crew" and the banner shows only Crew slots. The Sell menu and "Sold only" are gone, and "Hide sold" now reads "Hide sell (N)" (GL-473)
+
+**🏗 Buildings**
+- The Resource building with the lowest ROI shows it in a pill (BU-062)
+
+**🔬 Research**
+- Short costs and Needs (n) are gold instead of red (RE-052)
+
+**⚙ Behind the scenes**
+- The missions check after an expedition launch goes through the shared data helper (GL-471, sixth part)
+
 ## v0.5.174 · Nov 28, 2026
 
 **👑 Leader**
@@ -207,11 +227,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🚀 Performance**
 - Galaxy no longer stutters: very big tables draw only the rows on screen, and Galaxy remembers rows that haven't changed (GL-416, GA-010)
-
-## v0.5.155 · Nov 22, 2026
-
-**🚀 Performance**
-- Big tables no longer freeze while they redraw: a 2,000-row table now redraws in a blink instead of about 27 seconds, and the Galaxy table finishes loading (GL-410)
-
-**🪐 Planets**
-- Recycling compare shows the cost difference with the right sign and colour (RE-046)
