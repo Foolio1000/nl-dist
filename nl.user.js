@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.176
+// @version      0.5.177
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.176", features: [] };
+    const NL = window.__nl2 = { version: "0.5.177", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -95,39 +95,124 @@
                     }
                 }
         };
-        const of = window.fetch;
-        if (typeof of === "function")
-            window.fetch = function (input, init) {
-                const p = of.apply(this, arguments);
+        const edits = [], gates = [];
+        NL._reqStat = { edits: 0, gates: 0, changed: 0, held: 0, cancelled: 0 };
+        NL.onRequestEdit = (fn) => { if (typeof fn === "function") {
+            edits.push(fn);
+            NL._reqStat.edits++;
+        } };
+        NL.onRequestGate = (fn) => { if (typeof fn === "function") {
+            gates.push(fn);
+            NL._reqStat.gates++;
+        } };
+        const reqRun = (url, method, body) => {
+            if ((!edits.length && !gates.length) || typeof body !== "string")
+                return null;
+            const q = { url: String(url || ""), method: String(method || "GET").toUpperCase(), body };
+            for (const fn of edits) {
                 try {
-                    const method = String((init && init.method) || (input && input.method) || "GET").toUpperCase();
-                    const path = method === "GET" ? rel(typeof input === "string" ? input : input && input.url) : null;
-                    if (path)
-                        p.then((r) => { if (r && r.ok)
-                            r.clone().json().then((d) => put(path, d)).catch(() => { }); }).catch(() => { });
-                    const wpath = method !== "GET" ? rel(typeof input === "string" ? input : input && input.url) : null;
-                    if (wpath)
-                        p.then((r) => { if (r && r.ok)
-                            wrote(wpath.split("?")[0], method); }).catch(() => { });
-                    const tpath = rel(typeof input === "string" ? input : input && input.url);
-                    if (tpath && tpath.startsWith("/api/transport/"))
-                        p.then((r) => {
-                            if (!r || !r.ok || !txWant(tpath))
-                                return;
-                            const c = r.clone();
-                            tx(tpath, method, () => c.json().catch(() => null), () => { try {
-                                if (c.body)
-                                    c.body.cancel();
-                            }
-                            catch (e) { } });
-                        }).catch(() => { });
+                    const b = fn({ url: q.url, method: q.method, body: q.body });
+                    if (typeof b === "string")
+                        q.body = b;
                 }
                 catch (e) { }
-                return p;
+            }
+            const held = [];
+            for (const fn of gates) {
+                try {
+                    const g = fn({ url: q.url, method: q.method, body: q.body });
+                    if (g && typeof g.then === "function")
+                        held.push(g);
+                }
+                catch (e) { }
+            }
+            if (q.body === body && !held.length)
+                return null;
+            if (q.body !== body)
+                NL._reqStat.changed++;
+            if (held.length)
+                NL._reqStat.held++;
+            return { body: q.body, gate: held.length ? Promise.all(held.map((g) => Promise.resolve(g).then((ok) => ok !== false, () => true))).then((a) => { const ok = a.every(Boolean); if (!ok)
+                    NL._reqStat.cancelled++; return ok; }) : null };
+        };
+        const of = window.fetch;
+        const teeFetch = function (input, init) {
+            const p = of.apply(this, arguments);
+            try {
+                const method = String((init && init.method) || (input && input.method) || "GET").toUpperCase();
+                const path = method === "GET" ? rel(typeof input === "string" ? input : input && input.url) : null;
+                if (path)
+                    p.then((r) => { if (r && r.ok)
+                        r.clone().json().then((d) => put(path, d)).catch(() => { }); }).catch(() => { });
+                const wpath = method !== "GET" ? rel(typeof input === "string" ? input : input && input.url) : null;
+                if (wpath)
+                    p.then((r) => { if (r && r.ok)
+                        wrote(wpath.split("?")[0], method); }).catch(() => { });
+                const tpath = rel(typeof input === "string" ? input : input && input.url);
+                if (tpath && tpath.startsWith("/api/transport/"))
+                    p.then((r) => {
+                        if (!r || !r.ok || !txWant(tpath))
+                            return;
+                        const c = r.clone();
+                        tx(tpath, method, () => c.json().catch(() => null), () => { try {
+                            if (c.body)
+                                c.body.cancel();
+                        }
+                        catch (e) { } });
+                    }).catch(() => { });
+            }
+            catch (e) { }
+            return p;
+        };
+        if (typeof of === "function")
+            window.fetch = function (input, init) {
+                let q = null;
+                try {
+                    if (init && typeof init.body === "string")
+                        q = reqRun(typeof input === "string" ? input : input && input.url, init.method || (input && input.method), init.body);
+                }
+                catch (e) {
+                    q = null;
+                }
+                if (!q)
+                    return teeFetch.apply(this, arguments);
+                const self = this, args = q.body === init.body ? arguments : [input, Object.assign({}, init, { body: q.body })];
+                if (!q.gate)
+                    return teeFetch.apply(self, args);
+                return q.gate.then((ok) => (ok ? teeFetch.apply(self, args) : new Response(JSON.stringify({ error: "Cancelled" }), { status: 400, headers: { "content-type": "application/json" } })));
             };
-        NL.rawFetch = window.fetch.bind(window);
+        NL.rawFetch = typeof of === "function" ? teeFetch.bind(window) : window.fetch;
         const oo = XMLHttpRequest.prototype.open;
+        const xq = new WeakMap(), os = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.send = function (body) {
+            let q = null;
+            try {
+                const o = (edits.length || gates.length) && typeof body === "string" ? xq.get(this) : null;
+                if (o)
+                    q = reqRun(o.u, o.m, body);
+            }
+            catch (e) {
+                q = null;
+            }
+            if (!q)
+                return os.apply(this, arguments);
+            if (!q.gate)
+                return os.call(this, q.body);
+            const self = this;
+            q.gate.then((ok) => { if (ok)
+                os.call(self, q.body);
+            else {
+                try {
+                    self.abort();
+                }
+                catch (e) { }
+            } });
+        };
         XMLHttpRequest.prototype.open = function (m, u) {
+            try {
+                xq.set(this, { m, u });
+            }
+            catch (e) { }
             try {
                 const path = String(m || "").toUpperCase() === "GET" ? rel(u) : null;
                 if (path)
@@ -6279,6 +6364,7 @@ nxtSnap | 92_gl_task_data | retired
         if (NL.option)
             NL.option({ key: "gl-biowarn.days", group: "Bio warning", label: "Bio warning (days)", type: "number", def: 3, min: 0, max: 60, step: 0.5 });
         const bioDays = () => { const v = NL.opt ? +NL.opt("gl-biowarn.days") : NaN; return isFinite(v) && v >= 0 ? v : 3; };
+        NL.bioGate = true;
         let bioSupply = null, bioPass = 0, shipBio = glLoad("shipBio", {}, "nxgShipBio");
         function gotSupply(j) {
             const sp = j && j.supplyPlanet;
@@ -6391,58 +6477,64 @@ nxtSnap | 92_gl_task_data | retired
       .nl2-bioask-btns .nl2-bioask-yes{background:rgba(251,191,36,.22);border-color:rgba(245,158,11,.6);color:#fbbf24}`);
                 NL.onData(/^\/api\/fleet\/supply(\?|$)/, (p, d) => gotSupply(d));
                 NL.onData(/^\/api\/planets\/\d+\/shipyard(\?|$)/, (p, d) => gotShipBio(d));
-                const of = window.fetch;
-                window.fetch = function (input, init) {
-                    try {
-                        const u = typeof input === "string" ? input : input && input.url, m = (init && init.method) || (input && input.method) || "GET";
-                        const sp = !bioPass && /^post$/i.test(m) && init && typeof init.body === "string" ? bioSpend(u, init.body) : null;
-                        if (sp && sp.bio > 0) {
-                            const self = this, args = arguments;
-                            return bioCheck(sp).then((ok) => {
-                                if (!ok)
-                                    return new Response(JSON.stringify({ error: "Cancelled" }), { status: 400, headers: { "content-type": "application/json" } });
-                                bioPass++;
-                                try {
-                                    return of.apply(self, args);
+                if (NL.bioGate !== false && typeof NL.onRequestGate === "function")
+                    NL.onRequestGate(({ url, method, body }) => { if (bioPass || !/^post$/i.test(method || ""))
+                        return; const sp = typeof body === "string" ? bioSpend(url, body) : null; if (sp && sp.bio > 0)
+                        return bioCheck(sp); });
+                else {
+                    const of = window.fetch;
+                    window.fetch = function (input, init) {
+                        try {
+                            const u = typeof input === "string" ? input : input && input.url, m = (init && init.method) || (input && input.method) || "GET";
+                            const sp = !bioPass && /^post$/i.test(m) && init && typeof init.body === "string" ? bioSpend(u, init.body) : null;
+                            if (sp && sp.bio > 0) {
+                                const self = this, args = arguments;
+                                return bioCheck(sp).then((ok) => {
+                                    if (!ok)
+                                        return new Response(JSON.stringify({ error: "Cancelled" }), { status: 400, headers: { "content-type": "application/json" } });
+                                    bioPass++;
+                                    try {
+                                        return of.apply(self, args);
+                                    }
+                                    finally {
+                                        bioPass--;
+                                    }
+                                });
+                            }
+                        }
+                        catch (e) { }
+                        return of.apply(this, arguments);
+                    };
+                    const oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
+                    XMLHttpRequest.prototype.open = function (m, u) { try {
+                        this.__nl2Post = /^post$/i.test(m);
+                        this.__nl2Url = u;
+                    }
+                    catch (e) { } return oo.apply(this, arguments); };
+                    XMLHttpRequest.prototype.send = function (body) {
+                        try {
+                            const sp = !bioPass && this.__nl2Post && typeof body === "string" ? bioSpend(this.__nl2Url, body) : null;
+                            if (sp && sp.bio > 0) {
+                                const self = this, args = arguments;
+                                bioCheck(sp).then((ok) => { if (!ok) {
+                                    try {
+                                        self.abort();
+                                    }
+                                    catch (e) { }
+                                    return;
+                                } bioPass++; try {
+                                    os.apply(self, args);
                                 }
                                 finally {
                                     bioPass--;
-                                }
-                            });
-                        }
-                    }
-                    catch (e) { }
-                    return of.apply(this, arguments);
-                };
-                const oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
-                XMLHttpRequest.prototype.open = function (m, u) { try {
-                    this.__nl2Post = /^post$/i.test(m);
-                    this.__nl2Url = u;
-                }
-                catch (e) { } return oo.apply(this, arguments); };
-                XMLHttpRequest.prototype.send = function (body) {
-                    try {
-                        const sp = !bioPass && this.__nl2Post && typeof body === "string" ? bioSpend(this.__nl2Url, body) : null;
-                        if (sp && sp.bio > 0) {
-                            const self = this, args = arguments;
-                            bioCheck(sp).then((ok) => { if (!ok) {
-                                try {
-                                    self.abort();
-                                }
-                                catch (e) { }
+                                } });
                                 return;
-                            } bioPass++; try {
-                                os.apply(self, args);
                             }
-                            finally {
-                                bioPass--;
-                            } });
-                            return;
                         }
-                    }
-                    catch (e) { }
-                    return os.apply(this, arguments);
-                };
+                        catch (e) { }
+                        return os.apply(this, arguments);
+                    };
+                }
             },
         });
         NL.feature({
@@ -16313,11 +16405,7 @@ nxtSnap | 92_gl_task_data | retired
                     ".nl2-btt-det{display:flex;align-items:center;gap:16px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}",
                     ".nl2-btt-det .nl2-btt-opt{display:inline-flex;align-items:center;gap:8px}",
                     ".nl2-t-pill.nl2-btt-st{display:block;box-sizing:border-box;width:100%;text-align:center}",
-                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:7px;padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,.11)}",
-                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td+td{border-left-color:rgba(255,255,255,.11)}",
-                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]:not(:has(~ tr[data-key]))>td{border-bottom-color:transparent}",
                     ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td .nl2-t-in{vertical-align:middle}",
-                    ".nl2-btt-host table.nl2-t-tbl>tbody[data-sec=\"hid\"]:not(:has(>tr[data-key]:not([hidden])))>tr.nl2-t-sec .nl2-t-ctl{display:none}",
                 ].join(""));
                 const on = () => NL.btTbl !== false && !!(NL.table && NL.table.mount);
                 const txt = (el) => (el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "");
@@ -16960,6 +17048,8 @@ nxtSnap | 92_gl_task_data | retired
             desc: "RE-003: on a single research page, a Precursor Fragments slider (0 to 5) under Start, like the planet Research page; the time shown follows it.",
             init() {
                 NL.css("re-frag", ".nl2-fragboost{display:flex;flex-direction:column;gap:4px;margin:0 0 8px;font-family:Rajdhani,\"Exo 2\",sans-serif;color:#d9e6f7}.nl2-fraglabel{font-size:13px;opacity:.85}.nl2-fragctl{display:flex;align-items:center;gap:10px}.nl2-fragctl input{flex:1;min-width:120px;accent-color:#38bdf8}.nl2-fragval{min-width:12px;font-weight:700}.nl2-fragdisc{color:#5ee08a;font-weight:600;white-space:nowrap}.nl2g-fraghost{flex-wrap:wrap!important}.nl2g-fraghost>.nl2-fragbreak{order:98;flex-basis:100%;height:0;margin:0;padding:0}.nl2g-fraghost>.nl2-fragboost{order:99;margin:4px 0 0 auto;box-sizing:border-box}");
+                if (NL.fragEdit === undefined)
+                    NL.fragEdit = true;
                 const generalOn = () => document.documentElement.dataset.nxGeneral === "1";
                 const isStart = (u) => /\/api\/research\/[^/?]+\/start(\?|$)/.test(String(u || ""));
                 let fragN = 0, fragTech = "", stores = null, storesAsked = false;
@@ -16974,36 +17064,44 @@ nxtSnap | 92_gl_task_data | retired
                     NL._kick();
                     return JSON.stringify(j);
                 };
-                const of = window.fetch;
-                window.fetch = function (input, init) {
-                    try {
-                        const u = typeof input === "string" ? input : input && input.url;
-                        if (init && typeof init.body === "string" && isStart(u)) {
-                            const nb = withFragments(init.body);
-                            if (nb !== init.body) {
-                                arguments[1] = Object.assign({}, init, { body: nb });
+                if (NL.fragEdit !== false && typeof NL.onRequestEdit === "function")
+                    NL.onRequestEdit(({ url, body }) => { if (isStart(url)) {
+                        const nb = withFragments(body);
+                        if (nb !== body)
+                            return nb;
+                    } });
+                else {
+                    const of = window.fetch;
+                    window.fetch = function (input, init) {
+                        try {
+                            const u = typeof input === "string" ? input : input && input.url;
+                            if (init && typeof init.body === "string" && isStart(u)) {
+                                const nb = withFragments(init.body);
+                                if (nb !== init.body) {
+                                    arguments[1] = Object.assign({}, init, { body: nb });
+                                }
                             }
                         }
+                        catch (e) { }
+                        return of.apply(this, arguments);
+                    };
+                    const oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
+                    XMLHttpRequest.prototype.open = function (m, u) { try {
+                        this.__nl2Start = /^post$/i.test(m) && isStart(u);
                     }
-                    catch (e) { }
-                    return of.apply(this, arguments);
-                };
-                const oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
-                XMLHttpRequest.prototype.open = function (m, u) { try {
-                    this.__nl2Start = /^post$/i.test(m) && isStart(u);
-                }
-                catch (e) { } return oo.apply(this, arguments); };
-                XMLHttpRequest.prototype.send = function (body) {
-                    try {
-                        if (this.__nl2Start && typeof body === "string") {
-                            const nb = withFragments(body);
-                            if (nb !== body)
-                                arguments[0] = nb;
+                    catch (e) { } return oo.apply(this, arguments); };
+                    XMLHttpRequest.prototype.send = function (body) {
+                        try {
+                            if (this.__nl2Start && typeof body === "string") {
+                                const nb = withFragments(body);
+                                if (nb !== body)
+                                    arguments[0] = nb;
+                            }
                         }
-                    }
-                    catch (e) { }
-                    return os.apply(this, arguments);
-                };
+                        catch (e) { }
+                        return os.apply(this, arguments);
+                    };
+                }
                 const findStores = () => {
                     if (stores || storesAsked)
                         return;
@@ -49930,6 +50028,7 @@ nxtSnap | 92_gl_task_data | retired
             return gone;
         };
         NL.simSweep = true;
+        NL.tdTee = true;
         if (NL.simSweep !== false) {
             try {
                 const mark = "nl2.simSweep.v", v = String(NL.version || "");
@@ -50026,10 +50125,12 @@ nxtSnap | 92_gl_task_data | retired
                     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden")
                         flush(); });
                 }
-                function ingest(path, j) {
+                function ingest(path, j, at) {
                     if (!j)
                         return;
-                    CACHE[path] = { at: Date.now(), data: j };
+                    if (at && CACHE[path] && CACHE[path].at > at)
+                        return;
+                    CACHE[path] = { at: at || Date.now(), data: j };
                     persistCache();
                     clearTimeout(ingestTimer);
                     ingestTimer = setTimeout(() => { try {
@@ -50050,24 +50151,27 @@ nxtSnap | 92_gl_task_data | retired
                         Object.assign(CACHE, c);
                 }
                 catch (e) { }
-                window.fetch = function (input, init) {
-                    const p = pathOf(typeof input === "string" ? input : input && input.url);
-                    const r = rawFetch.apply(window, arguments);
-                    const m = String((init && init.method) || (input && input.method) || "GET").toUpperCase();
-                    if (m !== "GET") {
-                        const u = typeof input === "string" ? input : input && input.url;
-                        r.then((res) => { if (res && res.ok) {
-                            try {
-                                planetsWrite(new URL(u, location.origin).pathname, m);
-                            }
-                            catch (e) { }
-                        } }).catch(() => { });
-                    }
-                    if (p && m === "GET" && WANT.test(p))
-                        r.then((res) => { if (res && res.ok)
-                            res.clone().json().then((j) => ingest(p, j)).catch(() => { }); }).catch(() => { });
-                    return r;
-                };
+                const ownRead = new Map();
+                const TEE1 = NL.tdTee !== false && typeof NL.onData === "function" && typeof NL.onWrite === "function";
+                if (!TEE1)
+                    window.fetch = function (input, init) {
+                        const p = pathOf(typeof input === "string" ? input : input && input.url);
+                        const r = rawFetch.apply(window, arguments);
+                        const m = String((init && init.method) || (input && input.method) || "GET").toUpperCase();
+                        if (m !== "GET") {
+                            const u = typeof input === "string" ? input : input && input.url;
+                            r.then((res) => { if (res && res.ok) {
+                                try {
+                                    planetsWrite(new URL(u, location.origin).pathname, m);
+                                }
+                                catch (e) { }
+                            } }).catch(() => { });
+                        }
+                        if (p && m === "GET" && WANT.test(p))
+                            r.then((res) => { if (res && res.ok)
+                                res.clone().json().then((j) => ingest(p, j)).catch(() => { }); }).catch(() => { });
+                        return r;
+                    };
                 NL.bu035 = true;
                 let onPlanetsChanged = () => { }, planetsStale = true;
                 const PLANETS_WRITE = /abandon|coloni[sz]/i;
@@ -50081,28 +50185,34 @@ nxtSnap | 92_gl_task_data | retired
                     catch (e) { } }, 1500);
                 };
                 const xOpen = XMLHttpRequest.prototype.open;
-                XMLHttpRequest.prototype.open = function (method, url) {
-                    const p = pathOf(url);
-                    if (String(method).toUpperCase() !== "GET") {
-                        const wm = String(method).toUpperCase();
-                        let wp = "";
-                        try {
-                            wp = new URL(url, location.origin).pathname;
-                        }
-                        catch (e) { }
-                        this.addEventListener("load", () => { if (this.status >= 200 && this.status < 300)
-                            planetsWrite(wp, wm); });
-                    }
-                    if (p && String(method).toUpperCase() === "GET" && WANT.test(p))
-                        this.addEventListener("load", () => {
+                if (TEE1) {
+                    NL.onData({ test: (p) => WANT.test(p) }, (path, data, at) => { if (!ownRead.get(path))
+                        ingest(path, data, at); });
+                    NL.onWrite({ test: () => true }, (path, method) => planetsWrite(path, method));
+                }
+                else
+                    XMLHttpRequest.prototype.open = function (method, url) {
+                        const p = pathOf(url);
+                        if (String(method).toUpperCase() !== "GET") {
+                            const wm = String(method).toUpperCase();
+                            let wp = "";
                             try {
-                                if (this.status === 200)
-                                    ingest(p, this.responseType === "json" ? this.response : JSON.parse(this.responseText));
+                                wp = new URL(url, location.origin).pathname;
                             }
                             catch (e) { }
-                        });
-                    return xOpen.apply(this, arguments);
-                };
+                            this.addEventListener("load", () => { if (this.status >= 200 && this.status < 300)
+                                planetsWrite(wp, wm); });
+                        }
+                        if (p && String(method).toUpperCase() === "GET" && WANT.test(p))
+                            this.addEventListener("load", () => {
+                                try {
+                                    if (this.status === 200)
+                                        ingest(p, this.responseType === "json" ? this.response : JSON.parse(this.responseText));
+                                }
+                                catch (e) { }
+                            });
+                        return xOpen.apply(this, arguments);
+                    };
                 function boot() {
                     const MO_PAGE = NL.enabled("mo-page"), MO_HASH = "#moons";
                     const PAGE = "/overview";
@@ -50176,6 +50286,18 @@ nxtSnap | 92_gl_task_data | retired
                     let readChain = Promise.resolve(), lastRead = 0, noFoAt = 0;
                     const FO_PATH = "/api/command-center/fleet-overview";
                     async function directRead(path) {
+                        ownRead.set(path, (ownRead.get(path) || 0) + 1);
+                        try {
+                            return await directRead1(path);
+                        }
+                        finally {
+                            setTimeout(() => { const n = (ownRead.get(path) || 1) - 1; if (n > 0)
+                                ownRead.set(path, n);
+                            else
+                                ownRead.delete(path); }, 150);
+                        }
+                    }
+                    async function directRead1(path) {
                         try {
                             const r = await rawFetch(path, { credentials: "include", headers: { Accept: "application/json" } });
                             if (r.status === 429) {
@@ -52452,6 +52574,14 @@ nxtSnap | 92_gl_task_data | retired
 table.nl2-t-tbl{table-layout:fixed;width:100%;border-collapse:collapse;font:400 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
 table.nl2-t-tbl th,table.nl2-t-tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;box-sizing:border-box;padding:0 8px;height:32px;text-align:left}
 table.nl2-t-tbl td+td,table.nl2-t-tbl th+th{border-left:1px solid rgba(255,255,255,.06)}
+
+table.nl2-t-tbl>tbody>tr:not(.nl2-t-sec):not(.nl2-t-gap):not(.nl2-t-det):not(.nl2-t-vsp)>td{height:40px;padding-top:4px;padding-bottom:4px}   
+table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:4px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.11)}
+table.nl2-t-tbl>tbody>tr[data-key]>td+td{border-left-color:rgba(255,255,255,.11)}
+table.nl2-t-tbl>tbody>tr[data-key]:not(:has(~ tr[data-key]))>td{border-bottom-color:transparent}
+table.nl2-t-tbl>tbody>tr[data-key]>td .nl2-t-in{vertical-align:middle}
+table.nl2-t-tbl td[data-span]>.nl2-t-pill:only-child{display:block;width:100%;text-align:center}
+table.nl2-t-tbl>tbody:has(>tr.nl2-t-sec.nl2-t-hid):not(:has(>tr[data-key]:not([hidden])))>tr.nl2-t-sec .nl2-t-ctl{display:none}
 table.nl2-t-tbl thead th{font:600 12.8px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-head,#8fb3d9);height:28px;border-bottom:1px solid rgba(120,200,255,.12);user-select:none}
 table.nl2-t-tbl thead th[data-k]:not([data-nosort]){cursor:pointer}
 table.nl2-t-tbl thead th .nl2-t-ar{margin-left:3px;font-size:10px}
@@ -52483,6 +52613,8 @@ table.nl2-t-tbl tr.nl2-t-det button.nl2-t-b-bad,table.nl2-t-tbl .nl2-t-ctl butto
 table.nl2-t-tbl tr.nl2-t-det button.nl2-t-b-ok,table.nl2-t-tbl .nl2-t-ctl button.nl2-t-b-ok{border-color:rgba(74,222,128,.55);background:rgba(74,222,128,.12);color:var(--nl2-ok,#4ade80)}
 table.nl2-t-tbl td.nl2-t-act>button:disabled{opacity:1;cursor:not-allowed;border-color:#2a3446;background:rgba(120,130,150,.12);color:#6b7686}
 table.nl2-t-tbl tr.nl2-t-sec>td{height:auto;padding:20px 8px 10px;border-left:0;background:none;cursor:pointer;user-select:none;font:700 13px Rajdhani,"Exo 2",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--nl2-t-c)}
+
+table.nl2-t-tbl tr.nl2-t-sec>td{background:linear-gradient(to bottom,transparent calc(100% - 34px),rgba(255,255,255,.06) calc(100% - 34px))}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-bar{display:inline-block;width:3px;height:14px;margin-right:8px;vertical-align:-2px;background:var(--nl2-t-c);border-radius:1px}
 table.nl2-t-tbl tr.nl2-t-vsp>td{padding:0!important;border:0!important;background:none!important;height:inherit}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-chev{display:inline-block;width:12px;font-size:11px}
@@ -52582,7 +52714,7 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                         NL.tip && NL.tip(el, t);
                     }
                 }, true);
-                const table = H("table", { class: "nl2-t-tbl nl2-tbl" + (opts.subFill ? " nl2-t-subfill" : "") + (opts.zebra === false ? " nl2-t-nozebra" : "") });
+                const table = H("table", { class: "nl2-t-tbl nl2-tbl" + (opts.subFill ? " nl2-t-subfill" : "") + (opts.zebra === true ? "" : " nl2-t-nozebra") });
                 if (act)
                     table.style.setProperty("--nl2-t-btnw", (act.w || 110) + "px");
                 const widths = cols.map((c) => (c.w === "flex" || c.w == null ? null : (typeof c.w === "number" ? c.w + "px" : c.w)));
@@ -52952,6 +53084,8 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                     }
                 }
                 function toneOf(sec, used) {
+                    if (NL.tblBlueSecs !== false)
+                        return SEC_TONES[1];
                     const want = sec.tone && (TONE_BY_MEANING[sec.tone] || sec.tone);
                     let t = SEC_TONES.find((x) => x[0] === want);
                     if (!t)
@@ -53181,7 +53315,7 @@ table.nl2-t-tbl td.nl2-t-act>.nl2-t-none{color:var(--nl2-dim,#8aa3c0);padding-ri
                             at = tr;
                             fillRow(tr, row);
                             tr.hidden = !open;
-                            tr.classList.toggle("nl2-t-z", opts.zebra !== false && (z++ % 2) === 1);
+                            tr.classList.toggle("nl2-t-z", opts.zebra === true && (z++ % 2) === 1);
                             let det = tr._nl2Det;
                             if (row.detail && isOpen(row)) {
                                 if (!det) {

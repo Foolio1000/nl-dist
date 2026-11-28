@@ -1,5 +1,20 @@
 # Release notes archive
 
+## v0.5.157 · Nov 24, 2026
+
+**✨ Moons and Outposts**
+- Phalanx results, Moon Thresholds and the Relocate belt list now use the standard sortable tables (MO-056, MO-057, OU-016)
+- Moon Bring uses the same amber as the rest of the script (MO-064)
+
+**🐞 Fixes**
+- The moon pill now refreshes right after you Hide a moon (MO-065)
+
+**🔧 Under the hood**
+- Retired 14 old feature switches for badges and quiet messages; behaviour is unchanged (GL-378, GL-424)
+- One shared list of finished mission statuses for badges (FL-509)
+- One shared planet zone read, now used by Moons; other areas move over next (GL-381, in progress)
+- Removed the old Research click watcher; the Research badge already clears on the action itself (RE-045)
+
 ## v0.5.156 · Nov 23, 2026
 
 **🚀 Performance**

@@ -2,6 +2,18 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.177 · Nov 28, 2026
+
+**🎨 Look and feel**
+- Tables across the script share one look: 40px rows, no zebra striping, and blue section heads on a grey band. Shipyard keeps its alternating rows (GL-474, GL-482)
+
+**🔬 Research**
+- The Research page edits the game's reply through the shared request registry. Nothing changes on screen (GL-461, third part)
+
+**⚙ Behind the scenes**
+- Task data listens to game replies through the shared listener instead of its own fetch and XHR wrappers (GL-457, first part)
+- The Low Bio warning asks through one shared request gate instead of wrapping fetch and XHR itself. It still asks before the same sends (GL-461, first and second parts)
+
 ## v0.5.176 · Nov 28, 2026
 
 **🚀 Shipyard**
@@ -233,18 +245,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🔧 Under the hood**
 - One shared planet zone read for Moons, Fleet, Attack, Salvage and Targets (GL-381)
-
-## v0.5.157 · Nov 24, 2026
-
-**✨ Moons and Outposts**
-- Phalanx results, Moon Thresholds and the Relocate belt list now use the standard sortable tables (MO-056, MO-057, OU-016)
-- Moon Bring uses the same amber as the rest of the script (MO-064)
-
-**🐞 Fixes**
-- The moon pill now refreshes right after you Hide a moon (MO-065)
-
-**🔧 Under the hood**
-- Retired 14 old feature switches for badges and quiet messages; behaviour is unchanged (GL-378, GL-424)
-- One shared list of finished mission statuses for badges (FL-509)
-- One shared planet zone read, now used by Moons; other areas move over next (GL-381, in progress)
-- Removed the old Research click watcher; the Research badge already clears on the action itself (RE-045)
