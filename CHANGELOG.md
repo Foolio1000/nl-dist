@@ -2,6 +2,29 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.178 · Nov 28, 2026
+
+**🎨 Look and feel**
+- Section heads in every table sit on a light blue band (GL-487)
+- Buildings, Shipyard and Research share one page header: the same size, title font and layout (GL-484)
+- Right-aligned columns keep a 12px gap before the next column (SH-093, GL-485)
+- Resource headers like Hydrogen and Alloys keep their icon when a search hides every card that uses them (GL-486)
+- The purple Inbound box has an even border all around, with no thick left edge or glow (GL-483)
+
+**🏗 Buildings**
+- The slots count is plain text under the title and no longer covers the button on the right (BU-065)
+
+**🚀 Shipyard**
+- Queue cards sit side by side, with the end time just right of the timer. Only repairs keep their icon, and waiting ships have no hourglass (SH-090)
+- The ship list has a "Shipyard" header like Fleet on Planet, Search Ships under it, then a section for each ship size (SH-091)
+- Stat icons line up in columns down the table (SH-092)
+- Matchups use the S0 23 Nov Max research data (SH-094)
+
+**🔬 Research**
+- The header shows only the title and Lab level. The Research tab gets the same outline as Artifacts and Recycling when selected, and the Table View box sits on that tab (RE-053)
+- The lab requirement turns gold when this planet's lab is too low (RE-054)
+- The Currently Researching card sits above the filter row (RE-055)
+
 ## v0.5.177 · Nov 28, 2026
 
 **🎨 Look and feel**
@@ -224,24 +247,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🐞 Fixes**
 - Bring missing resources, then picking a hub, fills only the missing resources in Market's Pickup, never every resource (GL-435)
-
-## v0.5.158 · Nov 24, 2026
-
-**✨ New**
-- Genesis Scout is one click: it sends 1 Probe, or 1 Spy Probe if you have no Probes (FL-566)
-- Genesis tab drops Scouted rows and adds a Garrison counter pill and an "RSS lost / dmg" column (FL-567, FL-585, FL-587)
-- The Mining table hides belts that an outpost is on or relocating to (FL-576)
-- Moon Effect shows the next level's production gain, with the total on hover (MO-069)
-- Command Center's Fleet matrix turns orange when a Planetary or Orbital queue has under 8 hours left (EM-047)
-- Gather Fleets leaves damaged ships at home and adds a Gate checkbox (SH-078, SH-077)
-- "Use Galactic Highway" now reads "Gateway" in the fleet dialogs, Salvage, Make route and Gather Fleets (GL-434)
-
-**🐞 Fixes**
-- Genesis system messages are quiet: no ding, no badge (GL-413)
-- Genesis attacks show as PVE in Fleet > Active (FL-569)
-- Research stays condensed on the Artifacts and Recycling tabs (RE-049)
-- Bring Resources leaves enough hydrogen for fuel (FL-586)
-- The Bulk Carriers need fills in on Resources while Evacuate refreshes (FL-571)
-
-**🔧 Under the hood**
-- One shared planet zone read for Moons, Fleet, Attack, Salvage and Targets (GL-381)

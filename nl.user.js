@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.177
+// @version      0.5.178
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.177", features: [] };
+    const NL = window.__nl2 = { version: "0.5.178", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -6328,7 +6328,7 @@ nxtSnap | 92_gl_task_data | retired
       .nl2-inbound{box-sizing:border-box;padding:6px 12px;border-radius:8px;background:rgba(6,14,27,.94);border:1px solid rgba(116,176,232,.2);font-family:Rajdhani,"Exo 2",sans-serif;color:#d9e6f7}
       
       
-      .nl2-inbound{background:rgba(168,85,247,.13);border:1px solid rgba(168,85,247,.7);border-left:4px solid #a855f7;box-shadow:0 0 12px rgba(168,85,247,.25)}
+      .nl2-inbound{background:rgba(168,85,247,.13);border:1px solid rgba(168,85,247,.7)}   
       .nl2-inbound .nl2-in-row>div{border-top-color:rgba(168,85,247,.22)}
       .nl2-inbound .nl2-in-row>div:first-child{color:#d8b4fe}
       .nl2-inbound.nl2-in-gap{margin:16px 0}
@@ -9577,17 +9577,17 @@ nxtSnap | 92_gl_task_data | retired
                 return out;
             };
             const MATCHUPS = {
-                scout: { good: [{ key: "dreadnought", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }, { key: "missile_cruiser", s: "crushes" }, { key: "carrier", s: "beats" }, { key: "fighter", s: "beats" }, { key: "interceptor", s: "beats" }], bad: [{ key: "cruiser", s: "loses" }] },
-                fighter: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }], bad: [{ key: "missile_cruiser", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "scout", s: "loses" }] },
-                interceptor: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "beats" }], bad: [{ key: "cruiser", s: "crushed" }, { key: "missile_cruiser", s: "crushed" }, { key: "battleship", s: "crushed" }, { key: "scout", s: "loses" }] },
-                cruiser: { good: [{ key: "interceptor", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "fighter", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "scout", s: "beats" }, { key: "dreadnought", s: "beats" }], bad: [{ key: "battleship", s: "crushed" }] },
-                missile_cruiser: { good: [{ key: "interceptor", s: "crushes" }, { key: "fighter", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }], bad: [{ key: "scout", s: "crushed" }, { key: "battleship", s: "crushed" }] },
-                torpedo_frigate: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "battleship", s: "crushes" }], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "missile_cruiser", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "interceptor", s: "loses" }] },
-                carrier: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }], bad: [{ key: "scout", s: "loses" }] },
-                battleship: { good: [{ key: "interceptor", s: "crushes" }, { key: "cruiser", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "missile_cruiser", s: "crushes" }], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }] },
-                dreadnought: { good: [], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "interceptor", s: "crushed" }, { key: "cruiser", s: "loses" }] },
-                titan: { good: [], bad: [{ key: "scout", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "interceptor", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "missile_cruiser", s: "crushed" }, { key: "battleship", s: "crushed" }] },
-                bomber: null,
+                scout: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }, { key: "bomber", s: "crushes" }, { key: "missile_cruiser", s: "crushes" }, { key: "carrier", s: "beats" }, { key: "fighter", s: "beats" }, { key: "interceptor", s: "beats" }], bad: [{ key: "cruiser", s: "crushed" }] },
+                fighter: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }, { key: "bomber", s: "crushes" }], bad: [{ key: "missile_cruiser", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "scout", s: "loses" }, { key: "carrier", s: "loses" }] },
+                interceptor: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "beats" }], bad: [{ key: "missile_cruiser", s: "crushed" }, { key: "battleship", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "bomber", s: "crushed" }, { key: "scout", s: "loses" }] },
+                torpedo_frigate: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "battleship", s: "crushes" }, { key: "bomber", s: "beats" }], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "interceptor", s: "loses" }, { key: "missile_cruiser", s: "loses" }, { key: "cruiser", s: "loses" }] },
+                cruiser: { good: [{ key: "interceptor", s: "crushes" }, { key: "fighter", s: "crushes" }, { key: "scout", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "carrier", s: "crushes" }, { key: "torpedo_frigate", s: "beats" }], bad: [{ key: "battleship", s: "crushed" }, { key: "missile_cruiser", s: "crushed" }, { key: "bomber", s: "loses" }, { key: "dreadnought", s: "loses" }] },
+                missile_cruiser: { good: [{ key: "interceptor", s: "crushes" }, { key: "fighter", s: "crushes" }, { key: "carrier", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "cruiser", s: "crushes" }, { key: "bomber", s: "beats" }, { key: "battleship", s: "beats" }, { key: "dreadnought", s: "beats" }, { key: "torpedo_frigate", s: "beats" }], bad: [{ key: "scout", s: "crushed" }] },
+                carrier: { good: [{ key: "titan", s: "crushes" }, { key: "dreadnought", s: "crushes" }, { key: "torpedo_frigate", s: "crushes" }, { key: "battleship", s: "crushes" }, { key: "bomber", s: "crushes" }, { key: "fighter", s: "beats" }], bad: [{ key: "missile_cruiser", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "scout", s: "loses" }] },
+                bomber: { good: [{ key: "interceptor", s: "crushes" }, { key: "titan", s: "crushes" }, { key: "battleship", s: "crushes" }, { key: "dreadnought", s: "beats" }, { key: "cruiser", s: "beats" }], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "missile_cruiser", s: "loses" }, { key: "torpedo_frigate", s: "loses" }] },
+                battleship: { good: [{ key: "interceptor", s: "crushes" }, { key: "cruiser", s: "crushes" }, { key: "titan", s: "crushes" }], bad: [{ key: "scout", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "bomber", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }, { key: "missile_cruiser", s: "loses" }, { key: "dreadnought", s: "loses" }] },
+                dreadnought: { good: [{ key: "cruiser", s: "beats" }, { key: "battleship", s: "beats" }], bad: [{ key: "scout", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "interceptor", s: "crushed" }, { key: "bomber", s: "loses" }, { key: "missile_cruiser", s: "loses" }] },
+                titan: { good: [], bad: [{ key: "scout", s: "crushed" }, { key: "torpedo_frigate", s: "crushed" }, { key: "fighter", s: "crushed" }, { key: "carrier", s: "crushed" }, { key: "bomber", s: "crushed" }, { key: "interceptor", s: "crushed" }, { key: "missile_cruiser", s: "crushed" }, { key: "cruiser", s: "crushed" }, { key: "battleship", s: "crushed" }] },
             };
             for (const k of Object.keys(MATCHUPS)) {
                 const v = MATCHUPS[k];
@@ -9618,7 +9618,7 @@ nxtSnap | 92_gl_task_data | retired
                 defenseLevels: Object.freeze(defenseLevels),
                 need,
                 matchups: MATCHUPS,
-                matchupsAsOf: "2026-11-18",
+                matchupsAsOf: "2026-11-23",
                 debris,
                 debrisRates: { primary: DEB_PRIMARY, rare: DEB_RARE, hydrogen: 0 },
             });
@@ -16017,13 +16017,12 @@ nxtSnap | 92_gl_task_data | retired
                 const C = ".buildings-page > .bld-hero .bld-stat-chip[data-nl2-slots]";
                 NL.css("bu-slots-color", [
                     `${C} .chip-flag{display:none!important}`,
-                    `${C}[data-nl2-slots="full"]{border-color:color-mix(in srgb,var(--nl2-amber,#fbbf24) 40%,transparent)!important}`,
+                    `${C}{background:none!important;border:0!important;box-shadow:none!important;padding:0!important;border-radius:0!important;min-height:0!important;height:auto!important;gap:0!important}`,
+                    `${C} > span{color:inherit!important;font-size:inherit!important}`,
+                    `${C} > strong{margin-right:.25em!important}`,
+                    `${C} .ui-icon,${C} .game-glyph,${C} .lucide-layers,${C} > svg{display:none!important}`,
                     `${C}[data-nl2-slots="full"] strong{color:var(--nl2-amber,#fbbf24)!important}`,
                     ".buildings-page > .bld-hero .bld-stat-chip[data-nl2-bu-nochip]{display:none!important}",
-                    `${C}[data-nl2-slots="one"]{border-color:color-mix(in srgb,var(--nl2-amber,#fbbf24) 40%,transparent)!important}`,
-                    `${C}[data-nl2-slots="one"] strong{color:var(--text-primary,#f1f6ff)!important}`,
-                    `${C}[data-nl2-slots="ok"]{border-color:var(--border-color,rgba(120,200,255,.12))!important}`,
-                    `${C}[data-nl2-slots="ok"] strong{color:var(--text-primary,#f1f6ff)!important}`,
                 ].join(""));
                 const mark = (chip) => {
                     const st = chip.querySelector("strong"), m = st && /(\d[\d,]*)\s*\/\s*(\d[\d,]*)/.exec(st.textContent);
@@ -16070,29 +16069,39 @@ nxtSnap | 92_gl_task_data | retired
             const n = el ? el.textContent.replace(/\s*\[[^\]]*\]\s*$/, "").trim() : "";
             return n ? n + " " + page : page;
         };
+        NL.pageHead = {
+            H: 80,
+            CTL_TOP: 25,
+            HALO: "0 1px 2px rgba(0,0,0,.95),0 0 4px rgba(0,0,0,.85),0 0 8px rgba(0,0,0,.6)",
+            css(o) {
+                const P = NL.pageHead, out = [
+                    `${o.hero}{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:16px!important;padding:0 24px!important;height:${P.H}px!important;min-height:${P.H}px!important;max-height:${P.H}px!important;box-sizing:border-box!important;overflow:hidden!important}`,
+                    `${o.main}{display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;align-items:flex-start!important;justify-content:center!important;gap:2px!important;flex:1 1 auto!important;min-width:0!important;margin:0!important;padding:0!important}`,
+                    `${o.title}[data-nl2-pt]{display:block!important;font-size:0!important;margin:0!important;padding:0!important;line-height:1!important;white-space:nowrap}`,
+                    `${o.title}[data-nl2-pt]::before{content:attr(data-nl2-pt);font-size:32px;font-weight:700;color:#fff;line-height:1.15;letter-spacing:normal}`,
+                ];
+                if (o.line)
+                    out.push(`${o.line}{display:block!important;font-family:Rajdhani,"Exo 2",sans-serif!important;font-size:16px!important;font-weight:500!important;line-height:20px!important;color:var(--nl2-onart,#c0cce0)!important;text-shadow:${P.HALO}!important;white-space:nowrap!important;margin:0!important;padding:0!important}`, `${o.line} b,${o.line} strong{color:#fff;font-weight:700;font-size:inherit!important}`);
+                if (o.ctl)
+                    out.push(`${o.ctl}{position:static!important;margin:0 0 0 auto!important;flex:0 0 auto!important;align-self:center!important}`);
+                return out.join("");
+            },
+        };
         NL.feature({
             id: "bu-banner",
             set: "Buildings",
             name: "Condensed Buildings banner",
-            desc: "BU-021: one-row Buildings banner: the slots, queue and upgrading chips, and the Hide buttons. Drops the title and planet name.",
+            desc: "BU-021 / BU-065 / GL-484: Buildings banner in the shared page header: \"<planet> Buildings\", the slots count under it, Hide at the right.",
             init() {
                 const H = ".buildings-page > .bld-hero";
                 NL.css("bu-banner", [
-                    `${H}{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:8px 16px!important;padding:10px 24px!important;min-height:0!important;height:auto!important}`,
-                    `${H} > .bld-hero-main{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:8px 16px!important;flex:0 1 auto!important;min-width:0!important}`,
-                    `${H} .bld-hero-title,${H} .bld-hero-sub{display:none!important}`,
-                    `${H} .bld-stat-chips{margin:0!important}`,
-                    `.buildings-page > .nl2-syopts{top:12px!important;bottom:auto!important}`,
+                    `${H} .bld-hero-sub{display:none!important}`,
+                    `${H} .bld-stat-chips{display:block!important;margin:0!important;padding:0!important;gap:0!important}`,
+                    `.buildings-page > .nl2-syopts{top:${NL.pageHead.CTL_TOP}px!important;bottom:auto!important}`,
                 ].join(""));
-                if (NL.pageTitle479 !== false) {
-                    NL.css("bu-banner-479", [
-                        `${H} .bld-hero-title[data-nl2-pt]{display:block!important;font-size:0!important;margin:0!important;line-height:1;white-space:nowrap}`,
-                        `${H} .bld-hero-title[data-nl2-pt]::before{content:attr(data-nl2-pt);font-size:32px;font-weight:700;color:#fff;line-height:1.15}`,
-                        `${H} > .bld-hero-main{flex:1 1 auto!important}`,
-                        `${H} .bld-stat-chips{margin:0 0 0 auto!important}`,
-                    ].join(""));
+                NL.css("bu-banner-479", NL.pageHead.css({ hero: H, main: H + " > .bld-hero-main", title: H + " .bld-hero-title", line: H + " .bld-stat-chip[data-nl2-slots]" }));
+                if (NL.pageTitle479 !== false)
                     NL.watch(H + " .bld-hero-title", (h1) => NL.setAttr(h1, "data-nl2-pt", NL.pageTitle("Buildings")));
-                }
             },
         });
     }
@@ -17757,7 +17766,10 @@ nxtSnap | 92_gl_task_data | retired
                     ".research-page[data-nl2-retabs] .res-branch-tab[data-nl2-br]{display:none!important}",
                     ".research-page[data-nl2-retbl] .filter-row .chip{display:none!important}",
                     ".research-page:not([data-nl2-retabs]) .nl2-retab{display:none!important}",
-                    ".nl2-retv{margin-left:auto!important}",
+                    ".nl2-retv{display:inline-flex;align-items:center;margin:0 10px 0 -4px;cursor:pointer;align-self:center}",
+                    ".nl2-retv input{margin:0;width:14px;height:14px;cursor:pointer}",
+                    ".nl2-relablow{color:var(--nl2-amber,#fbbf24)!important}",
+                    ".research-page .res-branch-tab.nl2-retab.active{border:1px solid rgba(56,189,248,.6)!important;background:rgba(56,189,248,.12)!important;border-radius:8px!important;color:#e7f6ff!important}",
                     ".nl2-retb{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:10px;background:rgba(10,16,32,.85);border:1px solid #1f2a40;font-family:Rajdhani,\"Exo 2\",sans-serif;font-size:14px;color:#c9d4e3}",
                     ".nl2-retb th{font-size:12px;font-weight:600;color:#8fa6c8;text-align:left;padding:7px 8px;border-bottom:1px solid #26324c;background:#0f172b;white-space:nowrap}",
                     ".nl2-retb td{padding:6px 8px;border-bottom:1px solid #18223a;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
@@ -18041,6 +18053,8 @@ nxtSnap | 92_gl_task_data | retired
                 function rowOf(it, byKey, ps, lab, have) {
                     const level = +it.level || 0, max = +it.maxLevel || 0;
                     const r = { key: it.key, name: it.name || cap(it.key), type: cap(it.branch || ""), lv: level + "/" + (max || "?"), lab: it.requiredLabLevel != null ? String(it.requiredLabLevel) : "\u2014", fx: fxOf(it), sec: (+it.nextResearchTime || 0) * speedMult([it]), maxed: !!it.isMaxed };
+                    r.labLow = !r.maxed && lab != null && it.requiredLabLevel != null && +it.requiredLabLevel > lab;
+                    r.labHave = lab;
                     r.time = (NL.buildTime && NL.buildTime(Math.round(r.sec))) || NL.fmtDur(Math.round(r.sec));
                     const cost = costOf(it);
                     let short = false;
@@ -18195,7 +18209,7 @@ nxtSnap | 92_gl_task_data | retired
                     const td = (cls, ...kids) => NL.h("td", cls ? { class: cls } : {}, ...kids);
                     const bl = (r.type || "?")[0];
                     tr.appendChild(td("", NL.h("span", { class: "nl2-retb-br nl2-" + bl.toLowerCase(), "data-nl2-tip": r.type }, bl), NL.h("span", { class: "nl2-retb-n", "data-act": "open", "data-nl2-tip": r.name }, r.name)));
-                    tr.appendChild(NL.h("td", { "data-nl2-tip": "Needs Research Lab " + r.lab + ", level " + r.lv }, "L" + r.lab + " \u00B7 " + r.lv));
+                    tr.appendChild(NL.h("td", { "data-nl2-tip": labTip(r) }, labCell(r)));
                     tr.appendChild(td("nl2-retb-fx", ...r.fx.map((c) => NL.h("span", { class: "nl2-retb-chip" + (/^unlocks?:/i.test(c) ? " nl2-u" : ""), "data-nl2-tip": c }, c))));
                     if (NL.tableRules !== false)
                         tr.appendChild(td("nl2-retb-cost nl2-retb-c2", costSlots(r)));
@@ -18267,7 +18281,7 @@ nxtSnap | 92_gl_task_data | retired
                         id: "re",
                         cols: [
                             { k: "name", l: "Research", w: 180, name: true, cell: (r) => { const bl = (r.d.type || "?")[0]; return NL.h("span", null, NL.h("span", { class: "nl2-retb-br nl2-" + bl.toLowerCase(), "data-nl2-tip": r.d.type }, bl), r.d.name); } },
-                            { k: "lab", l: "Lab \u00B7 Lv", w: 70 },
+                            { k: "lab", l: "Lab \u00B7 Lv", w: 70, cell: (r) => labCell(r.d) },
                             { k: "fx", l: "Effects", w: "flex", wrap: true, cell: (r) => NL.h("span", null, ...r.d.fx.map((c) => NL.h("span", { class: "nl2-retb-chip" + (/^unlocks?:/i.test(c) ? " nl2-u" : ""), "data-nl2-tip": c }, c))) },
                             res("ore", "Ore", 56),
                             res("silicates", "Silicates", 56),
@@ -18342,12 +18356,16 @@ nxtSnap | 92_gl_task_data | retired
                     });
                 }
                 let last = null;
+                function labCell(r) {
+                    return NL.h("span", null, NL.h("span", { class: r.labLow ? "nl2-t-warn nl2-relablow" : "" }, "L" + r.lab), " \u00B7 " + r.lv);
+                }
+                const labTip = (r) => "Needs Research Lab " + r.lab + ", level " + r.lv + (r.labLow ? " (this planet's lab is " + r.labHave + ")" : "");
                 function ntRow(d, hid) {
                     const by = {};
                     d.cost.forEach((c) => { by[c.k] = c; });
                     const none = d.maxed || d.underway || !d.cost.length;
                     const tv = d.maxed || d.underway ? null : timeView(d.sec, Math.min(frags[d.key] || 0, d.fmax || 0));
-                    const vals = { lab: "L" + d.lab + " \u00B7 " + d.lv, time: tv ? tv.txt : "\u2014", roi: d.roi || "\u2014" }, tips = { name: d.name, lab: "Needs Research Lab " + d.lab + ", level " + d.lv, st: d.end ? (d.tip || d.st) + ", done " + NL.clock(d.end) : (d.tip || d.st) }, cellCls = {}, sortVals = {};
+                    const vals = { lab: "L" + d.lab + " \u00B7 " + d.lv, time: tv ? tv.txt : "\u2014", roi: d.roi || "\u2014" }, tips = { name: d.name, lab: labTip(d), st: d.end ? (d.tip || d.st) + ", done " + NL.clock(d.end) : (d.tip || d.st) }, cellCls = {}, sortVals = {};
                     if (tv && tv.tip)
                         tips.time = tv.tip;
                     if (d.roiTip)
@@ -18365,6 +18383,7 @@ nxtSnap | 92_gl_task_data | retired
                     sortVals.time = tv ? d.sec : null;
                     const sg = {};
                     Object.keys(vals).forEach((k) => { sg[k] = vals[k] + "|" + (cellCls[k] || "") + "|" + (tips[k] || ""); });
+                    sg.lab += "|" + !!d.labLow;
                     const row = { key: d.key, d, hid, vals, tips, cellCls, sortVals, link: () => openRe(d.key), cls: hid ? "nl2-t-row-dim" : "", sig: { ...sg, name: d.type + d.name, fx: d.fx.join("|"), rare: JSON.stringify(d.cost.filter((c) => !RE_SLOTS.includes(c.k))), st: d.st + "|" + (d.end || 0), frag: d.fmax + ":" + Math.min(frags[d.key] || 0, d.fmax || 0) + ":" + (d.have || 0), plan: String(!!d.plan) + d.key, hide: String(!!hid) + d.key } };
                     if (none)
                         row.vals.rare = "\u2014";
@@ -18622,15 +18641,22 @@ nxtSnap | 92_gl_task_data | retired
                     }
                 }
                 let box = null, cbx = null, rtab = null;
-                NL.watch(".research-page .filter-row", (row) => {
+                const tvTip = () => NL.tip(box, on ? "disable table view" : "enable table view");
+                const placeBox = () => {
                     if (!box) {
-                        cbx = NL.h("input", { type: "checkbox", onchange: () => { on = cbx.checked; ctx.store.set("on", on); sig = ""; paint(); reRefresh(); } });
-                        box = NL.h("label", { class: "nl2-retv research-filter-toggle", "data-nl2-tip": "Show every research of all three branches as one table" }, cbx, NL.h("span", null, "Table View"));
+                        cbx = NL.h("input", { type: "checkbox", onchange: () => { on = cbx.checked; ctx.store.set("on", on); sig = ""; tvTip(); paint(); reRefresh(); } });
+                        box = NL.h("label", { class: "nl2-retv" }, cbx);
+                        cbx.addEventListener("click", (e) => e.stopPropagation());
+                        box.addEventListener("click", (e) => e.stopPropagation());
                     }
-                    cbx.checked = on;
-                    if (row.lastElementChild !== box)
-                        row.appendChild(box);
-                });
+                    if (cbx.checked !== on)
+                        cbx.checked = on;
+                    tvTip();
+                    const brs = branchTabs().filter((x) => x.hasAttribute("data-nl2-br"));
+                    const host = on ? rtab : (brs.find((x) => x.classList.contains("active")) || brs[0]);
+                    if (host && host.isConnected && host.nextElementSibling !== box)
+                        host.after(box);
+                };
                 NL.watch(".research-page .res-branch-tab", (b) => {
                     if (b.classList.contains("nl2-retab"))
                         return;
@@ -18662,6 +18688,7 @@ nxtSnap | 92_gl_task_data | retired
                     const ab = activeBranch();
                     if (ab && ctx.store.get("br", null) !== ab)
                         ctx.store.set("br", ab);
+                    placeBox();
                 });
                 NL.watch(".research-page", paint);
                 reHooks.push(() => { sig = ""; paint(); });
@@ -18841,17 +18868,93 @@ nxtSnap | 92_gl_task_data | retired
             id: "re-page-title",
             set: "Research",
             name: "Research banner title",
-            desc: "GL-479: the Research banner title reads \"<planet> Research\".",
+            desc: "GL-479 / RE-053: the Research banner reads \"<planet> Research\" with only the Lab level under it.",
             init() {
                 if (NL.pageTitle479 === false)
                     return;
                 const H = ".research-page > .res-hero";
+                const PH = NL.pageHead && NL.pageHead.css;
                 NL.css("re-page-title", [
-                    `${H} h1[data-nl2-pt]{font-size:0!important;line-height:1;white-space:nowrap}`,
-                    `${H} h1[data-nl2-pt]::before{content:attr(data-nl2-pt);font-size:32px;font-weight:700;color:#fff;line-height:1.15}`,
+                    PH ? NL.pageHead.css({ hero: H, main: H + " [data-nl2-rhm]", title: H + " h1", line: H + " .nl2-rhlab" }) : [
+                        `${H} h1[data-nl2-pt]{font-size:0!important;line-height:1;white-space:nowrap;margin:0!important}`,
+                        `${H} h1[data-nl2-pt]::before{content:attr(data-nl2-pt);font-size:32px;font-weight:700;color:#fff;line-height:1.15}`,
+                        `${H} .nl2-rhlab{display:block;font-family:Rajdhani,"Exo 2",sans-serif;font-size:16px;font-weight:500;line-height:20px;color:var(--nl2-onart,#c0cce0);white-space:nowrap}`,
+                        `${H} .nl2-rhlab b{color:#fff;font-weight:700}`,
+                    ].join(""),
+                    `${H} [data-nl2-rhx]{display:none!important}`,
+                    `.research-page > .nl2-syopts{top:${PH ? NL.pageHead.CTL_TOP : 25}px!important;bottom:auto!important}`,
                 ].join(""));
-                NL.watch(H + " h1", (h1) => { if (h1 === h1.closest(".res-hero").querySelector("h1"))
-                    NL.setAttr(h1, "data-nl2-pt", NL.pageTitle ? NL.pageTitle("Research") : "Research"); });
+                const CHIPS = /\d+\s*\/\s*\d+\s*(military|economy|science|artifacts)/i, LAB = /Lab\s*Lv\.?\s*(\d+)/i;
+                const hide = (el, on) => { if (on !== el.hasAttribute("data-nl2-rhx")) {
+                    if (on)
+                        el.setAttribute("data-nl2-rhx", "");
+                    else
+                        el.removeAttribute("data-nl2-rhx");
+                } };
+                const ours = (el) => !!el.classList && [...el.classList].some((x) => x.startsWith("nl2"));
+                NL.watch(H + " h1", (h1) => {
+                    const hero = h1.closest(".res-hero");
+                    if (h1 !== hero.querySelector("h1"))
+                        return;
+                    NL.setAttr(h1, "data-nl2-pt", NL.pageTitle ? NL.pageTitle("Research") : "Research");
+                    const main = h1.parentElement;
+                    if (main === hero)
+                        return;
+                    NL.setAttr(main, "data-nl2-rhm", "");
+                    let lab = null, labEl = main.querySelector(":scope > .nl2-rhlab");
+                    for (const c of main.children) {
+                        if (c === h1 || c === labEl)
+                            continue;
+                        if (ours(c))
+                            continue;
+                        const m = LAB.exec(c.textContent || "");
+                        if (m && lab == null)
+                            lab = m[1];
+                        hide(c, true);
+                    }
+                    for (const c of hero.children)
+                        if (c !== main && !ours(c) && !c.contains(main) && CHIPS.test(c.textContent || ""))
+                            hide(c, true);
+                    if (lab == null) {
+                        if (labEl)
+                            labEl.remove();
+                        return;
+                    }
+                    if (!labEl)
+                        labEl = NL.h("span", { class: "nl2-rhlab" });
+                    if (labEl.getAttribute("data-lv") !== lab) {
+                        labEl.setAttribute("data-lv", lab);
+                        labEl.textContent = "Lab ";
+                        labEl.appendChild(NL.h("b", null, lab));
+                    }
+                    if (h1.nextElementSibling !== labEl)
+                        h1.after(labEl);
+                });
+            },
+        });
+        NL.feature({
+            id: "re-order",
+            set: "Research",
+            name: "Research page order",
+            desc: "Research page: the Currently Researching card above the filter row, the table right under the filter row.",
+            init() {
+                if (NL.reOrder === false)
+                    return;
+                const P = ".research-page[data-nl2-reord]";
+                NL.css("re-order", [
+                    `${P}{display:flex!important;flex-direction:column!important}`,
+                    `${P} > [data-nl2-ro="1"]{order:1}`,
+                    `${P} > [data-nl2-ro="2"]{order:2}`,
+                    `${P} > [data-nl2-ro="3"]{order:3}`,
+                ].join(""));
+                const CUR = /^\s*currently\s+researching/i;
+                NL.watch(".research-page", (pg) => {
+                    const kids = [...pg.children], fi = kids.findIndex((c) => c.matches(".filter-row") || !!c.querySelector(".filter-row"));
+                    const card = kids.find((c, i) => i > fi && CUR.test(c.textContent || "") && !c.querySelector(".filter-row"));
+                    const on = fi >= 0 && !!card;
+                    NL.setAttr(pg, "data-nl2-reord", on ? "" : null);
+                    kids.forEach((c, i) => NL.setAttr(c, "data-nl2-ro", !on ? null : c === card ? "2" : i < fi ? "1" : "3"));
+                });
             },
         });
     }
@@ -19055,8 +19158,8 @@ nxtSnap | 92_gl_task_data | retired
                     P40 + " .ship-card.locked .ship-locked-badge{grid-column:5!important;grid-row:1!important;justify-self:end!important;align-self:center!important;position:static!important;margin:0!important;width:110px;box-sizing:border-box;justify-content:center;font-size:13px!important}",
                     ...(NL.sh089 === false ? [] : [
                         ".shipyard-page[data-nl2-shb] .size-group-header h3{color:var(--nl2-info)!important}",
-                        P40 + " .ship-card[data-nl2-shl-own]::after{justify-self:stretch!important;text-align:right!important}",
-                        P40 + " .ship-costs>[data-nl2-shl-c=\"7\"]{justify-self:stretch!important;justify-content:flex-end!important;text-align:right!important}",
+                        P40 + " .ship-card[data-nl2-shl-own]::after{justify-self:stretch!important;text-align:right!important;padding-right:12px!important;box-sizing:border-box!important}",
+                        P40 + " .ship-costs>[data-nl2-shl-c=\"7\"]{justify-self:stretch!important;justify-content:flex-end!important;text-align:right!important;padding-right:12px!important;box-sizing:border-box!important}",
                         P40 + " .ship-costs>.ship-build-time>:is(svg,img,.ui-icon,.game-glyph,[class*=\"glyph\"]){display:none!important}",
                         P40 + " .ship-card.locked>.ship-requirements:not(#nl2-sh89){grid-column:4/5!important;text-align:center!important;align-self:center!important;height:22px;line-height:20px!important;border-radius:999px!important;border:1px solid rgba(148,163,184,.45)!important;background:rgba(148,163,184,.12)!important;color:var(--nl2-text)!important;padding:0 10px!important;box-sizing:border-box}",
                     ]),
@@ -19606,7 +19709,9 @@ nxtSnap | 92_gl_task_data | retired
                     `${H} .sy-stat-chips{display:none!important}`,
                     `${H} > .nl2-tstd-ctl{margin:0 0 0 auto!important;min-height:0!important}`,
                     `${H} > .nl2-tstd-ctl + .nl2-gf-btn{margin-left:0!important}`,
-                ].join("")));
+                ].join("")) + (!NEW || NL.shHead484 === false || !NL.pageHead ? "" :
+                    NL.pageHead.css({ hero: H, main: H + " > .sy-hero-main", title: H + " .sy-hero-title", line: H + " .nl2-shb-sl", ctl: H + " > :is(.nl2-tstd-ctl, .nl2-gf-btn, .nl2-syopts):not(:is(.nl2-tstd-ctl, .nl2-gf-btn, .nl2-syopts) ~ *)" })
+                        + `${H} > :is(.nl2-tstd-ctl, .nl2-gf-btn, .nl2-syopts) ~ :is(.nl2-gf-btn, .nl2-syopts){margin-left:0!important}`));
                 if (NEW) {
                     const num = (s) => { const m = /(\d[\d,]*)/.exec(s || ""); return m ? m[1] : null; };
                     NL.watch(H + " > .sy-hero-main", (main) => {
@@ -19797,10 +19902,11 @@ nxtSnap | 92_gl_task_data | retired
                 }
                 const visBtn = (b) => !!b && getComputedStyle(b).display !== "none" && !b.hasAttribute("data-nl2-shmt");
                 const PILL = { Planetary: " nl2-t-pill-info", Orbital: " nl2-t-pill-purple" };
+                const SW = NL.sh092 === false ? {} : { hp: 52, sh: 40, at: 40, sp: 34, cg: 52 };
                 const COLS = [
                     { k: "name", l: "Ship", w: 160, name: true, cls: "nl2-t-white", cell: (r) => NL.h("span", {}, r.name) },
                     { k: "count", l: "Count", w: 72, cls: "nl2-t-count", align: NL.shFleet086 !== false ? "right" : undefined },
-                    { k: "stats", l: "Stats", w: 280, slots: [{ k: "hp", l: "HP", icon: "heart" }, { k: "sh", l: "Shield", icon: "shield" }, { k: "at", l: "Attack", icon: "swords" }, { k: "sp", l: "Speed", icon: "gauge" }, { k: "cg", l: "Cargo", icon: "package" }] },
+                    { k: "stats", l: "Stats", w: 280, slots: [{ k: "hp", l: "HP", icon: "heart", w: SW.hp }, { k: "sh", l: "Shield", icon: "shield", w: SW.sh }, { k: "at", l: "Attack", icon: "swords", w: SW.at }, { k: "sp", l: "Speed", icon: "gauge", w: SW.sp }, { k: "cg", l: "Cargo", icon: "package", w: SW.cg }] },
                     { k: "wp", l: "Weapon", w: 68 },
                     { k: "ar", l: "Armor", w: 68 },
                     { k: "good", l: "Good against", w: "flex", sort: false, cell: (r) => goodBad(r.vals.good, NL.shFleet086 !== false ? "nl2-t-good nl2-shft-gbp" : "nl2-t-good") },
@@ -19938,6 +20044,84 @@ nxtSnap | 92_gl_task_data | retired
                         put(cell(r, "good"), list(m && m.good));
                         put(cell(r, "bad"), list(m && m.bad));
                     });
+                });
+            },
+        });
+        NL.feature({
+            id: "sh-list-head",
+            set: "Shipyard",
+            name: "Shipyard header over the ship list",
+            desc: "SH-091: the ship list sits under a \"Shipyard\" header like Fleet on Planet, with Search Ships under it and the hull sizes as section heads.",
+            init() {
+                const P = ".shipyard-page[data-nl2-sh91]";
+                NL.css("sh-list-head-091", [
+                    P + ">.nl2-sh91-hd{box-sizing:border-box;margin:var(--nl2-sh91-mt,16px) 0 0!important;padding:var(--nl2-sh91-pt,16px) var(--nl2-sh91-px,16px) 10px;background:var(--nl2-sh91-bg,rgba(10,20,36,.6));border:var(--nl2-sh91-bd,1px solid rgba(116,176,232,.2));border-bottom:0;border-radius:var(--nl2-sh91-r,10px) var(--nl2-sh91-r,10px) 0 0}",
+                    P + ">.nl2-sh91-hd>h3{margin:0!important}",
+                    P + ">.shipyard-filters," + P + ">.ship-size-group{box-sizing:border-box;margin-top:calc(-1 * var(--nl2-sh91-gap,0px))!important;margin-bottom:0!important;padding-left:var(--nl2-sh91-px,16px)!important;padding-right:var(--nl2-sh91-px,16px)!important;background:var(--nl2-sh91-bg,rgba(10,20,36,.6))!important;border:var(--nl2-sh91-bd,1px solid rgba(116,176,232,.2))!important;border-top:0!important;border-bottom:0!important;border-radius:0!important;box-shadow:none!important}",
+                    P + ">.ship-size-group[data-nl2-sh91-last]{border-bottom:var(--nl2-sh91-bd,1px solid rgba(116,176,232,.2))!important;border-radius:0 0 var(--nl2-sh91-r,10px) var(--nl2-sh91-r,10px)!important;padding-bottom:var(--nl2-sh91-pt,16px)!important}",
+                    P + " .size-group-header{display:flex!important;align-items:baseline;gap:8px;margin:0!important;padding:20px 8px 10px!important;border:0!important;background:linear-gradient(to bottom,transparent calc(100% - 34px),var(--nl2-sec-band,rgba(56,189,248,.16)) calc(100% - 34px))!important}",
+                    P + " .size-group-header h3{display:inline-flex!important;align-items:center;margin:0!important;padding:0!important;border:0!important;font:700 13px Rajdhani,\"Exo 2\",sans-serif!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:var(--nl2-info,#38bdf8)!important}",
+                    P + " .size-group-header h3::before{content:\"\";display:inline-block;width:3px;height:14px;margin-right:8px;background:var(--nl2-info,#38bdf8);border-radius:1px}",
+                    P + " .size-group-header h3 :is(svg,img,.ui-icon,.game-glyph){display:none!important}",
+                    P + " .size-group-header .size-group-shipyard{margin:0!important;font:500 13px Rajdhani,\"Exo 2\",sans-serif!important;letter-spacing:0!important;text-transform:none!important;color:var(--nl2-dim,#8aa3c0)!important;background:none!important;border:0!important;padding:0!important}",
+                ].join("\n"));
+                const setAttr = NL.setAttr;
+                const H3_PROPS = ["fontFamily", "fontSize", "fontWeight", "letterSpacing", "textTransform", "color", "lineHeight", "paddingLeft", "borderLeft"];
+                const BAR_PROPS = ["content", "display", "width", "height", "marginRight", "background", "borderRadius", "verticalAlign"];
+                let seen = "";
+                const copyLook = (page, sum, hd) => {
+                    const cs = getComputedStyle(sum), pg = getComputedStyle(page), h = sum.querySelector(":scope > h3");
+                    const bd = cs.borderLeftWidth !== "0px" && cs.borderLeftStyle !== "none" ? cs.borderLeftWidth + " " + cs.borderLeftStyle + " " + cs.borderLeftColor : "0 none transparent";
+                    const bg = cs.backgroundImage && cs.backgroundImage !== "none" ? cs.backgroundImage + "," + cs.backgroundColor : cs.backgroundColor;
+                    const gap = parseFloat(pg.rowGap) > 0 && /flex|grid/.test(pg.display) ? pg.rowGap : "0px";
+                    const v = { bg, bd, r: cs.borderTopLeftRadius, px: cs.paddingLeft, pt: cs.paddingTop, gap, mt: gap !== "0px" ? "0px" : cs.marginBottom !== "0px" ? cs.marginBottom : "16px" };
+                    const hs = h ? getComputedStyle(h) : null, bs = h ? getComputedStyle(h, "::before") : null;
+                    const key = JSON.stringify(v) + (hs ? H3_PROPS.map((p) => hs[p]).join("|") + BAR_PROPS.map((p) => bs[p]).join("|") : "");
+                    if (key === seen && hd.getAttribute("data-nl2-sh91-k") === "1")
+                        return;
+                    seen = key;
+                    hd.setAttribute("data-nl2-sh91-k", "1");
+                    for (const [k, x] of Object.entries(v))
+                        page.style.setProperty("--nl2-sh91-" + k, x);
+                    const t = hd.firstElementChild;
+                    if (hs)
+                        for (const p of H3_PROPS)
+                            t.style[p] = hs[p];
+                    const bar = t.querySelector(":scope > .nl2-sh91-bar");
+                    if (bs && bs.content && bs.content !== "none" && bs.content !== "normal") {
+                        const b = bar || t.insertBefore(NL.h("span", { class: "nl2-sh91-bar" }), t.firstChild);
+                        for (const p of BAR_PROPS.slice(1))
+                            b.style[p] = bs[p];
+                        if (bs.display === "inline" || !bs.display)
+                            b.style.display = "inline-block";
+                    }
+                    else if (bar)
+                        bar.remove();
+                };
+                const undo = (page) => {
+                    page.querySelectorAll(":scope > .nl2-sh91-hd").forEach((e) => e.remove());
+                    page.removeAttribute("data-nl2-sh91");
+                    page.querySelectorAll("[data-nl2-sh91-last]").forEach((e) => e.removeAttribute("data-nl2-sh91-last"));
+                    seen = "";
+                };
+                NL.watch(".shipyard-page", (page) => {
+                    const bar = page.querySelector(":scope > .shipyard-filters"), groups = page.querySelectorAll(":scope > .ship-size-group");
+                    if (NL.sh091 === false || !bar || !groups.length) {
+                        if (page.hasAttribute("data-nl2-sh91"))
+                            undo(page);
+                        return;
+                    }
+                    let hd = page.querySelector(":scope > .nl2-sh91-hd");
+                    if (!hd)
+                        hd = NL.h("div", { class: "nl2-sh91-hd" }, NL.h("h3", {}, NL.h("span", { class: "nl2-sh91-t" }, "Shipyard")));
+                    if (bar.previousElementSibling !== hd)
+                        bar.insertAdjacentElement("beforebegin", hd);
+                    setAttr(page, "data-nl2-sh91", "");
+                    const last = groups[groups.length - 1];
+                    groups.forEach((g) => setAttr(g, "data-nl2-sh91-last", g === last ? "" : null));
+                    const sum = page.querySelector(":scope > .sy-fleet-summary");
+                    if (sum)
+                        copyLook(page, sum, hd);
                 });
             },
         });
@@ -20950,7 +21134,7 @@ nxtSnap | 92_gl_task_data | retired
                 ].join("\n"));
                 if (Q85)
                     NL.css("sh-queue-085", [
-                        ".shipyard-queue-section[data-nl2-shq85]{display:flex!important;flex-wrap:wrap;gap:10px;margin:0 0 12px!important;padding:10px 12px!important;border:1px solid rgba(116,176,232,.25)!important;border-radius:10px!important;background:rgba(14,32,60,.55)!important}",
+                        ".shipyard-queue-section[data-nl2-shq85]{display:flex!important;flex-direction:row!important;flex-wrap:wrap;align-items:stretch!important;gap:10px;margin:0 0 12px!important;padding:10px 12px!important;border:1px solid rgba(116,176,232,.25)!important;border-radius:10px!important;background:rgba(14,32,60,.55)!important}",
                         ".shipyard-queue-section[data-nl2-shq85] > .nl2-shq-hdr{flex:1 0 100%;padding:0!important;margin:0!important;font-size:13px!important}",
                         ".shipyard-queue-section[data-nl2-shq85] .nl2-shq-k{font:700 13px Rajdhani,\"Exo 2\",sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:#7dd3fc}",
                         ".shipyard-queue-section[data-nl2-shq85] .nl2-shq-eta{color:#c9d6e8;font-weight:500}",
@@ -20965,18 +21149,22 @@ nxtSnap | 92_gl_task_data | retired
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"nm\"] > strong[data-nl2-shq-n]{font-size:0!important;opacity:1!important}",
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"nm\"] > strong[data-nl2-shq-n]::before{content:attr(data-nl2-shq-n);font-size:16px;font-weight:700;color:#fff}",
                         ".shipyard-active[data-nl2-shq-i] > .active-info:not(:has([data-nl2-shq-r=\"left\"])) [data-nl2-shq-r=\"nm\"]{grid-row:1/3}",
-                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"hg\"]{display:none!important}",
-                        ".shipyard-active[data-nl2-shq-i] .qol-completion{display:contents!important}",
-                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"left\"]{grid-column:3;grid-row:2;color:#fff;white-space:nowrap}",
-                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"end\"]{grid-column:4;grid-row:2;justify-self:end;color:var(--nl2-dim);white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-i] :is([data-nl2-shq-r=\"hg\"],[data-nl2-shq-r=\"ix\"]){display:none!important}",
+                        ".shipyard-active[data-nl2-shq-i] .qol-completion{display:flex!important;grid-column:3/5;grid-row:2;align-items:baseline;gap:10px;min-width:0;overflow:hidden;white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-i] .qol-completion > :not([data-nl2-shq-r]){display:none!important}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"left\"]{color:#fff;white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"end\"]{color:var(--nl2-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"wait\"]{grid-column:4;grid-row:2;justify-self:end;font-size:0!important}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"wait\"] *{display:none!important}",
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"wait\"]::before{content:\"Waiting\";font-size:14px;color:var(--nl2-dim)}",
                         ".shipyard-active[data-nl2-shq-i] > .cancel-build-btn{flex:0 0 auto;font-size:0!important;padding:0 4px!important;margin:0!important;border:0!important;background:none!important;min-width:0!important;cursor:pointer}",
                         ".shipyard-active[data-nl2-shq-i] > .cancel-build-btn > *{display:none!important}",
                         ".shipyard-active[data-nl2-shq-i] > .cancel-build-btn::before{content:\"\\00d7\";font:700 18px Rajdhani,\"Exo 2\",sans-serif;color:var(--nl2-bad)}",
                     ].join("\n"));
                 const fmtN = (t) => t.replace(/\s+/g, " ").trim().replace(/^(\d+)\s*x\s+/i, (m, n) => Number(n).toLocaleString("en-US") + " \u00D7 ");
-                const card = (row, i) => {
+                const isRepair = (it, el) => it ? (it.operation || (it.isRepair ? "repair" : "build")) === "repair"
+                    : /repair|wrench/i.test((el.getAttribute("class") || "") + " " + (el.getAttribute("style") || "") + " " + (el.innerHTML || ""));
+                const card = (row, i, it) => {
                     const info = row.querySelector(":scope > .active-info");
                     if (!info)
                         return;
@@ -20993,8 +21181,8 @@ nxtSnap | 92_gl_task_data | retired
                             if (end)
                                 setAttr(end, "data-nl2-shq-r", "end");
                         }
-                        else if (el.matches(".ui-icon, svg, img, .game-glyph")) {
-                            r = icon ? "hg" : "ic";
+                        else if (el.matches(".ui-icon, svg, img, .game-glyph, [class*=\"glyph\"]") || (!el.textContent.trim() && !el.querySelector("strong"))) {
+                            r = icon ? "hg" : isRepair(it, el) ? "ic" : "ix";
                             icon = true;
                         }
                         else if (el.querySelector("strong")) {
@@ -21131,7 +21319,7 @@ nxtSnap | 92_gl_task_data | retired
                         paint(hdr, label || LABEL[kind], rows.length, max, list.length === rows.length ? finishOf(list, d) : null, false);
                         setAttr(sec, "data-nl2-shq85", Q85 ? "" : null);
                         if (Q85)
-                            rows.forEach(card);
+                            rows.forEach((r, i) => card(r, i, list.length === rows.length ? list[i] : null));
                     }
                     const hero = page.querySelector(":scope > .sy-hero");
                     const hasDock = !!(hero && /orbital dock/i.test(hero.textContent || "")) || !!seen.o;
@@ -52121,7 +52309,16 @@ nxtSnap | 92_gl_task_data | retired
                 }
                 NL.watch(".fleet-page .nl2-fat-h", (h) => { if (h.dataset.nl2TstdS !== "1")
                     h.dataset.nl2TstdS = "1"; sortActive(h); });
-                const iconOf = (alt) => { const i = document.querySelector("img.game-resource-icon[alt=\"" + alt + "\" i]"); return i ? i.cloneNode(false) : null; };
+                const iconOf = (alt) => {
+                    const i = document.querySelector("img.game-resource-icon[alt=\"" + alt + "\" i]");
+                    if (i)
+                        return i.cloneNode(false);
+                    const im = document.createElement("img");
+                    im.className = "game-resource-icon";
+                    im.alt = alt;
+                    im.src = "/images/resources/" + String(alt).toLowerCase().replace(/[^a-z]+/g, "_") + ".webp";
+                    return im;
+                };
                 const at = (sel) => (row) => { const e = sel && row.querySelector(sel); return e ? (e.getAttribute("data-nl2-bt-v") || e.getAttribute("data-nl2-shf-v") || e.getAttribute("data-nl2-shl-v") || e.getAttribute("data-nl2-mt-v") || e.getAttribute("data-nl2-bt-lv") || txt(e)) : ""; };
                 const syV = (x) => at("*")({ querySelector: () => x });
                 const syStat = (nm, lu) => (row) => {
@@ -52275,7 +52472,7 @@ nxtSnap | 92_gl_task_data | retired
                             if (gh.dataset.sig !== hs) {
                                 gh.dataset.sig = hs;
                                 gh.replaceChildren(...shown.map(({ c, i }) => {
-                                    const sp = H("span", { style: "left:" + Math.round(c.x) + "px;width:" + Math.max(0, Math.round(c.w)) + "px" + (c.col.right ? ";justify-content:flex-end" : "") });
+                                    const sp = H("span", { style: "left:" + Math.round(c.x) + "px;width:" + Math.max(0, Math.round(c.w)) + "px" + (c.col.right ? ";justify-content:flex-end;padding-right:12px" : "") });
                                     if (c.col.key)
                                         sp.setAttribute("data-k", String(i));
                                     const ic = c.col.icon ? iconOf(c.col.icon) : null;
@@ -52614,7 +52811,7 @@ table.nl2-t-tbl tr.nl2-t-det button.nl2-t-b-ok,table.nl2-t-tbl .nl2-t-ctl button
 table.nl2-t-tbl td.nl2-t-act>button:disabled{opacity:1;cursor:not-allowed;border-color:#2a3446;background:rgba(120,130,150,.12);color:#6b7686}
 table.nl2-t-tbl tr.nl2-t-sec>td{height:auto;padding:20px 8px 10px;border-left:0;background:none;cursor:pointer;user-select:none;font:700 13px Rajdhani,"Exo 2",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--nl2-t-c)}
 
-table.nl2-t-tbl tr.nl2-t-sec>td{background:linear-gradient(to bottom,transparent calc(100% - 34px),rgba(255,255,255,.06) calc(100% - 34px))}
+table.nl2-t-tbl tr.nl2-t-sec>td{background:linear-gradient(to bottom,transparent calc(100% - 34px),var(--nl2-sec-band,rgba(56,189,248,.16)) calc(100% - 34px))}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-bar{display:inline-block;width:3px;height:14px;margin-right:8px;vertical-align:-2px;background:var(--nl2-t-c);border-radius:1px}
 table.nl2-t-tbl tr.nl2-t-vsp>td{padding:0!important;border:0!important;background:none!important;height:inherit}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-chev{display:inline-block;width:12px;font-size:11px}

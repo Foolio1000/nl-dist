@@ -1,5 +1,26 @@
 # Release notes archive
 
+## v0.5.158 · Nov 24, 2026
+
+**✨ New**
+- Genesis Scout is one click: it sends 1 Probe, or 1 Spy Probe if you have no Probes (FL-566)
+- Genesis tab drops Scouted rows and adds a Garrison counter pill and an "RSS lost / dmg" column (FL-567, FL-585, FL-587)
+- The Mining table hides belts that an outpost is on or relocating to (FL-576)
+- Moon Effect shows the next level's production gain, with the total on hover (MO-069)
+- Command Center's Fleet matrix turns orange when a Planetary or Orbital queue has under 8 hours left (EM-047)
+- Gather Fleets leaves damaged ships at home and adds a Gate checkbox (SH-078, SH-077)
+- "Use Galactic Highway" now reads "Gateway" in the fleet dialogs, Salvage, Make route and Gather Fleets (GL-434)
+
+**🐞 Fixes**
+- Genesis system messages are quiet: no ding, no badge (GL-413)
+- Genesis attacks show as PVE in Fleet > Active (FL-569)
+- Research stays condensed on the Artifacts and Recycling tabs (RE-049)
+- Bring Resources leaves enough hydrogen for fuel (FL-586)
+- The Bulk Carriers need fills in on Resources while Evacuate refreshes (FL-571)
+
+**🔧 Under the hood**
+- One shared planet zone read for Moons, Fleet, Attack, Salvage and Targets (GL-381)
+
 ## v0.5.157 · Nov 24, 2026
 
 **✨ Moons and Outposts**
