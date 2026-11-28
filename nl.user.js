@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.178
+// @version      0.5.179
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.178", features: [] };
+    const NL = window.__nl2 = { version: "0.5.179", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -13085,7 +13085,8 @@ nxtSnap | 92_gl_task_data | retired
                 const txt = (el) => (el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "");
                 const SLOTS = [["specialization", "Specialization System"], ["weapon", "Weapon"], ["engine", "Engine"], ["armor", "Armor"], ["shield", "Shields"], ["sensor", "Sensors"], ["auxiliary", "Auxiliary System"]];
                 const SLOTN = Object.fromEntries(SLOTS), SLOTI = Object.fromEntries(SLOTS.map(([k], i) => [k, i]));
-                const RAR = ["common", "uncommon", "rare", "epic", "legendary"];
+                const RAR = ["common", "rare", "epic", "legendary"];
+                const gradeT = (g) => { const n = RAR.indexOf(g); return g ? cap(g) + (n >= 0 ? " (" + (n + 1) + ")" : "") : ""; };
                 let L = null, marked = new Set(), elig = new Map(), marksAt = 0;
                 NL.onData(/^\/api\/leadership(\?|$)/, (p, d) => { if (d && d.vessel) {
                     L = d;
@@ -13100,7 +13101,6 @@ nxtSnap | 92_gl_task_data | retired
                     NL._kick();
                 });
                 NL.css("gl-leader", `
-      .leadership-page[data-nl2-ld]{max-width:none!important;width:100%!important}
       .leadership-page[data-nl2-ld] .leadership-portrait-stage,.leadership-page[data-nl2-ld] .leadership-breadcrumb,
       .leadership-page[data-nl2-ld] .leadership-title-row,.leadership-page[data-nl2-ld] .leadership-identity-pills,
       .leadership-page[data-nl2-ld] .leadership-activity-strip{display:none!important}
@@ -13120,14 +13120,16 @@ nxtSnap | 92_gl_task_data | retired
       .leadership-page[data-nl2-ld] nav.leadership-tabs>[data-nl2-ldo]{order:var(--nl2-ldo)}
       .leadership-page[data-nl2-ld] nav.leadership-tabs>button[data-nl2-ldoff]{background:none!important;border-color:transparent!important;box-shadow:none!important;color:inherit!important}
       nav.leadership-tabs>button[data-nl2-ldoff]::after,nav.leadership-tabs>button[data-nl2-ldoff]::before{display:none!important}
-      .nl2-ldcb{display:inline-flex;align-items:center;margin:0 10px 0 -2px;cursor:pointer}
+      
+      .leadership-page[data-nl2-ld] nav.leadership-tabs>button[data-nl2-ldo=modules],.leadership-page[data-nl2-ld] nav.leadership-tabs>button[data-nl2-ldo=crew]{padding-right:40px!important}
+      .nl2-ldcb{display:inline-flex;align-items:center;align-self:center;margin:0 18px 0 -32px;position:relative;z-index:2;cursor:pointer}
       .nl2-ldcb input{margin:0;width:14px;height:14px;cursor:pointer}
       .leadership-page[data-nl2-ldm=overview] .leadership-fitting-main{display:none!important}
       .leadership-page[data-nl2-ldm=overview] .leadership-fitting-layout{display:block!important}
-      .leadership-page[data-nl2-ldm=overview] .leadership-fitting-side{display:flex!important;flex-direction:column;gap:12px;width:100%!important;max-width:none!important}
-      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=vs]{order:1}
-      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=xp]{order:2}
-      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=bon]{order:3}
+      .leadership-page[data-nl2-ldm=overview] .leadership-fitting-side{display:grid!important;grid-template-columns:minmax(0,2fr) minmax(0,1fr);grid-template-rows:auto 1fr;gap:12px;align-items:start;width:100%!important;max-width:none!important}
+      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=bon]{grid-column:1;grid-row:1 / span 2;margin:0!important}
+      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=vs]{grid-column:2;grid-row:1;margin:0!important}
+      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=xp]{grid-column:2;grid-row:2;margin:0!important}
       .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=hide]{display:none!important}
       [data-nl2-ldg=vs] .leadership-stat-group-body{display:flex!important;flex-wrap:wrap;gap:6px 26px;align-items:baseline}
       [data-nl2-ldg=vs] .leadership-repair-control{display:contents!important}
@@ -13147,9 +13149,16 @@ nxtSnap | 92_gl_task_data | retired
       .nl2-ldbon-g>div{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.05);padding:3px 0;font:500 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
       .nl2-ldbon-g>div>span{display:flex;align-items:center;gap:6px;min-width:0}
       .nl2-ldbon-g i{font-style:normal;padding:0 5px;border:1px solid rgba(138,163,192,.4);border-radius:4px;font-size:11px;color:var(--nl2-dim,#8aa3c0);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+      
+      .nl2-ldbon-g i[data-sc]{border-color:color-mix(in srgb,var(--nl2-sc) 55%,transparent);background:color-mix(in srgb,var(--nl2-sc) 12%,transparent);color:var(--nl2-sc)}
+      .nl2-ldbon-g i[data-sc=empire]{--nl2-sc:var(--nl2-info,#38bdf8)}
+      .nl2-ldbon-g i[data-sc=fleet]{--nl2-sc:#2dd4bf}
+      .nl2-ldbon-g i[data-sc=planet]{--nl2-sc:#818cf8}
+      .nl2-ldbon-g i[data-sc=operation]{--nl2-sc:#f472b6}
+      .nl2-ldbon-g i[data-sc=vessel]{--nl2-sc:var(--nl2-purple,#a855f7)}
       .nl2-ldbon-g b{color:var(--nl2-text,#d9e6f7);font-weight:600;white-space:nowrap}   
       .leadership-page:not([data-nl2-ldm=modules]) .nl2-ldmod{display:none!important}
-      .leadership-page[data-nl2-ldm=modules][data-nl2-ldlv] .leadership-fitting-layout{display:none!important}
+      .leadership-page[data-nl2-ldm=modules][data-nl2-ldlv] .leadership-fitting-layout,.leadership-page[data-nl2-ldm=modules][data-nl2-ldlv] [data-nl2-ldpanel]>:not(.nl2-ldmod){display:none!important}
       .leadership-page[data-nl2-ldm=modules]:not([data-nl2-ldlv]) .nl2-ldmod{display:none!important}
       .leadership-page[data-nl2-ldm=modules]:not([data-nl2-ldlv]) .leadership-fitting-side{display:none!important}
       .leadership-page[data-nl2-ldm=modules]:not([data-nl2-ldlv]) .leadership-fitting-layout{display:block!important}
@@ -13164,7 +13173,7 @@ nxtSnap | 92_gl_task_data | retired
       .nl2-ldmod-seg{display:inline-flex;border:1px solid rgba(120,200,255,.25);border-radius:6px;overflow:hidden}
       .nl2-ldmod-seg>button{height:26px;padding:0 10px;border:0;background:none;color:var(--nl2-text,#d9e6f7);font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer}
       .nl2-ldmod-seg>button[data-on]{background:rgba(56,189,248,.18);color:var(--nl2-info,#38bdf8)}
-      .nl2-t-pill.nl2-ldmod-fx{margin:2px 4px 2px 0;max-width:none}
+      .nl2-t-pill.nl2-ldmod-fx{margin:2px 4px 2px 0;max-width:100%;white-space:normal;overflow:visible;text-overflow:clip;height:auto;min-height:20px}   
       .nl2-ldmod table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:4px;padding-bottom:4px}
       .nl2-ldmod tr.nl2-ldmod-empty td{color:var(--nl2-dim,#8aa3c0)}
       .nl2-ldmod td input.nl2-ldmod-cb{margin:0;width:15px;height:15px;cursor:pointer;vertical-align:middle}
@@ -13248,7 +13257,7 @@ nxtSnap | 92_gl_task_data | retired
                         }
                     }
                 };
-                let mode = "overview", modBtn = null, modCb = null, crewCb = null, restored = null;
+                let selfClick = false, mode = "overview", modBtn = null, modCb = null, crewCb = null, restored = null;
                 const ORDER = { overview: 10, perks: 20, modules: 30, crew: 40 };
                 const gameTab = (nav, name) => [...nav.children].find((b) => b.tagName === "BUTTON" && !b.classList.contains("nl2-ldtab") && txt(b).toLowerCase() === name);
                 const lvBox = (get, set) => {
@@ -13286,7 +13295,7 @@ nxtSnap | 92_gl_task_data | retired
                             if (!b || b.classList.contains("nl2-ldtab") || b.parentElement !== nav)
                                 return;
                             const k = txt(b).toLowerCase();
-                            if (ORDER[k]) {
+                            if (ORDER[k] && !selfClick) {
                                 st.set("tab", k);
                                 setMode(page, k === "overview" ? "overview" : "other");
                                 NL._kick();
@@ -13299,8 +13308,15 @@ nxtSnap | 92_gl_task_data | retired
                             const o = gameTab(modBtn.parentElement || nav, "overview");
                             st.set("tab", "modules");
                             setMode(page, "modules");
-                            if (o && !o.classList.contains("active"))
-                                o.click();
+                            if (o && !o.classList.contains("active")) {
+                                selfClick = true;
+                                try {
+                                    o.click();
+                                }
+                                finally {
+                                    selfClick = false;
+                                }
+                            }
                             NL._kick();
                         });
                         modCb = lvBox(() => st.get("mlv", true) !== false, (v) => st.set("mlv", v));
@@ -13320,20 +13336,40 @@ nxtSnap | 92_gl_task_data | retired
                     crewCb.lab.style.setProperty("--nl2-ldo", ORDER.crew + 1);
                     modCb.sync();
                     crewCb.sync();
-                    const active = [ov, pk, cr].find((b) => b && b.classList.contains("active"));
-                    const ak = active ? txt(active).toLowerCase() : "";
+                    const pan = page.querySelector(".leadership-tab-panel");
+                    let ak = pan ? (["overview", "perks", "crew"].find((k) => pan.classList.contains(k)) || "") : "";
+                    if (!ak) {
+                        const active = [ov, pk, cr].find((b) => b && (b.classList.contains("active") || b.getAttribute("aria-selected") === "true" || b.hasAttribute("aria-current")));
+                        ak = active ? txt(active).toLowerCase() : "";
+                    }
+                    if (!ak && pan && pan.querySelector(".leadership-fitting-layout, .leadership-bonus-list, .leadership-loadout-list"))
+                        ak = "overview";
                     if (restored !== page) {
                         restored = page;
                         const want = st.get("tab", "overview");
                         if (want === "modules") {
                             setMode(page, "modules");
-                            if (ov && ak !== "overview")
-                                ov.click();
+                            if (ov && ak !== "overview") {
+                                selfClick = true;
+                                try {
+                                    ov.click();
+                                }
+                                finally {
+                                    selfClick = false;
+                                }
+                            }
                         }
                         else if (want !== ak && ORDER[want]) {
                             const b = gameTab(nav, want);
-                            if (b)
-                                b.click();
+                            if (b) {
+                                selfClick = true;
+                                try {
+                                    b.click();
+                                }
+                                finally {
+                                    selfClick = false;
+                                }
+                            }
                             setMode(page, want === "overview" ? "overview" : "other");
                         }
                         else
@@ -13370,6 +13406,7 @@ nxtSnap | 92_gl_task_data | retired
                         return "combat";
                     return "other";
                 };
+                const scKey = (t) => { t = String(t).toLowerCase(); return /empire/.test(t) ? "empire" : /fleet/.test(t) ? "fleet" : /planet/.test(t) ? "planet" : /operation/.test(t) ? "operation" : /vessel/.test(t) ? "vessel" : "other"; };
                 let bonBox = null;
                 const overview = (page) => {
                     for (const g of page.querySelectorAll(".leadership-fitting-side > .leadership-stat-group")) {
@@ -13399,7 +13436,7 @@ nxtSnap | 92_gl_task_data | retired
                         if (!inC.length)
                             continue;
                         bonBox.append(NL.h("h4", null, cl.toUpperCase()), NL.h("div", { class: "nl2-ldbon-g" }, ...inC.map((r) => {
-                            const row = NL.h("div", null, NL.h("span", null, r.label, r.scope ? NL.h("i", null, r.scope) : null), NL.h("b", null, r.val));
+                            const row = NL.h("div", null, NL.h("span", null, r.label, r.scope ? NL.h("i", { "data-sc": scKey(r.scope) }, r.scope) : null), NL.h("b", null, r.val));
                             if (r.src)
                                 NL.tip(row, r.src);
                             return row;
@@ -13488,7 +13525,7 @@ nxtSnap | 92_gl_task_data | retired
                     mui.q.addEventListener("input", () => setMf("q", mui.q.value));
                     mui.type = NL.h("select", null, NL.h("option", { value: "" }, "All types"), ...SLOTS.map(([k, l]) => NL.h("option", { value: k }, l)));
                     mui.type.addEventListener("change", () => setMf("type", mui.type.value));
-                    mui.grade = NL.h("select", { class: "nl2-ldmod-gr" }, NL.h("option", { value: "" }, "All grades"), ...RAR.slice().reverse().map((g) => NL.h("option", { value: g }, cap(g))));
+                    mui.grade = NL.h("select", { class: "nl2-ldmod-gr" }, NL.h("option", { value: "" }, "All grades"), ...RAR.slice().reverse().map((g) => NL.h("option", { value: g }, gradeT(g))));
                     mui.grade.addEventListener("change", () => setMf("grade", mui.grade.value));
                     mui.seg = NL.h("span", { class: "nl2-ldmod-seg" }, ...[["owned", "Owned"], ["equipped", "Equipped"]].map(([v, l]) => { const b = NL.h("button", { type: "button", "data-v": v }, l); b.addEventListener("click", () => setMf("scope", v)); return b; }));
                     const hi = NL.h("input", { type: "checkbox" });
@@ -13504,9 +13541,9 @@ nxtSnap | 92_gl_task_data | retired
                         id: "ld-mods",
                         top: mtop,
                         cols: [
-                            { k: "slot", l: "Slot", w: 170, cell: (r) => SLOTN[r.slot] || cap(r.slot) },
-                            { k: "name", l: "Module", w: 300, cell: (r) => r.name },
-                            { k: "grade", l: "Grade", w: 140, cell: (r) => (r.rarity ? cap(r.rarity) + (r.level ? " \u00B7 Lv " + r.level : "") : "") },
+                            { k: "slot", l: "Slot", w: 160, cell: (r) => SLOTN[r.slot] || cap(r.slot) },
+                            { k: "name", l: "Module", w: 240, cell: (r) => r.name },
+                            { k: "grade", l: "Grade", w: 140, cell: (r) => gradeT(r.rarity) },
                             { k: "fx", l: "Effects", w: "flex", wrap: true, cell: (r) => NL.h("span", { "data-nl2-ex": "Leader > Module effect pills" }, ...(r.fx || []).map((t) => NL.h("span", { class: "nl2-t-pill nl2-t-pill-info nl2-ldmod-fx" }, t))) },
                             { k: "refit", l: "Refit", w: 70, cell: (r) => r.refit || "" },
                             { k: "rec", l: "Recycle", w: 74, after: true, cell: (r) => recCell(r) },
@@ -13563,12 +13600,15 @@ nxtSnap | 92_gl_task_data | retired
                     const hs = "Hide recycle (" + recN + ")";
                     if (mui.hs.s.textContent !== hs)
                         mui.hs.s.textContent = hs;
-                    const row = (r) => ({ ...r, key: r.id != null ? "m" + r.id : r.key, _r: r, cls: r.empty ? "nl2-ldmod-empty" : null, sortVals: { slot: SLOTI[r.slot], grade: RAR.indexOf(r.rarity) * 100 + (Number(r.level) || 0), name: r.name }, sig: { fx: (r.fx || []).join("|"), rec: [r.id, recOn(r), canRec(r)].join("|") } });
+                    const row = (r) => ({ ...r, key: r.id != null ? "m" + r.id : r.key, _r: r, cls: r.empty ? "nl2-ldmod-empty" : null, sortVals: { slot: SLOTI[r.slot], grade: RAR.indexOf(r.rarity), name: r.name }, sig: { fx: (r.fx || []).join("|"), rec: [r.id, recOn(r), canRec(r)].join("|") } });
                     const nEq = new Set(eq.map((r) => r.slot)).size;
                     MT.update([{ id: "eq", label: "Equipped", count: nEq + "/" + SLOTS.length, rows: eqRows.map(row) }, ...(f.scope === "equipped" ? [] : [{ id: "ne", label: "Not equipped", count: ne.length, rows: ne.map(row) }])]);
                 };
                 const modules = (page) => {
-                    const panel = page.querySelector(".leadership-tab-panel.overview");
+                    const tp = page.querySelector(".leadership-tab-panel");
+                    const panel = tp && (tp.classList.contains("overview") || tp.querySelector(".leadership-loadout-list, .leadership-fitting-layout")) ? tp : null;
+                    if (panel && !panel.hasAttribute("data-nl2-ldpanel"))
+                        panel.setAttribute("data-nl2-ldpanel", "");
                     if (!panel) {
                         if (MT) {
                             try {
@@ -17765,11 +17805,15 @@ nxtSnap | 92_gl_task_data | retired
                     ".research-page[data-nl2-retbl] .research-grid{display:none!important}",
                     ".research-page[data-nl2-retabs] .res-branch-tab[data-nl2-br]{display:none!important}",
                     ".research-page[data-nl2-retbl] .filter-row .chip{display:none!important}",
-                    ".research-page:not([data-nl2-retabs]) .nl2-retab{display:none!important}",
+                    ".research-page:not([data-nl2-retabs]) .nl2-retab,.research-page:not([data-nl2-retabs]) .nl2-retabw{display:none!important}",
                     ".nl2-retv{display:inline-flex;align-items:center;margin:0 10px 0 -4px;cursor:pointer;align-self:center}",
+                    ".nl2-retabw{display:inline-flex;align-items:center;border:1px solid transparent;border-radius:8px;box-sizing:border-box}",
+                    ".nl2-retabw.nl2-on{border-color:rgba(56,189,248,.6);background:rgba(56,189,248,.12)}",
+                    ".research-page .nl2-retabw .res-branch-tab.nl2-retab{border:0!important;background:none!important;padding-right:8px!important}",
+                    ".nl2-retabw .nl2-retv{margin:0 12px 0 0}",
                     ".nl2-retv input{margin:0;width:14px;height:14px;cursor:pointer}",
                     ".nl2-relablow{color:var(--nl2-amber,#fbbf24)!important}",
-                    ".research-page .res-branch-tab.nl2-retab.active{border:1px solid rgba(56,189,248,.6)!important;background:rgba(56,189,248,.12)!important;border-radius:8px!important;color:#e7f6ff!important}",
+                    ".research-page .res-branch-tab.nl2-retab.active{color:#e7f6ff!important}",
                     ".nl2-retb{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:10px;background:rgba(10,16,32,.85);border:1px solid #1f2a40;font-family:Rajdhani,\"Exo 2\",sans-serif;font-size:14px;color:#c9d4e3}",
                     ".nl2-retb th{font-size:12px;font-weight:600;color:#8fa6c8;text-align:left;padding:7px 8px;border-bottom:1px solid #26324c;background:#0f172b;white-space:nowrap}",
                     ".nl2-retb td{padding:6px 8px;border-bottom:1px solid #18223a;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
@@ -18640,7 +18684,7 @@ nxtSnap | 92_gl_task_data | retired
                         window.dispatchEvent(new PopStateEvent("popstate", { state: {} }));
                     }
                 }
-                let box = null, cbx = null, rtab = null;
+                let box = null, cbx = null, rtab = null, rtabw = null;
                 const tvTip = () => NL.tip(box, on ? "disable table view" : "enable table view");
                 const placeBox = () => {
                     if (!box) {
@@ -18653,7 +18697,12 @@ nxtSnap | 92_gl_task_data | retired
                         cbx.checked = on;
                     tvTip();
                     const brs = branchTabs().filter((x) => x.hasAttribute("data-nl2-br"));
-                    const host = on ? rtab : (brs.find((x) => x.classList.contains("active")) || brs[0]);
+                    if (on) {
+                        if (rtabw && rtabw.lastElementChild !== box)
+                            rtabw.appendChild(box);
+                        return;
+                    }
+                    const host = brs.find((x) => x.classList.contains("active")) || brs[0];
                     if (host && host.isConnected && host.nextElementSibling !== box)
                         host.after(box);
                 };
@@ -18672,6 +18721,7 @@ nxtSnap | 92_gl_task_data | retired
                         return;
                     if (!rtab) {
                         rtab = NL.h("button", { class: "res-branch-tab nl2-retab", type: "button" }, "Research");
+                        rtabw = NL.h("span", { class: "nl2-retabw" }, rtab);
                         rtab.addEventListener("click", () => {
                             if (activeBranch())
                                 return;
@@ -18680,11 +18730,13 @@ nxtSnap | 92_gl_task_data | retired
                                 t.click();
                         });
                     }
-                    if (first.previousElementSibling !== rtab)
-                        first.before(rtab);
+                    if (first.previousElementSibling !== rtabw)
+                        first.before(rtabw);
                     const act2 = !!activeBranch();
                     if (rtab.classList.contains("active") !== act2)
                         rtab.classList.toggle("active", act2);
+                    if (rtabw.classList.contains("nl2-on") !== act2)
+                        rtabw.classList.toggle("nl2-on", act2);
                     const ab = activeBranch();
                     if (ab && ctx.store.get("br", null) !== ab)
                         ctx.store.set("br", ab);
@@ -21150,12 +21202,17 @@ nxtSnap | 92_gl_task_data | retired
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"nm\"] > strong[data-nl2-shq-n]::before{content:attr(data-nl2-shq-n);font-size:16px;font-weight:700;color:#fff}",
                         ".shipyard-active[data-nl2-shq-i] > .active-info:not(:has([data-nl2-shq-r=\"left\"])) [data-nl2-shq-r=\"nm\"]{grid-row:1/3}",
                         ".shipyard-active[data-nl2-shq-i] :is([data-nl2-shq-r=\"hg\"],[data-nl2-shq-r=\"ix\"]){display:none!important}",
-                        ".shipyard-active[data-nl2-shq-i] .qol-completion{display:flex!important;grid-column:3/5;grid-row:2;align-items:baseline;gap:10px;min-width:0;overflow:hidden;white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-i] .qol-completion{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;grid-column:3/5;grid-row:2;align-items:baseline!important;justify-content:flex-start!important;gap:10px!important;min-width:0;height:auto!important;margin:0!important;padding:0!important;overflow:hidden;white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-i] .qol-completion > [data-nl2-shq-r]{display:inline-block!important;flex:0 0 auto!important;width:auto!important;margin:0!important;padding:0!important;line-height:1.2!important}",
+                        ".shipyard-queue-section[data-nl2-shq85] > .shipyard-active[data-nl2-shq-i]{min-height:0!important;height:auto!important;padding:8px 12px!important}",
+                        ".shipyard-active[data-nl2-shq-i] > .active-info{min-height:0!important;height:auto!important;margin:0!important;padding:0!important;row-gap:2px!important}",
                         ".shipyard-active[data-nl2-shq-i] .qol-completion > :not([data-nl2-shq-r]){display:none!important}",
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"left\"]{color:#fff;white-space:nowrap}",
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"end\"]{color:var(--nl2-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+                        ".shipyard-active[data-nl2-shq-i] .qol-completion > [data-nl2-shq-r=\"end\"]{flex:0 1 auto!important;min-width:0}",
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"wait\"]{grid-column:4;grid-row:2;justify-self:end;font-size:0!important}",
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"wait\"] *{display:none!important}",
+                        ".shipyard-active[data-nl2-shq-i] > .active-info :is(svg, img, .ui-icon, .game-glyph, [class*=\"glyph\"]):not([data-nl2-shq-r=\"ic\"]):not([data-nl2-shq-r=\"ic\"] *){display:none!important}",
                         ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"wait\"]::before{content:\"Waiting\";font-size:14px;color:var(--nl2-dim)}",
                         ".shipyard-active[data-nl2-shq-i] > .cancel-build-btn{flex:0 0 auto;font-size:0!important;padding:0 4px!important;margin:0!important;border:0!important;background:none!important;min-width:0!important;cursor:pointer}",
                         ".shipyard-active[data-nl2-shq-i] > .cancel-build-btn > *{display:none!important}",
@@ -41003,9 +41060,15 @@ nxtSnap | 92_gl_task_data | retired
             }
             NL.patGame = {
                 rate: (q, el) => {
-                    const r = queue.then(() => { if (el)
-                        owner = el; if (!owner || !owner.isConnected)
-                        return null; lastUse = Date.now(); return rate(q); }).catch(() => null);
+                    const r = queue.then(async () => {
+                        const cur = typeof el === "function" ? await until(() => { const e = el(); return e && e.isConnected ? e : null; }, 3000) : el;
+                        if (cur)
+                            owner = cur;
+                        if (!owner || !owner.isConnected)
+                            return null;
+                        lastUse = Date.now();
+                        return rate(q);
+                    }).catch(() => null);
                     queue = r;
                     return r;
                 },
@@ -44827,11 +44890,9 @@ nxtSnap | 92_gl_task_data | retired
                         exclude: NL.fl416 ? PAT_NO_SHIPS.filter((k) => k !== "hacker_ship") : PAT_NO_SHIPS,
                         cp: null,
                         estMore: NL.fl608 && NL.patGame ? async (st) => {
-                            if (!cfg.ov || !cfg.ov.isConnected)
-                                return { fl608: true, pending: true };
                             const ships = st.ships.filter((x) => st.act[x.key] > 0).map((x) => ({ name: x.name, key: x.key, n: st.act[x.key] }));
                             const seq = (cfg.pgSeq = (cfg.pgSeq || 0) + 1);
-                            const got = NL.patGame.rate({ src: st.src, srcName: (S.planets.find((p) => p.id === st.src) || {}).name, ships, hours: L.hours, coverage: L.coverage }, cfg.ov)
+                            const got = NL.patGame.rate({ src: st.src, srcName: (S.planets.find((p) => p.id === st.src) || {}).name, ships, hours: L.hours, coverage: L.coverage }, () => cfg.ov)
                                 .then((g) => (g ? Object.assign({ fl608: true }, g) : { fl608: true, unavail: true }));
                             got.then((m) => { if (seq !== cfg.pgSeq)
                                 return; st.more = m; if (cfg.pgEl && cfg.pgEl.isConnected)
@@ -52809,13 +52870,14 @@ table.nl2-t-tbl tr.nl2-t-det button,table.nl2-t-tbl .nl2-t-ctl button{height:24p
 table.nl2-t-tbl tr.nl2-t-det button.nl2-t-b-bad,table.nl2-t-tbl .nl2-t-ctl button.nl2-t-b-bad{border-color:rgba(248,113,113,.55);background:rgba(248,113,113,.12);color:var(--nl2-bad,#f87171)}
 table.nl2-t-tbl tr.nl2-t-det button.nl2-t-b-ok,table.nl2-t-tbl .nl2-t-ctl button.nl2-t-b-ok{border-color:rgba(74,222,128,.55);background:rgba(74,222,128,.12);color:var(--nl2-ok,#4ade80)}
 table.nl2-t-tbl td.nl2-t-act>button:disabled{opacity:1;cursor:not-allowed;border-color:#2a3446;background:rgba(120,130,150,.12);color:#6b7686}
-table.nl2-t-tbl tr.nl2-t-sec>td{height:auto;padding:20px 8px 10px;border-left:0;background:none;cursor:pointer;user-select:none;font:700 13px Rajdhani,"Exo 2",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--nl2-t-c)}
+table.nl2-t-tbl tr.nl2-t-sec>td{height:auto;padding:13px 8px 0;border-left:0;border-top:0;border-bottom:0;background:none;cursor:pointer;user-select:none;font:700 13px Rajdhani,"Exo 2",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--nl2-t-c);line-height:34px}
+
 
 table.nl2-t-tbl tr.nl2-t-sec>td{background:linear-gradient(to bottom,transparent calc(100% - 34px),var(--nl2-sec-band,rgba(56,189,248,.16)) calc(100% - 34px))}
-table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-bar{display:inline-block;width:3px;height:14px;margin-right:8px;vertical-align:-2px;background:var(--nl2-t-c);border-radius:1px}
+table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-bar{display:inline-block;width:3px;height:14px;margin-right:8px;vertical-align:middle;background:var(--nl2-t-c);border-radius:1px}
 table.nl2-t-tbl tr.nl2-t-vsp>td{padding:0!important;border:0!important;background:none!important;height:inherit}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-chev{display:inline-block;width:12px;font-size:11px}
-table.nl2-t-tbl tbody:first-of-type>tr.nl2-t-sec:first-child>td{padding-top:12px} 
+table.nl2-t-tbl tbody:first-of-type>tr.nl2-t-sec:first-child>td{padding-top:5px} 
 .nl2-t-slots{display:flex;align-items:center;overflow:hidden;gap:14px}
 .nl2-t-slot{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .nl2-t-slot>svg,.nl2-t-slot>img,.nl2-t-slot>.nl2-t-ic{flex:0 0 auto;width:14px;height:14px;opacity:.7;display:inline-flex}
@@ -52837,6 +52899,8 @@ table.nl2-t-tbl tr.nl2-t-grand>td{font-weight:700;color:#f1f5f9;background:var(-
 
 table.nl2-t-tbl tr.nl2-t-sec.nl2-t-hid>td{color:var(--nl2-dim,#8aa3c0);letter-spacing:.04em}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-ctl{float:right;text-transform:none;letter-spacing:0;font-weight:600;cursor:default}
+table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-ctl:not(.nl2-t-ssort){height:34px;display:flex;align-items:center;gap:6px;line-height:normal}
+table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-ssort{margin-top:7px}
 table.nl2-t-tbl tr.nl2-t-sec>td>.nl2-t-ssort{cursor:pointer;margin-left:10px;padding:0 8px;border:1px solid rgba(56,189,248,.55);border-radius:10px;background:rgba(56,189,248,.12);color:var(--nl2-info,#38bdf8);font:600 12px Rajdhani,"Exo 2",sans-serif;line-height:18px}
 .nl2-t-kept{color:var(--nl2-dim,#8aa3c0);white-space:nowrap}
 table.nl2-t-tbl thead th .nl2-t-ar2{opacity:.4;font-size:.8em}

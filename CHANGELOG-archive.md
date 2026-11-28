@@ -1,5 +1,18 @@
 # Release notes archive
 
+## v0.5.159 · Nov 24, 2026
+
+**✨ New**
+- Market now sits right under Messages in the left menu (GL-417)
+- Command Center > Fleet: a "Highlight under N h" box sets the warning threshold, the Command Vessel box is hidden, and a ★ marks the leader's planet (EM-048, EM-049, EM-050)
+- Gather Fleets lists moons in their own collapsible Moons section (SH-079)
+- Wandering Trader > Modules: a sticky Equipped column and a slot label on each card, with no hover popup (RE-047, RE-048)
+- Mining resource pills each get their own colour, plus a 16x chip (FL-573, FL-575)
+- Genesis Bases: Tunnels column widened, and sectors show short names such as G17, with the full name on hover (FL-568, GL-411)
+
+**🐞 Fixes**
+- Bring missing resources, then picking a hub, fills only the missing resources in Market's Pickup, never every resource (GL-435)
+
 ## v0.5.158 · Nov 24, 2026
 
 **✨ New**

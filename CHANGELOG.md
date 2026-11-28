@@ -2,6 +2,26 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.179 · Nov 28, 2026
+
+**🎨 Look and feel**
+- Section head text is centred in its band, and the band no longer grows or shifts when you expand or collapse a section (GL-488)
+
+**🚀 Shipyard**
+- Queue cards are shorter, with the end time beside the timer (SH-095)
+- A paused queue card has no hourglass (SH-096)
+
+**🔬 Research**
+- The Table View checkbox sits inside the Research tab's outline (RE-056)
+
+**👑 Leader**
+- The page is back to the game's width, and Overview is in two columns: Active Bonuses on the left, Vessel Status and Recent XP on the right (GL-489)
+- Scope tags are colour-coded, effect pills wrap instead of being cut off, and module grades read like "Legendary (4)" (GL-489)
+- Your first click on Modules no longer lands on Overview, on NF2 and S0 (GL-489)
+
+**🛰 PVE**
+- A Capability Readout that opens already filled no longer sticks on "Asking the game…" (FL-612)
+
 ## v0.5.178 · Nov 28, 2026
 
 **🎨 Look and feel**
@@ -234,16 +254,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 **🐞 Fixes**
 - Browser storage no longer fills up on S0. When storage is nearly full at load, the script clears caches it can rebuild from the game, largest first (GL-436)
 - Wandering Trader shows Equipped once instead of three times (RE-050)
-
-## v0.5.159 · Nov 24, 2026
-
-**✨ New**
-- Market now sits right under Messages in the left menu (GL-417)
-- Command Center > Fleet: a "Highlight under N h" box sets the warning threshold, the Command Vessel box is hidden, and a ★ marks the leader's planet (EM-048, EM-049, EM-050)
-- Gather Fleets lists moons in their own collapsible Moons section (SH-079)
-- Wandering Trader > Modules: a sticky Equipped column and a slot label on each card, with no hover popup (RE-047, RE-048)
-- Mining resource pills each get their own colour, plus a 16x chip (FL-573, FL-575)
-- Genesis Bases: Tunnels column widened, and sectors show short names such as G17, with the full name on hover (FL-568, GL-411)
-
-**🐞 Fixes**
-- Bring missing resources, then picking a hub, fills only the missing resources in Market's Pickup, never every resource (GL-435)
