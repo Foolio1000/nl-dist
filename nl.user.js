@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.175
+// @version      0.5.176
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.175", features: [] };
+    const NL = window.__nl2 = { version: "0.5.176", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -3824,7 +3824,7 @@ nxtSnap | 92_gl_task_data | retired
             const free = (k, lv) => (lv || 0) >= 1 && !(p.up && p.up[k]) && !busy[k];
             return { p: free("p", lp), o: free("o", lo) };
         }
-        const MAIN = ["/overview", "/buildings", "/research", "/shipyard", "/fleet", "#moons", "#outposts", "/galaxy", "/command-center", "#core", "/messages", "/market"];
+        const MAIN = ["/overview", "/buildings", "/shipyard", "/research", "/fleet", "#moons", "#outposts", "/galaxy", "/command-center", "#core", "/messages", "/market"];
         const mainKey = (a) => (/^galaxy map$/i.test(labelOf(a)) || /^\/galaxy/.test(pathOf(a)) ? "/galaxy" : pathOf(a));
         const DASH_ORDER = ["tasks", "pve", "pvp", "empire"];
         const OURS = "[data-nx-custom], [data-nl2-menu], [data-nxl]";
@@ -5611,6 +5611,7 @@ nxtSnap | 92_gl_task_data | retired
         const slHolds = (m) => !!m && m.logisticsRouteId == null && !SLOT_FREE_TYPES.includes(m.missionType) && SLOT_ST.includes(m.status);
         const slT = (v) => { const x = v ? Date.parse(v) : NaN; return Number.isFinite(x) ? x : 0; };
         let slList = null, slMax = null, slAt = 0;
+        NL.slData = true;
         let slReading = false, slAgain = false, slReadAt = 0, slCheckTimer = 0, slCheckAt = 0, slDueTimer = 0, slDueAt = 0, slTick = 0;
         let slState = null, slText = "", slHtml = "", slFull = false, slLow = false, slBox = null, slShow = false;
         const slOn = [], slOnRead = [];
@@ -5660,6 +5661,9 @@ nxtSnap | 92_gl_task_data | retired
                     console.warn("[NL slots] onRead", e);
                 }
             }
+            if (NL.slData !== false && NL.data && NL.data.need)
+                return NL.data.need("missions", { since: Date.now() }).finally(() => { slReading = false; if (slAgain)
+                    slRead(); });
             return NL.getJson("/api/fleet/missions").catch(() => { }).finally(() => { slReading = false; if (slAgain)
                 slRead(); });
         }
@@ -6056,6 +6060,8 @@ nxtSnap | 92_gl_task_data | retired
         NL.dlvAllRes = true;
         const DLV_NORMAL = ["ore", "silicates", "hydrogen", "alloys"];
         const IN_NAME = { ore: "Ore", silicates: "Silicates", hydrogen: "Hydrogen", alloys: "Alloys", cryo_ice: "Cryo-Ice", quantum_dust: "Quantum Dust", plasma_core: "Plasma Core", bio_extract: "Bio-Extract", dark_matter: "Dark Matter", antimatter: "Antimatter" };
+        NL.pgData = true;
+        const pgVia = () => NL.pgData !== false && !!(NL.data && NL.data.need);
         let inData = null, inKey = "", inReading = false, inLandTimer = 0, inLandAt = 0, inTickTimer = 0;
         const inShort = (n) => (n < 10000 ? Math.round(n).toLocaleString("en-US") : n < 1000000 ? +(n / 1000).toPrecision(3) + "K" : +(n / 1000000).toPrecision(3) + "M");
         const inTs = (v) => { const t = v ? Date.parse(v) : NaN; return Number.isFinite(t) ? t : 0; };
@@ -6152,7 +6158,10 @@ nxtSnap | 92_gl_task_data | retired
                 return;
             inReading = true;
             try {
-                await NL.getJson("/api/fleet/missions");
+                if (pgVia())
+                    await NL.data.need("missions", { since: Date.now() });
+                else
+                    await NL.getJson("/api/fleet/missions");
             }
             finally {
                 inReading = false;
@@ -7076,7 +7085,10 @@ nxtSnap | 92_gl_task_data | retired
                                     window.dispatchEvent(new CustomEvent("nexus:sfx", { detail: { name: "fleet-launch" } }));
                             }
                             catch (e) { }
-                            setTimeout(() => { NL.getJson("/api/fleet/missions").catch(() => { }); NL.getJson("/api/planets/" + s.sourceId + "/fleet").catch(() => { }); }, 1000);
+                            setTimeout(() => { if (pgVia())
+                                NL.data.need("missions", { since: Date.now() });
+                            else
+                                NL.getJson("/api/fleet/missions").catch(() => { }); NL.getJson("/api/planets/" + s.sourceId + "/fleet").catch(() => { }); }, 1000);
                             const mi = (j && (j.mission || j)) || {}, at = Date.parse(mi.arrivesAt) || (s.est && s.est.travelSec ? Date.now() + s.est.travelSec * 1000 : 0);
                             const clock = at ? new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
                             return { ok: true, message: "Delivery sent to " + ((s.target && s.target.label) || "the target") + (clock ? ", arriving " + clock : "") + "." };
@@ -9787,6 +9799,7 @@ nxtSnap | 92_gl_task_data | retired
     }
     {
         NL.d2Tbl = true;
+        NL.stData = true;
         NL.stationOps = function (ctx, MODE) {
             const OFF = MODE === "off", TAG = OFF ? "o2" : "d2";
             const TABC = OFF ? "nl2-o2-tab" : "nl2-d2-tab", BOXQ = ".nl2-d2[data-nl2-m=\"" + TAG + "\"]", ACT = OFF ? "Reinforce" : "Defend";
@@ -10542,6 +10555,13 @@ nxtSnap | 92_gl_task_data | retired
                 if (wait > 0)
                     await new Promise((r) => setTimeout(r, wait));
                 lastRead = Date.now();
+                if (path === "/api/fleet/missions" && NL.stData !== false && NL.data && NL.data.need) {
+                    const r = await NL.data.need("missions", { since: Date.now() });
+                    if (r && r.fresh)
+                        return r.data;
+                    if (!isUser)
+                        return r ? r.data : null;
+                }
                 return NL.getJson(path, isUser ? userNet() : /^\/api\/station-operations\/intel\?/.test(path) ? intelCtx : ctx);
             }
             async function load(force, isUser) {
@@ -12540,6 +12560,7 @@ nxtSnap | 92_gl_task_data | retired
       .nl2-crone table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:4px;padding-bottom:4px}
       .nl2-crone td input.nl2-crone-cb{margin:0;width:15px;height:15px;cursor:pointer;vertical-align:middle}
       .nl2-crone td input.nl2-crone-cb:disabled{cursor:not-allowed;opacity:.35}
+      .nl2-crone-err{color:var(--nl2-bad,#f87171);font:600 13px Rajdhani,"Exo 2",sans-serif;white-space:nowrap}
       .nl2-crban{position:absolute;right:20px;bottom:14px;display:flex;align-items:center;gap:8px;white-space:nowrap;font:500 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7);z-index:2}
       .nl2-crban b{color:#f1f5f9;font-weight:600}
       .nl2-crban label{display:inline-flex;align-items:center;gap:6px;margin-left:10px;cursor:pointer}
@@ -12576,6 +12597,7 @@ nxtSnap | 92_gl_task_data | retired
                     paint();
                     return ok;
                 };
+                let asErr = "";
                 const exactAs = (r) => r.id != null && !unBtn(r) && !r.slotted && (mods[r.k] || []).length > 1;
                 const equip = async (r) => {
                     if (busy)
@@ -12596,6 +12618,8 @@ nxtSnap | 92_gl_task_data | retired
                         return;
                     }
                     console.warn("[NL] gl-crew-one: equip failed", r.id, res && res.status);
+                    asErr = "Assign failed";
+                    setTimeout(() => { asErr = ""; paint(); }, 8000);
                     paint();
                 };
                 const refresh = () => {
@@ -12703,7 +12727,8 @@ nxtSnap | 92_gl_task_data | retired
                     }));
                     const cb = (k, txt) => { const i = NL.h("input", { type: "checkbox" }); i.addEventListener("change", () => setF(k, i.checked)); const s = NL.h("span", null, txt); return { lab: NL.h("label", null, i, s), i, s }; };
                     ui.hs = cb("hideSold", "Hide sell");
-                    top.append(ui.h2, ui.q, ui.role, ui.grade, ui.seg, ui.hs.lab);
+                    ui.err = NL.h("span", { class: "nl2-crone-err" });
+                    top.append(ui.h2, ui.err, ui.q, ui.role, ui.grade, ui.seg, ui.hs.lab);
                 };
                 const sellCell = (r) => {
                     if (r.id == null)
@@ -12844,7 +12869,7 @@ nxtSnap | 92_gl_task_data | retired
                     rowsShown = rowsAll.filter((r) => shown(r, o));
                     rowsShown.sort((a, b) => (GR[b.grade] || 0) - (GR[a.grade] || 0) || a.name.localeCompare(b.name) || (a.k > b.k ? 1 : a.k < b.k ? -1 : 0) || a.i - b.i);
                     const usedK = new Set();
-                    T.update(rowsShown.map((r) => {
+                    const toRow = (r) => {
                         let rk = r.k + "#" + (r.id != null ? r.id : "c" + r.i);
                         while (usedK.has(rk))
                             rk += "+";
@@ -12857,7 +12882,19 @@ nxtSnap | 92_gl_task_data | retired
                             tips: { name: r.full !== r.name ? r.full : "" },
                             sig: { fx: r.fx.join("|"), sell: [r.id, sold(r), canSell(r)].join("|"), role: r.role + (liveCnt[r.role] || 0) },
                         };
-                    }));
+                    };
+                    const chip = sec.querySelector(".leadership-panel-chip"), sm = chip && /(\d+)\s*\/\s*(\d+)/.exec(chip.textContent || "");
+                    const nAs = rowsAll.filter((r) => r.slotted).length;
+                    const secs = [
+                        { id: "as", label: "Assigned", count: sm ? nAs + "/" + sm[2] : nAs, rows: rowsShown.filter((r) => r.slotted).map(toRow) },
+                        { id: "un", label: "Unassigned", count: rowsShown.filter((r) => !r.slotted && !r.unowned).length, rows: rowsShown.filter((r) => !r.slotted && !r.unowned).map(toRow) },
+                    ];
+                    const nOwn = rowsShown.filter((r) => r.unowned);
+                    if (nOwn.length)
+                        secs.push({ id: "no", label: "Not owned", count: nOwn.length, rows: nOwn.map(toRow) });
+                    if (ui.err && ui.err.textContent !== asErr)
+                        ui.err.textContent = asErr;
+                    T.update(secs);
                 };
                 NL.watch(".leadership-crew-roster", (sec) => {
                     const on = tvOn();
@@ -12876,7 +12913,12 @@ nxtSnap | 92_gl_task_data | retired
                         scopeBack(sec);
                     }
                     layout(sec, on);
-                    banner(sec, on);
+                    if (NL._ldOn && NL._ldOn()) {
+                        if (ban)
+                            ban.remove();
+                    }
+                    else
+                        banner(sec, on);
                     if (on)
                         paint();
                 });
@@ -12933,6 +12975,558 @@ nxtSnap | 92_gl_task_data | retired
             };
             NL.forPlanet = (list, id, key) => (Array.isArray(list) && id != null ? list.filter((x) => x && x[key || "planetId"] != null && Number(x[key || "planetId"]) === Number(id)) : []);
         }
+    }
+    {
+        NL.leaderPage = true;
+        NL.feature({
+            id: "gl-leader",
+            set: "Global",
+            name: "Leader page layout",
+            desc: "Leader page: slim header with free-slot counts, tabs on the left with Modules, Overview widgets full width with sectioned bonuses, and a Modules table with Recycle boxes.",
+            init(ctx) {
+                if (NL.leaderPage === false || !(NL.table && NL.table.mount))
+                    return;
+                const st = ctx.store, tvSt = NL.store("gl-crew-table.");
+                NL._ldOn = () => NL.leaderPage !== false;
+                const fiberKey = (el) => { const k = Object.keys(el).find((x) => x.startsWith("__reactFiber")); const fb = k && el[k]; return fb && fb.key != null ? String(fb.key) : ""; };
+                const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
+                const txt = (el) => (el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "");
+                const SLOTS = [["specialization", "Specialization System"], ["weapon", "Weapon"], ["engine", "Engine"], ["armor", "Armor"], ["shield", "Shields"], ["sensor", "Sensors"], ["auxiliary", "Auxiliary System"]];
+                const SLOTN = Object.fromEntries(SLOTS), SLOTI = Object.fromEntries(SLOTS.map(([k], i) => [k, i]));
+                const RAR = ["common", "uncommon", "rare", "epic", "legendary"];
+                let L = null, marked = new Set(), elig = new Map(), marksAt = 0;
+                NL.onData(/^\/api\/leadership(\?|$)/, (p, d) => { if (d && d.vessel) {
+                    L = d;
+                    NL._kick();
+                } });
+                NL.onData(/^\/api\/artifacts\/inventory-marks\?(.*&)?kind=module(&|$)/, (p, d, at) => {
+                    if (!d)
+                        return;
+                    marked = new Set((d.markedIds || []).map(Number));
+                    elig = new Map((d.eligible || []).map((e) => [Number(e.id), e]));
+                    marksAt = at || Date.now();
+                    NL._kick();
+                });
+                NL.css("gl-leader", `
+      .leadership-page[data-nl2-ld]{max-width:none!important;width:100%!important}
+      .leadership-page[data-nl2-ld] .leadership-portrait-stage,.leadership-page[data-nl2-ld] .leadership-breadcrumb,
+      .leadership-page[data-nl2-ld] .leadership-title-row,.leadership-page[data-nl2-ld] .leadership-identity-pills,
+      .leadership-page[data-nl2-ld] .leadership-activity-strip{display:none!important}
+      .leadership-page[data-nl2-ld] .leadership-command-shell{position:relative}
+      .leadership-page[data-nl2-ld] .leadership-identity-main{display:flex;flex-direction:column}
+      .nl2-ldh{order:-1;margin-bottom:8px}
+      .nl2-ldh-r1{display:flex;align-items:baseline;gap:10px}
+      .nl2-ldh-r1 b{font:700 34px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
+      .nl2-ldh-r1 span{font:600 20px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-amber,#fbbf24)}
+      .nl2-ldh-r2{margin-top:2px;font:500 15px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
+      .nl2-ldh-r2 .nl2-ldh-st,.nl2-ldh-r2 .nl2-ldh-t{color:var(--nl2-amber,#fbbf24);font-weight:600}
+      .nl2-ldh-r2 .nl2-ldh-t{font-variant-numeric:tabular-nums;margin-left:6px}
+      .nl2-ldh-cnt{position:absolute;top:18px;right:20px;font:500 15px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-head,#8fb3d9);white-space:nowrap}
+      .nl2-ldh-cnt b{color:var(--nl2-text,#d9e6f7);font-weight:600}
+      .nl2-ldh-cnt b.nl2-ldh-open{color:var(--nl2-amber,#fbbf24)}   
+      .leadership-page[data-nl2-ld] nav.leadership-tabs{justify-content:flex-start!important}
+      .leadership-page[data-nl2-ld] nav.leadership-tabs>[data-nl2-ldo]{order:var(--nl2-ldo)}
+      .leadership-page[data-nl2-ld] nav.leadership-tabs>button[data-nl2-ldoff]{background:none!important;border-color:transparent!important;box-shadow:none!important;color:inherit!important}
+      nav.leadership-tabs>button[data-nl2-ldoff]::after,nav.leadership-tabs>button[data-nl2-ldoff]::before{display:none!important}
+      .nl2-ldcb{display:inline-flex;align-items:center;margin:0 10px 0 -2px;cursor:pointer}
+      .nl2-ldcb input{margin:0;width:14px;height:14px;cursor:pointer}
+      .leadership-page[data-nl2-ldm=overview] .leadership-fitting-main{display:none!important}
+      .leadership-page[data-nl2-ldm=overview] .leadership-fitting-layout{display:block!important}
+      .leadership-page[data-nl2-ldm=overview] .leadership-fitting-side{display:flex!important;flex-direction:column;gap:12px;width:100%!important;max-width:none!important}
+      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=vs]{order:1}
+      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=xp]{order:2}
+      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=bon]{order:3}
+      .leadership-page[data-nl2-ldm=overview] [data-nl2-ldg=hide]{display:none!important}
+      [data-nl2-ldg=vs] .leadership-stat-group-body{display:flex!important;flex-wrap:wrap;gap:6px 26px;align-items:baseline}
+      [data-nl2-ldg=vs] .leadership-repair-control{display:contents!important}
+      [data-nl2-ldg=vs] .leadership-stat-line{display:inline-flex!important;gap:6px;align-items:baseline;padding:0!important;border:0!important;background:none!important;min-width:0!important;width:auto!important}
+      [data-nl2-ldg=vs] .leadership-stat-line>.ui-icon,[data-nl2-ldg=vs] .leadership-stat-line>img{display:none!important}
+      [data-nl2-ldg=vs] .leadership-stat-line>span:not(.ui-icon){order:-1;color:var(--nl2-head,#8fb3d9)}
+      [data-nl2-ldg=vs] .leadership-stat-line>strong{color:var(--nl2-text,#d9e6f7);font-weight:600}
+      [data-nl2-ldg=vs] .leadership-muted{flex-basis:100%}
+      [data-nl2-ldg=xp] .leadership-xp-list{display:flex!important;flex-wrap:wrap;gap:6px 26px}
+      [data-nl2-ldg=xp] .leadership-xp-row{display:inline-flex!important;gap:6px;align-items:baseline;padding:0!important;border:0!important;background:none!important;width:auto!important}
+      [data-nl2-ldg=xp] .leadership-xp-row>span{color:var(--nl2-head,#8fb3d9)}
+      [data-nl2-ldg=xp] .leadership-xp-row>strong{color:var(--nl2-ok,#4ade80);font-weight:600}
+      [data-nl2-ldg=bon] .leadership-bonus-list{display:none!important}
+      .nl2-ldbon h4{margin:10px 0 4px;padding-left:7px;border-left:3px solid var(--nl2-info,#38bdf8);font:700 13px Rajdhani,"Exo 2",sans-serif;letter-spacing:.06em;color:var(--nl2-info,#38bdf8)}
+      .nl2-ldbon h4:first-child{margin-top:2px}
+      .nl2-ldbon-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:2px 16px}
+      .nl2-ldbon-g>div{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.05);padding:3px 0;font:500 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
+      .nl2-ldbon-g>div>span{display:flex;align-items:center;gap:6px;min-width:0}
+      .nl2-ldbon-g i{font-style:normal;padding:0 5px;border:1px solid rgba(138,163,192,.4);border-radius:4px;font-size:11px;color:var(--nl2-dim,#8aa3c0);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+      .nl2-ldbon-g b{color:var(--nl2-text,#d9e6f7);font-weight:600;white-space:nowrap}   
+      .leadership-page:not([data-nl2-ldm=modules]) .nl2-ldmod{display:none!important}
+      .leadership-page[data-nl2-ldm=modules][data-nl2-ldlv] .leadership-fitting-layout{display:none!important}
+      .leadership-page[data-nl2-ldm=modules]:not([data-nl2-ldlv]) .nl2-ldmod{display:none!important}
+      .leadership-page[data-nl2-ldm=modules]:not([data-nl2-ldlv]) .leadership-fitting-side{display:none!important}
+      .leadership-page[data-nl2-ldm=modules]:not([data-nl2-ldlv]) .leadership-fitting-layout{display:block!important}
+      .nl2-ldmod{margin-top:12px}
+      .nl2-ldmod-top{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;padding:4px 0 10px}
+      .nl2-ldmod-top h2{margin:0 auto 0 0;font:700 22px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7);white-space:nowrap}
+      .nl2-ldmod-top input[type=text],.nl2-ldmod-top select{height:28px}
+      .nl2-ldmod-top input[type=text],.nl2-ldmod-top select{width:170px}
+      .nl2-ldmod-top select.nl2-ldmod-gr{width:130px}
+      .nl2-ldmod-top label{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;font:500 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
+      .nl2-ldmod-top label input{margin:0;cursor:pointer}
+      .nl2-ldmod-seg{display:inline-flex;border:1px solid rgba(120,200,255,.25);border-radius:6px;overflow:hidden}
+      .nl2-ldmod-seg>button{height:26px;padding:0 10px;border:0;background:none;color:var(--nl2-text,#d9e6f7);font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer}
+      .nl2-ldmod-seg>button[data-on]{background:rgba(56,189,248,.18);color:var(--nl2-info,#38bdf8)}
+      .nl2-t-pill.nl2-ldmod-fx{margin:2px 4px 2px 0;max-width:none}
+      .nl2-ldmod table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:4px;padding-bottom:4px}
+      .nl2-ldmod tr.nl2-ldmod-empty td{color:var(--nl2-dim,#8aa3c0)}
+      .nl2-ldmod td input.nl2-ldmod-cb{margin:0;width:15px;height:15px;cursor:pointer;vertical-align:middle}
+      .nl2-ldmod td input.nl2-ldmod-cb:disabled{cursor:not-allowed;opacity:.35}
+      .nl2-ldmod-err{color:var(--nl2-bad,#f87171);font:600 13px Rajdhani,"Exo 2",sans-serif;white-space:nowrap}
+    `);
+                let hdr = null, stObs = null, stEl = null;
+                const statusText = (strip) => {
+                    const parts = [...strip.children].map((c) => txt(c)).filter(Boolean);
+                    return parts;
+                };
+                const paintStatus = () => {
+                    if (!hdr || !stEl)
+                        return;
+                    const parts = statusText(stEl), r2 = hdr.querySelector(".nl2-ldh-r2");
+                    const sig = parts.join("|");
+                    if (r2.dataset.sig === sig)
+                        return;
+                    r2.dataset.sig = sig;
+                    r2.textContent = "";
+                    const timeRe = /^(\d+[dhms]\s*)+$/;
+                    const last = parts.length > 1 && timeRe.test(parts[parts.length - 1]) ? parts.pop() : null;
+                    parts.forEach((p, i) => { if (i)
+                        r2.append(" \u00B7 "); r2.append(i === 0 ? NL.h("span", { class: "nl2-ldh-st" }, p) : p); });
+                    if (last)
+                        r2.append(NL.h("span", { class: "nl2-ldh-t" }, last));
+                };
+                const header = (page) => {
+                    const main = page.querySelector(".leadership-identity-main"), shell = page.querySelector(".leadership-command-shell");
+                    if (!main || !shell)
+                        return;
+                    if (!hdr)
+                        hdr = NL.h("div", { class: "nl2-ldh" }, NL.h("div", { class: "nl2-ldh-r1" }, NL.h("b"), NL.h("span")), NL.h("div", { class: "nl2-ldh-r2" }));
+                    if (hdr.parentElement !== main)
+                        main.appendChild(hdr);
+                    let cnt = shell.querySelector(":scope > .nl2-ldh-cnt");
+                    if (!cnt) {
+                        cnt = NL.h("div", { class: "nl2-ldh-cnt" });
+                        shell.appendChild(cnt);
+                    }
+                    const v = L && L.vessel;
+                    const pills = [...page.querySelectorAll(".leadership-identity-pills > span")];
+                    const name = (v && v.callsign) || (pills[1] ? txt(pills[1]) : "");
+                    const lvT = txt(page.querySelector(".leadership-title-row > strong")) || (v && v.level ? "Level " + v.level : "");
+                    const r1 = hdr.querySelector(".nl2-ldh-r1");
+                    if (r1.firstChild.textContent !== name)
+                        r1.firstChild.textContent = name;
+                    if (r1.lastChild.textContent !== lvT)
+                        r1.lastChild.textContent = lvT.replace(/\s+/g, " ");
+                    const strip = page.querySelector(".leadership-activity-strip");
+                    if (strip !== stEl) {
+                        if (stObs)
+                            stObs.disconnect();
+                        stEl = strip;
+                        stObs = null;
+                        if (strip) {
+                            stObs = new MutationObserver(paintStatus);
+                            stObs.observe(strip, { subtree: true, childList: true, characterData: true });
+                        }
+                    }
+                    paintStatus();
+                    if (L && v) {
+                        const total = Number((L.respec && L.respec.totalTalentPoints) || 0), un = Number(v.unspentTalentPoints || 0);
+                        const mods = L.modules || [];
+                        const slots = 1 + Math.max(0, Math.floor(Number(v.level) || 0));
+                        const crew = mods.filter((m) => /^crew_\d+$/.test(String(m.slot || "")) && m.equipped !== false).length;
+                        const eqm = new Set(mods.filter((m) => m.equipped && SLOTN[m.slot]).map((m) => m.slot)).size;
+                        const items = [["Perks", Math.max(0, total - un) + "/" + (total || "?"), un > 0], ["Crew", crew + "/" + slots, crew < slots], ["Modules", eqm + "/" + SLOTS.length, eqm < SLOTS.length]];
+                        const sig = JSON.stringify(items);
+                        if (cnt.dataset.sig !== sig) {
+                            cnt.dataset.sig = sig;
+                            cnt.textContent = "";
+                            items.forEach(([l, n, open], i) => {
+                                if (i)
+                                    cnt.append(" \u00B7 ");
+                                const b = NL.h("b", { class: open ? "nl2-ldh-open" : null }, n);
+                                if (open)
+                                    NL.tip(b, l === "Perks" ? "A perk point to spend" : l === "Crew" ? "A crew slot is open" : "A module slot is empty");
+                                cnt.append(l + " ", b);
+                            });
+                        }
+                    }
+                };
+                let mode = "overview", modBtn = null, modCb = null, crewCb = null, restored = null;
+                const ORDER = { overview: 10, perks: 20, modules: 30, crew: 40 };
+                const gameTab = (nav, name) => [...nav.children].find((b) => b.tagName === "BUTTON" && !b.classList.contains("nl2-ldtab") && txt(b).toLowerCase() === name);
+                const lvBox = (get, set) => {
+                    const i = NL.h("input", { type: "checkbox" }), lab = NL.h("label", { class: "nl2-ldcb" }, i);
+                    const tipNow = () => NL.tip(lab, i.checked ? "disable list view" : "enable list view");
+                    i.checked = get();
+                    tipNow();
+                    i.addEventListener("click", (e) => e.stopPropagation());
+                    i.addEventListener("change", () => { set(i.checked); tipNow(); NL._kick(); });
+                    lab.addEventListener("click", (e) => e.stopPropagation());
+                    return { lab, i, sync() { if (i.checked !== get()) {
+                            i.checked = get();
+                            tipNow();
+                        } } };
+                };
+                const setMode = (page, m) => {
+                    mode = m;
+                    if (page.getAttribute("data-nl2-ldm") !== m)
+                        page.setAttribute("data-nl2-ldm", m);
+                };
+                const tabs = (page) => {
+                    const nav = page.querySelector("nav.leadership-tabs");
+                    if (!nav)
+                        return;
+                    const ov = gameTab(nav, "overview"), pk = gameTab(nav, "perks"), cr = gameTab(nav, "crew");
+                    for (const [b, k] of [[ov, "overview"], [pk, "perks"], [cr, "crew"]])
+                        if (b && b.getAttribute("data-nl2-ldo") !== k) {
+                            b.setAttribute("data-nl2-ldo", k);
+                            b.style.setProperty("--nl2-ldo", ORDER[k]);
+                        }
+                    if (!nav.dataset.nl2Ld) {
+                        nav.dataset.nl2Ld = "1";
+                        nav.addEventListener("click", (e) => {
+                            const b = e.target.closest("button");
+                            if (!b || b.classList.contains("nl2-ldtab") || b.parentElement !== nav)
+                                return;
+                            const k = txt(b).toLowerCase();
+                            if (ORDER[k]) {
+                                st.set("tab", k);
+                                setMode(page, k === "overview" ? "overview" : "other");
+                                NL._kick();
+                            }
+                        }, true);
+                    }
+                    if (!modBtn) {
+                        modBtn = NL.h("button", { type: "button", class: "nl2-ldtab" }, "Modules");
+                        modBtn.addEventListener("click", () => {
+                            const o = gameTab(modBtn.parentElement || nav, "overview");
+                            st.set("tab", "modules");
+                            setMode(page, "modules");
+                            if (o && !o.classList.contains("active"))
+                                o.click();
+                            NL._kick();
+                        });
+                        modCb = lvBox(() => st.get("mlv", true) !== false, (v) => st.set("mlv", v));
+                        crewCb = lvBox(() => tvSt.get("tv", true) !== false, (v) => tvSt.set("tv", v));
+                    }
+                    if (modBtn.parentElement !== nav)
+                        nav.appendChild(modBtn);
+                    if (modCb.lab.parentElement !== nav)
+                        nav.appendChild(modCb.lab);
+                    if (crewCb.lab.parentElement !== nav)
+                        nav.appendChild(crewCb.lab);
+                    modBtn.setAttribute("data-nl2-ldo", "modules");
+                    modBtn.style.setProperty("--nl2-ldo", ORDER.modules);
+                    modCb.lab.setAttribute("data-nl2-ldo", "mcb");
+                    modCb.lab.style.setProperty("--nl2-ldo", ORDER.modules + 1);
+                    crewCb.lab.setAttribute("data-nl2-ldo", "ccb");
+                    crewCb.lab.style.setProperty("--nl2-ldo", ORDER.crew + 1);
+                    modCb.sync();
+                    crewCb.sync();
+                    const active = [ov, pk, cr].find((b) => b && b.classList.contains("active"));
+                    const ak = active ? txt(active).toLowerCase() : "";
+                    if (restored !== page) {
+                        restored = page;
+                        const want = st.get("tab", "overview");
+                        if (want === "modules") {
+                            setMode(page, "modules");
+                            if (ov && ak !== "overview")
+                                ov.click();
+                        }
+                        else if (want !== ak && ORDER[want]) {
+                            const b = gameTab(nav, want);
+                            if (b)
+                                b.click();
+                            setMode(page, want === "overview" ? "overview" : "other");
+                        }
+                        else
+                            setMode(page, ak === "overview" ? "overview" : "other");
+                    }
+                    else if (ak !== "overview" && mode !== "other")
+                        setMode(page, "other");
+                    else if (ak === "overview" && mode === "other")
+                        setMode(page, "overview");
+                    const onMods = mode === "modules";
+                    modBtn.classList.toggle("active", onMods);
+                    if (ov) {
+                        if (onMods)
+                            ov.setAttribute("data-nl2-ldoff", "");
+                        else
+                            ov.removeAttribute("data-nl2-ldoff");
+                    }
+                    const lv = st.get("mlv", true) !== false;
+                    if (lv)
+                        page.setAttribute("data-nl2-ldlv", "");
+                    else
+                        page.removeAttribute("data-nl2-ldlv");
+                };
+                const CATS = [["combat", "Combat"], ["travel", "Fleet and travel"], ["econ", "Economy"], ["pve", "Exploration and PVE"], ["other", "Other"]];
+                const catOf = (label) => {
+                    const s = String(label || "").toLowerCase();
+                    if (/survey|expedition|salvage|asteroid|mining|yield|rogue|pirate|loot|\bxp\b|experience|exploration|wormhole|debris|derelict|anomal/.test(s))
+                        return "pve";
+                    if (/refit|repair|research|production|construct|build|\blab\b|upkeep|credit|market|storage|hiring|trade|income|effectiveness/.test(s))
+                        return "econ";
+                    if (/fuel|cargo|speed|travel|flight|warp|jump/.test(s))
+                        return "travel";
+                    if (/attack|damage|shield|armou?r|hull|evasion|accuracy|rapid fire|defen|weapon|critical|resist|stealth|jamm|initiative|precision|sensor/.test(s))
+                        return "combat";
+                    return "other";
+                };
+                let bonBox = null;
+                const overview = (page) => {
+                    for (const g of page.querySelectorAll(".leadership-fitting-side > .leadership-stat-group")) {
+                        const t = txt(g.querySelector(".leadership-stat-group-head > span")).toLowerCase();
+                        const k = g.classList.contains("leadership-bonus-summary") || t === "active bonuses" ? "bon" : t === "vessel status" ? "vs" : t === "recent xp" ? "xp" : (t === "navigation" || t === "next level") ? "hide" : "";
+                        if (k && g.getAttribute("data-nl2-ldg") !== k)
+                            g.setAttribute("data-nl2-ldg", k);
+                    }
+                    const bon = page.querySelector("[data-nl2-ldg=bon]"), list = bon && bon.querySelector(".leadership-bonus-list");
+                    if (!list)
+                        return;
+                    const rows = [...list.querySelectorAll(":scope > .leadership-bonus-row")].map((r) => {
+                        const d = r.querySelector(":scope > div");
+                        return { scope: txt(d && d.querySelector("span")), label: txt(d && d.querySelector("strong")), src: txt(d && d.querySelector("em")), val: txt(r.querySelector(":scope > b")) };
+                    });
+                    const sig = JSON.stringify(rows);
+                    if (!bonBox)
+                        bonBox = NL.h("div", { class: "nl2-ldbon" });
+                    if (bonBox.parentElement !== bon)
+                        bon.appendChild(bonBox);
+                    if (bonBox.dataset.sig === sig)
+                        return;
+                    bonBox.dataset.sig = sig;
+                    bonBox.textContent = "";
+                    for (const [ck, cl] of CATS) {
+                        const inC = rows.filter((r) => catOf(r.label) === ck);
+                        if (!inC.length)
+                            continue;
+                        bonBox.append(NL.h("h4", null, cl.toUpperCase()), NL.h("div", { class: "nl2-ldbon-g" }, ...inC.map((r) => {
+                            const row = NL.h("div", null, NL.h("span", null, r.label, r.scope ? NL.h("i", null, r.scope) : null), NL.h("b", null, r.val));
+                            if (r.src)
+                                NL.tip(row, r.src);
+                            return row;
+                        })));
+                    }
+                };
+                let mhost = null, MT = null, mtop = null, mui = {}, mbusy = false, merr = "";
+                const mf = () => Object.assign({ q: "", type: "", grade: "", scope: "owned", hide: false }, st.get("mf", null) || {});
+                const setMf = (k, v) => { const o = mf(); o[k] = v; st.set("mf", o); mpaint(); };
+                const domRows = (page) => {
+                    const m = new Map();
+                    for (const r of page.querySelectorAll(".leadership-loadout-row")) {
+                        const k = fiberKey(r);
+                        if (!k)
+                            continue;
+                        const copy = r.querySelector(".leadership-loadout-row-copy");
+                        const muted = [...(copy ? copy.querySelectorAll(":scope > .leadership-muted") : [])].map(txt);
+                        const refit = (muted.find((t) => /^refit/i.test(t)) || "").replace(/^refit:?\s*/i, "");
+                        const fx = [...(copy ? copy.querySelectorAll(".leadership-compact-effects > span") : [])].map((s) => { const v = txt(s.querySelector("strong")); const l = txt(s).replace(v, "").trim(); return (v + " " + l).trim(); });
+                        m.set(k, { name: txt(copy && copy.querySelector(":scope > strong")), refit, fx, btn: r.querySelector(":scope > button"), active: r.classList.contains("active") });
+                    }
+                    return m;
+                };
+                const fmtDur = (s) => { s = Math.round(Number(s) || 0); if (!s)
+                    return ""; const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? h + "h" + (m ? " " + m + "m" : "") : m + "m"; };
+                const fxOf = (md) => ((md && md.effects) || []).map((e) => {
+                    const v = Number(e.value) || 0, cost = /cost/i.test(e.label || ""), shown = cost ? -v : v;
+                    const num = e.unit === "percent" ? Math.round(shown * 1000) / 10 + "%" : String(Math.round(shown * 100) / 100);
+                    return (shown >= 0 ? "+" : "") + num + " " + (e.label || "");
+                });
+                const canAct = (r) => !!r.btn && r.btn.isConnected && !r.btn.disabled;
+                const canRec = (r) => r.id != null && !r.equipped && elig.has(r.id) && !mbusy;
+                const recOn = (r) => r.id != null && marked.has(r.id);
+                const markMods = async (ids, on) => {
+                    if (mbusy || !ids.length)
+                        return false;
+                    mbusy = true;
+                    merr = "";
+                    mpaint();
+                    const before = new Set(marked);
+                    for (const id of ids)
+                        on ? marked.add(id) : marked.delete(id);
+                    let ok = true;
+                    try {
+                        const r = await NL.postJson("/api/artifacts/inventory-marks", { kind: "module", marked: !!on, itemIds: ids }, ctx);
+                        ok = !!(r && r.ok);
+                    }
+                    catch (e) {
+                        ok = false;
+                        ctx.err(e);
+                    }
+                    if (!ok) {
+                        marked = before;
+                        merr = "Recycle mark failed";
+                    }
+                    mbusy = false;
+                    const at = Date.now();
+                    try {
+                        window.dispatchEvent(new Event("inventory-marks-changed"));
+                    }
+                    catch (e) { }
+                    setTimeout(() => { if (!(marksAt > at))
+                        NL.getJson("/api/artifacts/inventory-marks?kind=module", ctx); }, 1500);
+                    mpaint();
+                    return ok;
+                };
+                const recCell = (r) => {
+                    if (r.id == null)
+                        return "";
+                    const i = NL.h("input", { type: "checkbox", class: "nl2-ldmod-cb" });
+                    i.checked = recOn(r);
+                    i.disabled = !canRec(r);
+                    i.setAttribute("aria-label", "Recycle " + r.name);
+                    if (r.equipped)
+                        NL.tip(i, "Equipped: unequip first");
+                    else if (!elig.has(r.id) && !mbusy)
+                        NL.tip(i, "The game does not allow this module to be recycled");
+                    i.addEventListener("change", () => { const want = i.checked; markMods([r.id], want).then((ok) => { if (!ok)
+                        i.checked = !want; }); });
+                    return i;
+                };
+                const mBuildTop = () => {
+                    mtop = NL.h("div", { class: "nl2-ldmod-top" });
+                    mui.h2 = NL.h("h2", null, "Modules");
+                    mui.q = NL.h("input", { type: "text", placeholder: "Search modules" });
+                    mui.q.addEventListener("input", () => setMf("q", mui.q.value));
+                    mui.type = NL.h("select", null, NL.h("option", { value: "" }, "All types"), ...SLOTS.map(([k, l]) => NL.h("option", { value: k }, l)));
+                    mui.type.addEventListener("change", () => setMf("type", mui.type.value));
+                    mui.grade = NL.h("select", { class: "nl2-ldmod-gr" }, NL.h("option", { value: "" }, "All grades"), ...RAR.slice().reverse().map((g) => NL.h("option", { value: g }, cap(g))));
+                    mui.grade.addEventListener("change", () => setMf("grade", mui.grade.value));
+                    mui.seg = NL.h("span", { class: "nl2-ldmod-seg" }, ...[["owned", "Owned"], ["equipped", "Equipped"]].map(([v, l]) => { const b = NL.h("button", { type: "button", "data-v": v }, l); b.addEventListener("click", () => setMf("scope", v)); return b; }));
+                    const hi = NL.h("input", { type: "checkbox" });
+                    hi.addEventListener("change", () => setMf("hide", hi.checked));
+                    mui.hs = { i: hi, s: NL.h("span", null, "Hide recycle") };
+                    mui.err = NL.h("span", { class: "nl2-ldmod-err" });
+                    mtop.append(mui.h2, mui.err, mui.q, mui.type, mui.grade, mui.seg, NL.h("label", null, hi, mui.hs.s));
+                };
+                const mMount = (panel) => {
+                    mhost = NL.h("div", { class: "nl2-ldmod" });
+                    mBuildTop();
+                    MT = NL.table.mount(mhost, {
+                        id: "ld-mods",
+                        top: mtop,
+                        cols: [
+                            { k: "slot", l: "Slot", w: 170, cell: (r) => SLOTN[r.slot] || cap(r.slot) },
+                            { k: "name", l: "Module", w: 300, cell: (r) => r.name },
+                            { k: "grade", l: "Grade", w: 140, cell: (r) => (r.rarity ? cap(r.rarity) + (r.level ? " \u00B7 Lv " + r.level : "") : "") },
+                            { k: "fx", l: "Effects", w: "flex", wrap: true, cell: (r) => NL.h("span", { "data-nl2-ex": "Leader > Module effect pills" }, ...(r.fx || []).map((t) => NL.h("span", { class: "nl2-t-pill nl2-t-pill-info nl2-ldmod-fx" }, t))) },
+                            { k: "refit", l: "Refit", w: 70, cell: (r) => r.refit || "" },
+                            { k: "rec", l: "Recycle", w: 74, after: true, cell: (r) => recCell(r) },
+                        ],
+                        actions: { w: 100, list: [{
+                                    k: "eq",
+                                    label: (r) => (r.equipped ? "Unequip" : "Equip"),
+                                    show: (r) => r.id != null && !!r.btn && (r.equipped ? /unequip/i.test(r.btn.textContent || "") : !/unequip/i.test(r.btn.textContent || "")),
+                                    enabled: (r) => canAct(r),
+                                    cls: (r) => (!canAct(r) ? "" : r.equipped ? "nl2-t-b-amber" : "nl2-t-b-ok"),
+                                    tip: (r) => (!canAct(r) ? "The vessel cannot change modules right now" : ""),
+                                    run: (r) => { if (canAct(r))
+                                        r.btn.click(); },
+                                }] },
+                    });
+                    panel.appendChild(mhost);
+                };
+                let mpage = null, mods0 = null;
+                const mpaint = () => {
+                    if (!MT || !mpage)
+                        return;
+                    const f = mf(), dom = domRows(mpage), mods = ((L && L.modules) || []).filter((m) => SLOTN[m.slot]);
+                    if (mui.q.value !== f.q && document.activeElement !== mui.q)
+                        mui.q.value = f.q;
+                    mui.type.value = f.type;
+                    mui.grade.value = f.grade;
+                    mui.hs.i.checked = !!f.hide;
+                    for (const b of mui.seg.children) {
+                        if (b.dataset.v === f.scope)
+                            b.setAttribute("data-on", "");
+                        else
+                            b.removeAttribute("data-on");
+                    }
+                    mui.err.textContent = merr;
+                    const rows = mods.map((m) => {
+                        const d = dom.get(m.key) || {}, md = m.metadata || {};
+                        return { id: Number(m.id), key: m.key, slot: m.slot, rarity: m.rarity, level: m.level, equipped: !!m.equipped, name: d.name || md.title || m.key, fx: d.fx && d.fx.length ? d.fx : fxOf(md), refit: d.refit || fmtDur(md.swapDurationSeconds), btn: d.btn || null };
+                    });
+                    const q = f.q.toLowerCase();
+                    const pass = (r) => (!f.type || r.slot === f.type) && (!f.grade || r.rarity === f.grade) && (!q || (r.name + " " + r.fx.join(" ")).toLowerCase().includes(q)) && !(f.hide && recOn(r));
+                    const eq = rows.filter((r) => r.equipped);
+                    const eqRows = [];
+                    for (const [sk] of SLOTS) {
+                        if (f.type && f.type !== sk)
+                            continue;
+                        const inS = eq.filter((r) => r.slot === sk);
+                        if (inS.length)
+                            inS.filter(pass).forEach((r) => eqRows.push(r));
+                        else if (!q && !f.grade)
+                            eqRows.push({ id: null, key: "empty-" + sk, slot: sk, name: "Empty slot", fx: [], empty: true });
+                    }
+                    const ne = f.scope === "equipped" ? [] : rows.filter((r) => !r.equipped && pass(r)).sort((a, b) => (SLOTI[a.slot] - SLOTI[b.slot]) || (RAR.indexOf(b.rarity) - RAR.indexOf(a.rarity)) || String(a.name).localeCompare(String(b.name)) || a.id - b.id);
+                    const recN = rows.filter(recOn).length;
+                    const hs = "Hide recycle (" + recN + ")";
+                    if (mui.hs.s.textContent !== hs)
+                        mui.hs.s.textContent = hs;
+                    const row = (r) => ({ ...r, key: r.id != null ? "m" + r.id : r.key, _r: r, cls: r.empty ? "nl2-ldmod-empty" : null, sortVals: { slot: SLOTI[r.slot], grade: RAR.indexOf(r.rarity) * 100 + (Number(r.level) || 0), name: r.name }, sig: { fx: (r.fx || []).join("|"), rec: [r.id, recOn(r), canRec(r)].join("|") } });
+                    const nEq = new Set(eq.map((r) => r.slot)).size;
+                    MT.update([{ id: "eq", label: "Equipped", count: nEq + "/" + SLOTS.length, rows: eqRows.map(row) }, ...(f.scope === "equipped" ? [] : [{ id: "ne", label: "Not equipped", count: ne.length, rows: ne.map(row) }])]);
+                };
+                const modules = (page) => {
+                    const panel = page.querySelector(".leadership-tab-panel.overview");
+                    if (!panel) {
+                        if (MT) {
+                            try {
+                                MT.destroy();
+                            }
+                            catch (e) { }
+                        }
+                        if (mhost)
+                            mhost.remove();
+                        MT = null;
+                        mhost = null;
+                        mpage = null;
+                        return;
+                    }
+                    if (!MT || mhost.parentElement !== panel) {
+                        if (MT) {
+                            try {
+                                MT.destroy();
+                            }
+                            catch (e) { }
+                            if (mhost)
+                                mhost.remove();
+                        }
+                        mui = {};
+                        mMount(panel);
+                    }
+                    if (mpage !== page) {
+                        clearTimeout(mods0);
+                        mods0 = null;
+                    }
+                    mpage = page;
+                    if (mode === "modules" && !marksAt && !mods0) {
+                        mods0 = setTimeout(() => { if (!marksAt)
+                            NL.getJson("/api/artifacts/inventory-marks?kind=module", ctx); }, 3000);
+                    }
+                    mpaint();
+                };
+                NL.watch(".leadership-page", (page) => {
+                    if (NL.leaderPage === false)
+                        return;
+                    if (!page.hasAttribute("data-nl2-ld"))
+                        page.setAttribute("data-nl2-ld", "");
+                    header(page);
+                    tabs(page);
+                    if (mode === "overview" || mode === "modules")
+                        overview(page);
+                    modules(page);
+                });
+            },
+        });
     }
     {
         NL.planetPick = true;
@@ -15379,6 +15973,11 @@ nxtSnap | 92_gl_task_data | retired
                 });
             },
         });
+        NL.pageTitle = (page) => {
+            const el = document.querySelector(".planet-switcher-btn .ps-name");
+            const n = el ? el.textContent.replace(/\s*\[[^\]]*\]\s*$/, "").trim() : "";
+            return n ? n + " " + page : page;
+        };
         NL.feature({
             id: "bu-banner",
             set: "Buildings",
@@ -15393,6 +15992,15 @@ nxtSnap | 92_gl_task_data | retired
                     `${H} .bld-stat-chips{margin:0!important}`,
                     `.buildings-page > .nl2-syopts{top:12px!important;bottom:auto!important}`,
                 ].join(""));
+                if (NL.pageTitle479 !== false) {
+                    NL.css("bu-banner-479", [
+                        `${H} .bld-hero-title[data-nl2-pt]{display:block!important;font-size:0!important;margin:0!important;line-height:1;white-space:nowrap}`,
+                        `${H} .bld-hero-title[data-nl2-pt]::before{content:attr(data-nl2-pt);font-size:32px;font-weight:700;color:#fff;line-height:1.15}`,
+                        `${H} > .bld-hero-main{flex:1 1 auto!important}`,
+                        `${H} .bld-stat-chips{margin:0 0 0 auto!important}`,
+                    ].join(""));
+                    NL.watch(H + " .bld-hero-title", (h1) => NL.setAttr(h1, "data-nl2-pt", NL.pageTitle("Buildings")));
+                }
             },
         });
     }
@@ -18131,6 +18739,23 @@ nxtSnap | 92_gl_task_data | retired
                 NL.watch(".shard-trader-grid", eqMount);
             },
         });
+        NL.feature({
+            id: "re-page-title",
+            set: "Research",
+            name: "Research banner title",
+            desc: "GL-479: the Research banner title reads \"<planet> Research\".",
+            init() {
+                if (NL.pageTitle479 === false)
+                    return;
+                const H = ".research-page > .res-hero";
+                NL.css("re-page-title", [
+                    `${H} h1[data-nl2-pt]{font-size:0!important;line-height:1;white-space:nowrap}`,
+                    `${H} h1[data-nl2-pt]::before{content:attr(data-nl2-pt);font-size:32px;font-weight:700;color:#fff;line-height:1.15}`,
+                ].join(""));
+                NL.watch(H + " h1", (h1) => { if (h1 === h1.closest(".res-hero").querySelector("h1"))
+                    NL.setAttr(h1, "data-nl2-pt", NL.pageTitle ? NL.pageTitle("Research") : "Research"); });
+            },
+        });
     }
     {
         NL.shIcon = (() => {
@@ -18330,6 +18955,13 @@ nxtSnap | 92_gl_task_data | retired
                     P40 + " .ship-card.locked>.ship-requirements svg{display:none!important}",
                     P40 + " .ship-card.locked>.ship-requirements .ship-req-warning+.ship-req-warning::before{content:\" \\00b7  \"}",
                     P40 + " .ship-card.locked .ship-locked-badge{grid-column:5!important;grid-row:1!important;justify-self:end!important;align-self:center!important;position:static!important;margin:0!important;width:110px;box-sizing:border-box;justify-content:center;font-size:13px!important}",
+                    ...(NL.sh089 === false ? [] : [
+                        ".shipyard-page[data-nl2-shb] .size-group-header h3{color:var(--nl2-info)!important}",
+                        P40 + " .ship-card[data-nl2-shl-own]::after{justify-self:stretch!important;text-align:right!important}",
+                        P40 + " .ship-costs>[data-nl2-shl-c=\"7\"]{justify-self:stretch!important;justify-content:flex-end!important;text-align:right!important}",
+                        P40 + " .ship-costs>.ship-build-time>:is(svg,img,.ui-icon,.game-glyph,[class*=\"glyph\"]){display:none!important}",
+                        P40 + " .ship-card.locked>.ship-requirements:not(#nl2-sh89){grid-column:4/5!important;text-align:center!important;align-self:center!important;height:22px;line-height:20px!important;border-radius:999px!important;border:1px solid rgba(148,163,184,.45)!important;background:rgba(148,163,184,.12)!important;color:var(--nl2-text)!important;padding:0 10px!important;box-sizing:border-box}",
+                    ]),
                 ].join(""));
                 const box = (key, label) => {
                     const cb = NL.h("input", { type: "checkbox" });
@@ -18362,6 +18994,15 @@ nxtSnap | 92_gl_task_data | retired
                     else if (lab !== bar.lastElementChild)
                         bar.appendChild(lab);
                     lab.firstChild.checked = tvOn("build");
+                });
+                NL.css("sh-filter-088", ".shipyard-page > .shipyard-filters [data-nl2-sh88]{display:none!important}");
+                NL.watch(".shipyard-page > .shipyard-filters", (bar) => {
+                    for (const el of bar.querySelectorAll("label, .shipyard-filter-toggle, [class*=\"available\"]")) {
+                        if (el.classList.contains("nl2-shl-cb") || el.closest(".nl2-shl-cb"))
+                            continue;
+                        const on = NL.shFilter088 !== false && /^\s*available only\s*$/i.test(el.textContent || "");
+                        setAttr(el, "data-nl2-sh88", on ? "" : null);
+                    }
                 });
                 const shCompact = (n) => n < 10000 ? n.toLocaleString("en-US") : n < 100000 ? (n / 1000).toFixed(1) + "K" : n < 1000000 ? Math.round(n / 1000) + "K" : (n / 1000000).toFixed(2) + "M";
                 function shortLabel(sp, col) {
@@ -18735,6 +19376,7 @@ nxtSnap | 92_gl_task_data | retired
                             have[k] = snap[k];
                     return have;
                 };
+                NL.shHave = haveResources;
                 const maxAffordable = (card, qty) => {
                     const have = haveResources();
                     let max = Infinity;
@@ -18802,6 +19444,7 @@ nxtSnap | 92_gl_task_data | retired
                     ".sy-fleet-summary>h3[data-nl2-shd-h]{display:flex;align-items:center;gap:12px}",
                     ".nl2-shd-cb{display:inline-flex;align-items:center;gap:5px;margin-left:auto;font-size:13px;font-weight:500;color:#8a96a6;cursor:pointer;user-select:none;white-space:nowrap;text-transform:none;letter-spacing:0}",
                     ".nl2-shd-cb input{margin:0;cursor:pointer}",
+                    NL.shFleet086 !== false ? ".sy-fleet-summary>h3 .nl2-shd-cb{font:400 14px Rajdhani,\"Exo 2\",sans-serif;color:var(--nl2-onart)}" : "",
                     ".sy-fleet-summary>h3 .nl2-shd-cb~.nl2-shl-cb{margin-left:0}",
                 ].join(""));
                 let path = location.pathname;
@@ -18842,9 +19485,10 @@ nxtSnap | 92_gl_task_data | retired
             id: "sh-banner",
             set: "Shipyard",
             name: "Condensed Shipyard banner",
-            desc: "SH-007: one-line Shipyard banner: shipyard levels, damaged and free workers chips, and the Hide buttons. Drops the title, planet name, ships and in-queue counts.",
+            desc: "SH-007 / SH-084: Shipyard banner: \"<planet> Shipyard\" title, one line with the shipyard levels and free workers, and Table View, Gather Fleets and Hide at the right.",
             init() {
                 const H = ".shipyard-page > .sy-hero";
+                const NEW = NL.shBanner084 !== false;
                 NL.css("sh-banner", [
                     `${H}{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:8px 16px!important;padding:10px 24px!important;min-height:0!important;height:auto!important}`,
                     `${H} > .sy-hero-main{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:8px 16px!important;flex:0 1 auto!important;min-width:0!important}`,
@@ -18854,7 +19498,50 @@ nxtSnap | 92_gl_task_data | retired
                     `${H} .sy-hero-sub > .sy-hero-sep:first-child{display:none!important}`,
                     `${H} .sy-stat-chip[data-nl2-ic="ships"],${H} .sy-stat-chip[data-nl2-ic="queue"]{display:none!important}`,
                     `${H} > .nl2-syopts{position:static!important;margin-left:auto!important;flex-wrap:nowrap!important}`,
-                ].join(""));
+                ].join("") + (!NEW ? "" : [
+                    `${H} > .sy-hero-main{flex-direction:column!important;align-items:flex-start!important;gap:2px!important}`,
+                    `${H} .sy-hero-title[data-nl2-pt]{display:block!important;font-size:0!important;margin:0!important;line-height:1}`,
+                    `${H} .sy-hero-title[data-nl2-pt]::before{content:attr(data-nl2-pt);font-size:32px;font-weight:700;color:#fff;line-height:1.15}`,
+                    `${H} > .sy-hero-main[data-nl2-shb-sl] > .sy-hero-sub{display:none!important}`,
+                    `${H} .nl2-shb-sl{font-size:16.32px;color:var(--nl2-onart);white-space:nowrap}`,
+                    `${H} .nl2-shb-sl b{color:#fff;font-weight:700}`,
+                    `${H} .sy-stat-chips{display:none!important}`,
+                    `${H} > .nl2-tstd-ctl{margin:0 0 0 auto!important;min-height:0!important}`,
+                    `${H} > .nl2-tstd-ctl + .nl2-gf-btn{margin-left:0!important}`,
+                ].join("")));
+                if (NEW) {
+                    const num = (s) => { const m = /(\d[\d,]*)/.exec(s || ""); return m ? m[1] : null; };
+                    NL.watch(H + " > .sy-hero-main", (main) => {
+                        const h1 = main.querySelector(":scope > .sy-hero-title"), sub = main.querySelector(":scope > .sy-hero-sub");
+                        if (!h1 || !sub)
+                            return;
+                        NL.setAttr(h1, "data-nl2-pt", NL.pageTitle ? NL.pageTitle("Shipyard") : "Shipyard");
+                        const parts = [...sub.querySelectorAll(":scope > span:not(.sy-hero-sep)")].map((e) => { const m = /^(.*?)\s*(?:Lv\.?\s*)?(\d[\d,]*)\s*$/i.exec(e.textContent.replace(/\s+/g, " ").trim()); return m ? [m[1] + " ", m[2], ""] : null; }).filter(Boolean);
+                        const crew = [...main.querySelectorAll(".sy-stat-chip")].find((c) => c.getAttribute("data-nl2-ic") === "crew" || /free workers/i.test(c.textContent));
+                        const w = crew && num(crew.textContent);
+                        if (w)
+                            parts.push(["", w, " free workers"]);
+                        let line = main.querySelector(":scope > .nl2-shb-sl");
+                        if (!parts.length) {
+                            if (line)
+                                line.remove();
+                            NL.setAttr(main, "data-nl2-shb-sl", null);
+                            return;
+                        }
+                        const key = JSON.stringify(parts);
+                        if (!line)
+                            line = NL.h("div", { class: "nl2-shb-sl" });
+                        if (line.previousElementSibling !== h1)
+                            h1.insertAdjacentElement("afterend", line);
+                        if (line.getAttribute("data-k") !== key) {
+                            line.setAttribute("data-k", key);
+                            line.textContent = "";
+                            parts.forEach((p, i) => { if (i)
+                                line.appendChild(document.createTextNode(" \u00B7 ")); line.append(p[0], NL.h("b", {}, p[1]), p[2]); });
+                        }
+                        NL.setAttr(main, "data-nl2-shb-sl", "");
+                    });
+                }
                 NL.shIcon.watch();
             },
         });
@@ -18989,7 +19676,8 @@ nxtSnap | 92_gl_task_data | retired
                 const sigOf = (arr) => (Array.isArray(arr) ? arr.map((x) => x.key + ":" + x.s).join(",") : String(arr));
                 function rowsOf(sum) {
                     return [...sum.querySelectorAll(".sy-fleet-cat-section")].map((sec, si) => {
-                        const label = ((sec.querySelector(".sy-fleet-cat-header") || {}).textContent || "").trim();
+                        const label0 = ((sec.querySelector(".sy-fleet-cat-header") || {}).textContent || "").trim();
+                        const label = NL.shFleet086 !== false ? label0.replace(/[\s(·×x]*[\d,]+\)?\s*$/i, "").trim() || label0 : label0;
                         const rows = [...sec.querySelectorAll(".sy-fleet-row")].map((r) => {
                             const nmEl = r.querySelector(".sy-fleet-ship-name"), name = ((nmEl && nmEl.textContent) || "").trim(), alt = keyOfRow(r);
                             const d = defs.get(alt) || byName.get(alt.replace(/_/g, " ")) || byName.get(name.toLowerCase()) || null;
@@ -19006,28 +19694,72 @@ nxtSnap | 92_gl_task_data | retired
                         });
                         const hd = sec.querySelector(".sy-fleet-cat-header");
                         const tone = hd && (hd.getAttribute("data-nl2-tstd-cat") || (hd.querySelector("[data-nl2-tstd-cat]") || { getAttribute: () => null }).getAttribute("data-nl2-tstd-cat")) === "combat" ? "combat" : undefined;
-                        return { id: label.toLowerCase() || "sec" + si, label, tone, rows };
+                        return { id: label.toLowerCase() || "sec" + si, label, tone: NL.shFleet086 !== false ? "sky" : tone, rows };
                     }).filter((s) => s.rows.length);
                 }
                 const visBtn = (b) => !!b && getComputedStyle(b).display !== "none" && !b.hasAttribute("data-nl2-shmt");
                 const PILL = { Planetary: " nl2-t-pill-info", Orbital: " nl2-t-pill-purple" };
                 const COLS = [
                     { k: "name", l: "Ship", w: 160, name: true, cls: "nl2-t-white", cell: (r) => NL.h("span", {}, r.name) },
-                    { k: "count", l: "Count", w: 72, cls: "nl2-t-count" },
+                    { k: "count", l: "Count", w: 72, cls: "nl2-t-count", align: NL.shFleet086 !== false ? "right" : undefined },
                     { k: "stats", l: "Stats", w: 280, slots: [{ k: "hp", l: "HP", icon: "heart" }, { k: "sh", l: "Shield", icon: "shield" }, { k: "at", l: "Attack", icon: "swords" }, { k: "sp", l: "Speed", icon: "gauge" }, { k: "cg", l: "Cargo", icon: "package" }] },
                     { k: "wp", l: "Weapon", w: 68 },
                     { k: "ar", l: "Armor", w: 68 },
-                    { k: "good", l: "Good against", w: "flex", sort: false, cell: (r) => goodBad(r.vals.good, "nl2-t-good") },
-                    { k: "bad", l: "Bad against", w: "flex", sort: false, cell: (r) => goodBad(r.vals.bad, "nl2-t-badv") },
+                    { k: "good", l: "Good against", w: "flex", sort: false, cell: (r) => goodBad(r.vals.good, NL.shFleet086 !== false ? "nl2-t-good nl2-shft-gbp" : "nl2-t-good") },
+                    { k: "bad", l: "Bad against", w: "flex", sort: false, cell: (r) => goodBad(r.vals.bad, NL.shFleet086 !== false ? "nl2-t-badv nl2-shft-gbp" : "nl2-t-badv") },
                     { k: "built", l: "Built at", w: 84, sort: true, cell: (r) => (r.vals.built ? NL.h("span", { class: "nl2-t-pill" + (PILL[r.vals.built] || "") }, r.vals.built) : "\u2014") },
                 ];
                 const ACTIONS = { w: 116, stack: true, list: [
-                        { k: "maint", label: (r) => (r.dmgN ? "Maintain (" + r.dmgN + ")" : "Maintain"), wrap: true, tip: (r) => (r.btn.maint && (r.btn.maint.getAttribute("title") || r.btn.maint.getAttribute("data-tip"))) || "", cls: "nl2-t-b-info", show: (r) => visBtn(r.btn.maint), enabled: (r) => !!r.btn.maint && !r.btn.maint.disabled, run: (r) => clickGame(r, "maint") },
-                        { k: "repair", label: (r) => (r.dmgN ? "Repair (" + r.dmgN + ")" : "Repair"), wrap: true, cls: "nl2-t-b-ok", show: (r) => visBtn(r.btn.repair), enabled: (r) => !!r.btn.repair && !r.btn.repair.disabled, run: (r) => clickGame(r, "repair") },
+                        { k: "maint", label: (r) => (r.dmgN ? "Maintain (" + r.dmgN + ")" : "Maintain"), wrap: true, tip: (r) => [(r.btn.maint && (r.btn.maint.getAttribute("title") || r.btn.maint.getAttribute("data-tip"))) || "", NL.shRepair087 !== false ? "Click: maintain all damaged. Shift-click: open the game's confirm." : ""].filter(Boolean).join("\n"), cls: "nl2-t-b-info", show: (r) => visBtn(r.btn.maint), enabled: (r) => !!r.btn.maint && !r.btn.maint.disabled, run: (r) => clickGame(r, "maint") },
+                        { k: "repair", label: (r) => (r.dmgN ? "Repair (" + r.dmgN + ")" : "Repair"), wrap: true, cls: "nl2-t-b-ok", tip: () => (NL.shRepair087 !== false ? "Click: repair all damaged. Shift-click: open the repair dialog." : ""), show: (r) => visBtn(r.btn.repair), enabled: (r) => !!r.btn.repair && !r.btn.repair.disabled, run: (r) => clickGame(r, "repair") },
                         { k: "scrap", label: "Dismantle", cls: "nl2-t-b-bad", show: (r) => !!r.btn.scrap && !!r.sum && r.sum.hasAttribute("data-nl2-shd"), enabled: (r) => !!r.btn.scrap && !r.btn.scrap.disabled, run: (r) => clickGame(r, "scrap") },
                     ] };
-                function clickGame(r, k) { const b = gameBtn(rowOf(r.sum, r.key), k); if (b && !b.disabled)
-                    b.click(); }
+                function clickGame(r, k) {
+                    const b = gameBtn(rowOf(r.sum, r.key), k);
+                    if (!b || b.disabled)
+                        return;
+                    const one = NL.shRepair087 !== false && (k === "repair" || k === "maint") && !shiftAt.on;
+                    shiftAt.on = false;
+                    b.click();
+                    if (one)
+                        (k === "repair" ? oneRepair : oneMaint)(b).catch((e) => console.warn("[NL] SH-087", e));
+                }
+                const shiftAt = { on: false };
+                document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest(".nl2-shft-host button"); if (b)
+                    shiftAt.on = !!e.shiftKey; }, true);
+                const waitFor = (fn, ms) => new Promise((res) => { const t0 = Date.now(); const tick = () => { const v = fn(); if (v || Date.now() - t0 > ms)
+                    res(v || null);
+                else
+                    setTimeout(tick, 50); }; tick(); });
+                const amtOf = (txt) => { const m = /([\d][\d,.]*)\s*([KMB])?/i.exec(String(txt || "")); return m ? parseFloat(m[1].replace(/,/g, "")) * ({ K: 1000, M: 1000000, B: 1000000000 }[(m[2] || "").toUpperCase()] || 1) : NaN; };
+                const resKey = (t) => String(t || "").toLowerCase().replace(/[^a-z]/g, "");
+                const confirmGame = async () => { const c = await waitFor(() => document.querySelector(".confirm-overlay .confirm-btn-confirm"), 1500); if (c && !c.disabled)
+                    c.click(); };
+                async function oneRepair() {
+                    const dlg = await waitFor(() => document.querySelector(".repair-dialog"), 1500);
+                    if (!dlg)
+                        return;
+                    const inp = dlg.querySelector(".repair-qty-row input"), btn = dlg.querySelector(".repair-actions .build-btn");
+                    if (!inp || !btn || btn.disabled || inp.max === "" || String(inp.value) !== String(inp.max))
+                        return;
+                    const have = NL.shHave ? NL.shHave() : {};
+                    const chips = [...dlg.querySelectorAll(".repair-cost-preview-chip")];
+                    for (const c of chips) {
+                        const img = c.querySelector("img"), k = resKey((img && (img.alt || img.title)) || c.getAttribute("title") || "");
+                        const need = amtOf(c.getAttribute("title") || c.textContent);
+                        if (!k || !(need >= 0) || have[k] == null || have[k] < need)
+                            return;
+                    }
+                    btn.click();
+                    await confirmGame();
+                }
+                async function oneMaint(b) {
+                    const cost = amtOf(((b.getAttribute("title") || "").match(/[\d][\d,.]*\s*[KMB]?/gi) || []).pop());
+                    const have = NL.shHave ? NL.shHave() : {};
+                    if (!(cost >= 0) || have.alloys == null || have.alloys < cost)
+                        return;
+                    await confirmGame();
+                }
                 function drawTable(sum) {
                     const secs = rowsOf(sum);
                     secs.forEach((s) => s.rows.forEach((r) => { r.sum = sum; }));
@@ -19050,7 +19782,7 @@ nxtSnap | 92_gl_task_data | retired
                             sum.prepend(host);
                     }
                     if (!t) {
-                        t = NL.table.mount(host, { id: "shf", cols: COLS, actions: ACTIONS });
+                        t = NL.table.mount(host, { id: "shf", cols: COLS, actions: ACTIONS, zebra: NL.shFleet086 !== false ? true : undefined });
                         cur = { t, host };
                     }
                     t.update(secs);
@@ -19068,6 +19800,7 @@ nxtSnap | 92_gl_task_data | retired
                     setAttr(sum, "data-nl2-shft", null);
                 }
                 NL.css("sh-fleet-tbl", ".sy-fleet-summary[data-nl2-shft]:not(#nl2-shft) > .sy-fleet-cat-section{display:none!important}"
+                    + ".nl2-shft-host .nl2-shft-gbp{color:inherit!important}"
                     + ".nl2-shft-host .nl2-shft-more{color:var(--nl2-dim,#8aa3c0);font-weight:400;cursor:default}.nl2-shft-host .nl2-shft-gb{display:block;overflow:hidden;white-space:nowrap;text-overflow:clip}.nl2-shft-host .nl2-t-good,.nl2-shft-host .nl2-t-badv{font-weight:400}.nl2-shft-host .nl2-t-good b,.nl2-shft-host .nl2-t-badv b{font-weight:700}");
                 NL.watch(".sy-fleet-summary", (sum) => {
                     const tbl = NL.shFleetTbl !== false && NL.table && typeof NL.table.mount === "function" && sum.hasAttribute("data-nl2-shl");
@@ -20107,6 +20840,7 @@ nxtSnap | 92_gl_task_data | retired
             init() {
                 if (NL.shQueueEta === undefined)
                     NL.shQueueEta = true;
+                const Q85 = NL.shQueue085 !== false;
                 const REPAIR_EST = 0.25;
                 const LABEL = { p: "Planetary Shipyard", o: "Orbital Dock" };
                 const yardOf = (pid) => { const d = NL.shYard ? NL.shYard.read(pid) : null; return d && Array.isArray(d.planetaryQueueAll) && Array.isArray(d.orbitalQueueAll) ? d : null; };
@@ -20116,6 +20850,81 @@ nxtSnap | 92_gl_task_data | retired
                     ".nl2-shq-hdr .nl2-shq-est{font-style:italic}",
                     ".nl2-shq-empty{margin-bottom:8px}",
                 ].join("\n"));
+                if (Q85)
+                    NL.css("sh-queue-085", [
+                        ".shipyard-queue-section[data-nl2-shq85]{display:flex!important;flex-wrap:wrap;gap:10px;margin:0 0 12px!important;padding:10px 12px!important;border:1px solid rgba(116,176,232,.25)!important;border-radius:10px!important;background:rgba(14,32,60,.55)!important}",
+                        ".shipyard-queue-section[data-nl2-shq85] > .nl2-shq-hdr{flex:1 0 100%;padding:0!important;margin:0!important;font-size:13px!important}",
+                        ".shipyard-queue-section[data-nl2-shq85] .nl2-shq-k{font:700 13px Rajdhani,\"Exo 2\",sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:#7dd3fc}",
+                        ".shipyard-queue-section[data-nl2-shq85] .nl2-shq-eta{color:#c9d6e8;font-weight:500}",
+                        ".shipyard-queue-section[data-nl2-shq85] > .shipyard-active{flex:1 1 0;min-width:0;display:flex!important;align-items:center;gap:10px;margin:0!important;padding:10px 12px!important;opacity:1!important;border:1px solid rgba(116,176,232,.2)!important;border-radius:8px!important;background:#060d1a!important;box-sizing:border-box}",
+                        ".shipyard-queue-section[data-nl2-shq85] > .shipyard-active[data-nl2-shq-act]{border-color:rgba(245,158,11,.55)!important;background:linear-gradient(135deg,rgba(245,158,11,.10),rgba(245,158,11,.03)),#060d1a!important}",
+                        ".shipyard-active[data-nl2-shq-i] > .active-info{flex:1 1 auto;min-width:0;display:grid!important;grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:10px;row-gap:2px;align-items:center}",
+                        ".shipyard-active[data-nl2-shq-i] > .active-info::before{content:attr(data-nl2-shq-no);grid-column:1;grid-row:1/3;color:#c9d6e8;font-weight:700}",
+                        ".shipyard-active[data-nl2-shq-i] > .active-info::after{content:attr(data-nl2-shq-tag);grid-column:4;grid-row:1;justify-self:end;margin-left:12px;font:700 11px Rajdhani,\"Exo 2\",sans-serif;letter-spacing:1px;padding:1px 8px;border-radius:999px;border:1px solid #475569;color:#cbd5e1;white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-act] > .active-info::after{border-color:rgba(245,158,11,.6);color:var(--nl2-amber);background:rgba(245,158,11,.12)}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"ic\"]{grid-column:2;grid-row:1/3}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"nm\"]{grid-column:3;grid-row:1;font-size:0!important;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"nm\"] > strong[data-nl2-shq-n]{font-size:0!important;opacity:1!important}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"nm\"] > strong[data-nl2-shq-n]::before{content:attr(data-nl2-shq-n);font-size:16px;font-weight:700;color:#fff}",
+                        ".shipyard-active[data-nl2-shq-i] > .active-info:not(:has([data-nl2-shq-r=\"left\"])) [data-nl2-shq-r=\"nm\"]{grid-row:1/3}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"hg\"]{display:none!important}",
+                        ".shipyard-active[data-nl2-shq-i] .qol-completion{display:contents!important}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"left\"]{grid-column:3;grid-row:2;color:#fff;white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"end\"]{grid-column:4;grid-row:2;justify-self:end;color:var(--nl2-dim);white-space:nowrap}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"wait\"]{grid-column:4;grid-row:2;justify-self:end;font-size:0!important}",
+                        ".shipyard-active[data-nl2-shq-i] [data-nl2-shq-r=\"wait\"]::before{content:\"Waiting\";font-size:14px;color:var(--nl2-dim)}",
+                        ".shipyard-active[data-nl2-shq-i] > .cancel-build-btn{flex:0 0 auto;font-size:0!important;padding:0 4px!important;margin:0!important;border:0!important;background:none!important;min-width:0!important;cursor:pointer}",
+                        ".shipyard-active[data-nl2-shq-i] > .cancel-build-btn > *{display:none!important}",
+                        ".shipyard-active[data-nl2-shq-i] > .cancel-build-btn::before{content:\"\\00d7\";font:700 18px Rajdhani,\"Exo 2\",sans-serif;color:var(--nl2-bad)}",
+                    ].join("\n"));
+                const fmtN = (t) => t.replace(/\s+/g, " ").trim().replace(/^(\d+)\s*x\s+/i, (m, n) => Number(n).toLocaleString("en-US") + " \u00D7 ");
+                const card = (row, i) => {
+                    const info = row.querySelector(":scope > .active-info");
+                    if (!info)
+                        return;
+                    setAttr(row, "data-nl2-shq-i", String(i + 1));
+                    setAttr(info, "data-nl2-shq-no", "#" + (i + 1));
+                    let icon = false, word = "", wait = false;
+                    for (const el of info.children) {
+                        let r = null;
+                        if (el.classList.contains("qol-completion")) {
+                            r = "qc";
+                            const left = el.querySelector(":scope > span"), end = el.querySelector(":scope > time");
+                            if (left)
+                                setAttr(left, "data-nl2-shq-r", "left");
+                            if (end)
+                                setAttr(end, "data-nl2-shq-r", "end");
+                        }
+                        else if (el.matches(".ui-icon, svg, img, .game-glyph")) {
+                            r = icon ? "hg" : "ic";
+                            icon = true;
+                        }
+                        else if (el.querySelector("strong")) {
+                            r = "nm";
+                            const st = [...el.querySelectorAll(":scope > strong")].find((x) => !/:\s*$/.test(x.textContent));
+                            if (st)
+                                setAttr(st, "data-nl2-shq-n", fmtN(st.textContent));
+                            const w = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(" ").trim().split(/\s+/)[0] || "";
+                            word = w;
+                        }
+                        else if (/waiting/i.test(el.textContent)) {
+                            r = "wait";
+                            wait = true;
+                        }
+                        if (r && r !== "qc")
+                            setAttr(el, "data-nl2-shq-r", r);
+                    }
+                    setAttr(info, "data-nl2-shq-tag", word ? word.toUpperCase() : null);
+                    setAttr(row, "data-nl2-shq-act", !wait && !/^queued$/i.test(word) ? "" : null);
+                    const btn = row.querySelector(":scope > .cancel-build-btn");
+                    if (btn)
+                        setAttr(btn, "title", "Cancel");
+                };
+                const hm = (sec) => {
+                    sec = Math.max(0, Math.floor(sec));
+                    const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60;
+                    return h ? h + "h " + m + "m" : m + "m " + x + "s";
+                };
                 const setAttr = NL.setAttr;
                 const t = (s) => { const v = Date.parse(s); return Number.isFinite(v) ? v : null; };
                 const durOf = (it, d, ships) => {
@@ -20164,12 +20973,12 @@ nxtSnap | 92_gl_task_data | retired
                 NL.shQueueFinish = (d) => (d && Array.isArray(d.planetaryQueueAll) && Array.isArray(d.orbitalQueueAll)
                     ? { p: d.planetaryQueueAll.length ? finishOf(d.planetaryQueueAll, d) : "idle", o: d.orbitalQueueAll.length ? finishOf(d.orbitalQueueAll, d) : "idle" } : null);
                 const utc = (ms) => { const x = new Date(ms); return x.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }) + " " + String(x.getUTCHours()).padStart(2, "0") + ":" + String(x.getUTCMinutes()).padStart(2, "0") + " UTC"; };
-                const etaText = (fin) => { const left = fin - Date.now(); return left > 0 ? ((NL.buildTime && NL.buildTime(left / 1000)) || NL.countdown(left)) + " left \u00B7 " + utc(fin) : "done \u00B7 " + utc(fin); };
+                const etaText = (fin) => { const left = fin - Date.now(); return left > 0 ? (Q85 ? hm(left / 1000) : ((NL.buildTime && NL.buildTime(left / 1000)) || NL.countdown(left))) + " left \u00B7 " + utc(fin) : "done \u00B7 " + utc(fin); };
                 const EST_TIP = "Estimate: the game doesn't give repair times for waiting repairs, so they are counted at about a quarter of the build time.";
                 const paint = (hdr, label, n, max, f, idle) => {
                     const k = hdr.querySelector(".nl2-shq-k") || hdr.appendChild(NL.h("span", { class: "nl2-shq-k" }));
                     const e = hdr.querySelector(".nl2-shq-eta") || hdr.appendChild(NL.h("span", { class: "nl2-shq-eta" }));
-                    const kt = label + " \u2014 " + n + (max ? "/" + max : "") + " slots";
+                    const kt = Q85 && !idle ? label : label + " \u2014 " + n + (max ? "/" + max : "") + " slots";
                     if (k.textContent !== kt)
                         k.textContent = kt;
                     setAttr(hdr, "data-nl2-shq-fin", f ? String(Math.round(f.fin)) : null);
@@ -20183,6 +20992,8 @@ nxtSnap | 92_gl_task_data | retired
                 const undo = (page) => {
                     page.querySelectorAll("[data-nl2-shq-hide]").forEach((el) => el.removeAttribute("data-nl2-shq-hide"));
                     page.querySelectorAll(".nl2-shq-hdr, .nl2-shq-empty").forEach((el) => el.remove());
+                    page.querySelectorAll("[data-nl2-shq85]").forEach((el) => el.removeAttribute("data-nl2-shq85"));
+                    page.querySelectorAll("[data-nl2-shq-i]").forEach((el) => el.removeAttribute("data-nl2-shq-i"));
                 };
                 NL.watch(".shipyard-page", (page) => {
                     const pid = NL.shQueueEta === false ? null : NL.herePlanetId();
@@ -20220,12 +21031,15 @@ nxtSnap | 92_gl_task_data | retired
                             sec.insertBefore(hdr, sec.firstChild);
                         const list = kind === "o" ? d.orbitalQueueAll : d.planetaryQueueAll;
                         paint(hdr, label || LABEL[kind], rows.length, max, list.length === rows.length ? finishOf(list, d) : null, false);
+                        setAttr(sec, "data-nl2-shq85", Q85 ? "" : null);
+                        if (Q85)
+                            rows.forEach(card);
                     }
                     const hero = page.querySelector(":scope > .sy-hero");
                     const hasDock = !!(hero && /orbital dock/i.test(hero.textContent || "")) || !!seen.o;
                     for (const kind of ["p", "o"]) {
                         let box = page.querySelector(":scope > .nl2-shq-empty[data-nl2-shq-k=\"" + kind + "\"]");
-                        const want = !seen[kind] && hero && (kind === "p" || hasDock);
+                        const want = !Q85 && !seen[kind] && hero && (kind === "p" || hasDock);
                         if (!want) {
                             if (box)
                                 box.remove();
@@ -37101,6 +37915,7 @@ nxtSnap | 92_gl_task_data | retired
                     P + ".entity-bcard>.nl2-cardtools>*{white-space:nowrap;flex:0 0 auto}",
                 ].join(""));
                 const tvOn = () => st.get("on", true) !== false;
+                NL.moTv = { on: tvOn, set: (v) => { st.set("on", !!v); NL._kick(); } };
                 const setAttr = NL.setAttr;
                 NL.watch(".moon-view .entity-building-grid", (grid) => {
                     const view = grid.closest(".moon-view");
@@ -37232,6 +38047,302 @@ nxtSnap | 92_gl_task_data | retired
                 };
                 NL.moBestEnergy = () => document.querySelectorAll(".moon-view[data-nl2-mt]").forEach(bestEnergy);
                 NL.watch(".moon-view[data-nl2-mt]", bestEnergy);
+            },
+        });
+        NL.moTbl = true;
+        NL.feature({
+            id: "mo-tbl2",
+            set: "Moons",
+            name: "Moon Buildings table (shared renderer)",
+            desc: "MO-058: the moon Buildings Table View drawn by the shared table renderer (one button column, status pills, Hidden section).",
+            init(ctx) {
+                const RES = ["ore", "silicates", "hydrogen", "alloys"];
+                const txt = (el) => (el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "");
+                const tvOn = () => !NL.moTv || NL.moTv.on();
+                const on = () => NL.moTbl !== false && !!(NL.table && NL.table.mount) && tvOn();
+                NL.css("mo-tbl2", [
+                    ".moon-view[data-nl2-mtt] .entity-building-grid{display:none!important}",
+                    ".moon-view[data-nl2-mtt] .nl2-mt-bar{display:none!important}",
+                    ".nl2-mtt-host{margin-top:8px}",
+                    ".nl2-t-pill.nl2-mtt-fx{display:inline-flex;align-items:center;gap:4px;padding-top:1.5px;margin:1px 4px 1px 0;white-space:nowrap}",
+                    ".nl2-mtt-fx img{width:14px;height:14px;flex:0 0 14px;display:block}",
+                    ".nl2-t-pill.nl2-mtt-st{display:block;box-sizing:border-box;width:100%;text-align:center}",
+                    ".nl2-mtt-pw{display:inline-flex;align-items:center;gap:4px}",
+                    ".nl2-mtt-pw input{width:56px;text-align:right}",
+                    ".nl2-mtt-det{display:flex;align-items:center;gap:16px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}",
+                    ".nl2-mtt-host table.nl2-t-tbl>tbody>tr[data-key]>td .nl2-t-in{vertical-align:middle}",
+                    "nav.moon-workspace-tabs>.nl2-mtt-tv{display:inline-flex;align-items:center;gap:6px;margin-left:auto;align-self:center;font-size:13px;white-space:nowrap;cursor:pointer;user-select:none}",
+                    "nav.moon-workspace-tabs>.nl2-mtt-tv~.nl2-motx.nl2-first{margin-left:8px}",
+                ].join(""));
+                const cardsOf = (grid) => [...grid.querySelectorAll(":scope > .entity-bcard")].filter((c) => c.querySelector(".entity-bcard-name"));
+                const keyOf = (card) => txt(card.querySelector(".entity-bcard-name"));
+                const cardOf = (key) => [...document.querySelectorAll(".moon-view .entity-building-grid > .entity-bcard")].find((c) => keyOf(c) === key) || null;
+                const demOn = (card) => { const pg = card.closest(".moon-page"); return !!(pg && pg.hasAttribute("data-nl2-mod")); };
+                const btnOf = (card, k) => {
+                    if (k === "up")
+                        return card.querySelector(".moon-bcard-upgrade > .entity-btn");
+                    if (k === "bring")
+                        return card.querySelector(".moon-bcard-upgrade > .construction-supply-trigger");
+                    if (k === "cancel")
+                        return card.querySelector(".moon-bcard-upgrading > button");
+                    if (k === "demolish")
+                        return demOn(card) ? card.querySelector(".moon-bcard-footer > div > .entity-btn-demolish") : null;
+                    return null;
+                };
+                const press = (r, k) => { const c = cardOf(r.key), b = c && btnOf(c, k); if (b && !b.disabled)
+                    b.click(); };
+                const detCache = new Map();
+                function detailOf(card, key) {
+                    const box = demOn(card) ? [...card.querySelectorAll(".moon-bcard-footer > div")].find((d) => d.querySelectorAll("button").length > 1 && d.querySelector(".entity-btn-demolish")) : null;
+                    if (!box) {
+                        detCache.delete(key);
+                        return null;
+                    }
+                    const sig = txt(box), old = detCache.get(key);
+                    if (old && old.sig === sig)
+                        return old.node;
+                    const btns = [...box.querySelectorAll("button")], note = [...box.querySelectorAll("div")].find((d) => !d.querySelector("button") && txt(d));
+                    const node = NL.h("div", { class: "nl2-mtt-det" }, NL.h("span", null, note ? txt(note) : "Demolish"));
+                    btns.forEach((b, i) => {
+                        const close = b.classList.contains("entity-btn-action");
+                        const go = NL.h("button", { type: "button", class: "nl2-t-btn" + (close ? "" : " nl2-t-b-bad") }, close ? "Cancel" : txt(b));
+                        go.addEventListener("click", (e) => { e.stopPropagation(); const c = cardOf(key), all = c ? [...c.querySelectorAll(".moon-bcard-footer > div button")] : [], x = all[i]; if (x && !x.disabled)
+                            x.click(); });
+                        node.appendChild(go);
+                    });
+                    detCache.set(key, { sig, node });
+                    return node;
+                }
+                const pill = (t, cls, tip) => { const p = NL.h("span", { class: "nl2-t-pill" + (cls ? " " + cls : "") }, t); if (tip && NL.tip)
+                    NL.tip(p, tip); return p; };
+                const fxPill = (f) => {
+                    const p = NL.h("span", { class: "nl2-t-pill nl2-mtt-fx " + (f.bad ? "nl2-t-pill-amber" : "nl2-t-pill-info") });
+                    if (f.src) {
+                        const i = document.createElement("img");
+                        i.src = f.src;
+                        i.alt = f.alt || "";
+                        p.appendChild(i);
+                    }
+                    p.appendChild(document.createTextNode(f.t));
+                    if (f.tip && NL.tip)
+                        NL.tip(p, f.tip);
+                    return p;
+                };
+                function setPower(key, v) {
+                    const c = cardOf(key), rg = c && c.querySelector(".moon-power-slider input[type=\"range\"]");
+                    if (!rg)
+                        return;
+                    const mn = +rg.min || 0, mx = rg.max !== "" ? +rg.max : 100, step = +rg.step || 1;
+                    let n = Math.round(Math.min(mx, Math.max(mn, +v)) / step) * step;
+                    if (!isFinite(n) || String(n) === rg.value)
+                        return;
+                    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+                    set.call(rg, String(n));
+                    rg.dispatchEvent(new Event("input", { bubbles: true }));
+                    rg.dispatchEvent(new Event("change", { bubbles: true }));
+                    ["pointerup", "mouseup"].forEach((t) => rg.dispatchEvent(new MouseEvent(t, { bubbles: true })));
+                    NL._kick();
+                }
+                function powerCell(r) {
+                    if (r.power == null)
+                        return "\u2014";
+                    const inp = NL.h("input", { type: "number", min: String(r.power.min), max: String(r.power.max), step: String(r.power.step), value: String(r.power.v), "aria-label": "Production % of " + r.key });
+                    const go = () => setPower(r.key, inp.value);
+                    inp.addEventListener("change", go);
+                    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") {
+                        e.preventDefault();
+                        inp.blur();
+                    } });
+                    inp.addEventListener("click", (e) => e.stopPropagation());
+                    return NL.h("span", { class: "nl2-mtt-pw" }, inp, "%");
+                }
+                function rowOf(card) {
+                    const key = keyOf(card), hid = card.classList.contains("nl2-hidden-card"), isNew = card.classList.contains("is-new");
+                    const lvEl = card.querySelector(".entity-bcard-level"), lvN = Number((/(\d+)/.exec(txt(lvEl)) || [])[1]);
+                    const max = !!card.querySelector(".moon-bcard-footer > .entity-max-level"), up = card.querySelector(".moon-bcard-footer > .moon-bcard-upgrading");
+                    const vals = {}, tips = { name: txt(card.querySelector(".entity-bcard-desc")) ? key + "\n" + txt(card.querySelector(".entity-bcard-desc")) : "" }, cellCls = {}, sig = {};
+                    vals.level = isNew || !(lvN >= 0) || !lvEl ? (txt(lvEl) || "\u2014") : max ? String(lvN) : lvN + " \u2192 " + (lvN + 1);
+                    const enSt = [...card.querySelectorAll(".entity-bcard-stat")].find((s) => !s.querySelector("img.game-resource-icon") && /energy/i.test(txt(s)));
+                    const enSp = enSt && enSt.querySelector(":scope > span");
+                    vals.en = enSt ? (enSt.getAttribute("data-nl2-mt-en") || txt(enSp).replace(/\s*energy$/i, "")) : "";
+                    const enN = Number(String(vals.en).replace(/[,+\s]/g, "").replace("\u2212", "-"));
+                    if (vals.en)
+                        cellCls.en = enN > 0 ? "nl2-t-ok" : enN < 0 ? "nl2-t-warn" : "";
+                    const enBest = !!(enSp && enSp.hasAttribute("data-nl2-mt-best"));
+                    if (enSt)
+                        tips.en = enSt.getAttribute("data-nl2-tip") || "";
+                    const fxs = [...card.querySelectorAll(".entity-bcard-stat")].filter((s) => s !== enSt).map((s) => {
+                        const sp = s.querySelector(":scope > span"), img = s.querySelector("img.game-resource-icon"), t0 = txt(sp || s);
+                        const t = (sp && sp.getAttribute("data-nl2-mt-pg")) || t0;
+                        return { t, src: img ? img.getAttribute("src") : null, alt: img ? img.getAttribute("alt") : "", bad: /^[-−]\s*[\d.,]*[1-9]/.test(t), tip: (sp && sp.getAttribute("data-nl2-mt-pt")) || "" };
+                    }).filter((f) => f.t);
+                    const rg = card.querySelector(".moon-power-slider input[type=\"range\"]");
+                    const power = rg ? { v: +rg.value, min: +rg.min || 0, max: rg.max !== "" ? +rg.max : 100, step: +rg.step || 1 } : null;
+                    const roi = card.querySelector(".moon-bcard-footer > .nl2-moroi");
+                    const roiC = roi ? (roi.classList.contains("nl2-r") ? "nl2-t-bad" : roi.classList.contains("nl2-y") ? "nl2-t-warn" : roi.classList.contains("nl2-na") ? "" : "nl2-t-ok") : "";
+                    vals.roi = roi ? txt(roi).replace(/^ROI\s*/i, "") : "";
+                    if (roi) {
+                        tips.roi = roi.getAttribute("data-nl2-tip") || "";
+                        if (roiC)
+                            cellCls.roi = roiC;
+                    }
+                    const roiBest = !!(roi && roi.hasAttribute("data-nl2-mo-best"));
+                    const by = {}, rare = [];
+                    card.querySelectorAll(".moon-bcard-upgrade .entity-bcard-costs > .entity-cost-chip").forEach((c) => {
+                        const img = c.querySelector("img.game-resource-icon"), src = img ? img.getAttribute("src") : null, alt = img ? img.getAttribute("alt") || "" : "";
+                        const name = ((src || "").split("/").pop() || "").replace(/\.\w+$/, "") || alt, v = Number(txt(c).replace(/[^\d]/g, "")) || 0, short = c.classList.contains("insufficient");
+                        if (!(v > 0))
+                            return;
+                        const k = RES.find((r) => new RegExp("\\b" + r + "\\b", "i").test((src || "") + " " + alt));
+                        const x = { k: k || name, name: alt || name, src, v, short };
+                        if (k)
+                            by[k] = x;
+                        else
+                            rare.push(x);
+                    });
+                    RES.forEach((k) => { const c = by[k]; if (c && c.short) {
+                        cellCls[k] = "nl2-t-warn";
+                        tips[k] = "Short of " + (c.name || k) + " (need " + (NL.fmt ? NL.fmt(c.v) : c.v) + ")";
+                    } sig[k] = c ? c.v + (c.short ? "!" : "") : "-"; });
+                    sig.rare = rare.map((c) => c.k + c.v + (c.short ? "!" : "")).join(",");
+                    const cd = up && up.querySelector(".countdown"), bt = card.querySelector(".moon-bcard-upgrade .entity-bcard-time");
+                    vals.time = cd ? txt(cd) : bt ? txt(bt) : "";
+                    Object.keys(vals).forEach((k) => { sig[k] = vals[k] + "|" + (cellCls[k] || "") + "|" + (tips[k] || ""); });
+                    sig.en += enBest ? "|best" : "";
+                    sig.roi += roiBest ? "|best" : "";
+                    sig.fx = fxs.map((f) => f.t + (f.src || "") + "|" + f.tip).join("#");
+                    sig.name = tips.name;
+                    sig.hide = String(hid);
+                    sig.power = power ? power.v + "/" + power.max : "-";
+                    const btn = {};
+                    ["up", "bring", "cancel", "demolish"].forEach((k) => { btn[k] = btnOf(card, k); });
+                    sig.btn = ["up", "bring", "cancel", "demolish"].map((k) => (btn[k] ? k + (btn[k].disabled ? "0" : "1") + txt(btn[k]) : "")).join("|");
+                    const row = { key, vals, tips, cellCls, sig, btn, by, rare, fxs, enBest, roiBest, power, hid };
+                    const st = up ? { t: "Building", cls: "nl2-t-pill-ok", tip: txt(up.querySelector(":scope > span")) || txt(up) } : max ? { t: "Max Level", cls: "" } : null;
+                    if (st) {
+                        row.span = { from: "ore", to: "rare", cell: () => pill(st.t, st.cls + " nl2-mtt-st", st.tip) };
+                        sig._span = st.t;
+                    }
+                    const det = detailOf(card, key);
+                    if (det) {
+                        row.detail = det;
+                        row.open = true;
+                    }
+                    else
+                        row.open = false;
+                    return row;
+                }
+                const resIcon = (k) => { const img = document.querySelector(".moon-view img.game-resource-icon[src*=\"" + k + "\"]"); return img ? img.getAttribute("src") : "/images/resources/" + k + ".webp"; };
+                const resCol = (k, l) => ({ k, l: "", icon: resIcon(k), tip: l, w: 72, sort: false, cell: (r) => { const c = r.by[k]; return c ? NL.table.iconNum(c.src || resIcon(k), c.v, { short: true }) : "\u2014"; } });
+                let t = null, host = null, tick = 0;
+                function mount(grid) {
+                    host = NL.h("div", { class: "nl2-mtt-host" });
+                    grid.after(host);
+                    t = NL.table.mount(host, {
+                        id: "mo-bu",
+                        zebra: false,
+                        cols: [
+                            { k: "name", l: "Building", w: 170, name: true, sort: false, cell: (r) => r.key },
+                            { k: "level", l: "Level", w: 72, sort: false },
+                            { k: "en", l: "Energy", w: 64, sort: false, cell: (r) => (r.enBest ? NL.h("span", { class: "nl2-t-pill nl2-t-pill-ok" }, r.vals.en) : r.vals.en || "\u2014") },
+                            { k: "fx", l: "Effect", w: "flex", wrap: true, sort: false, cell: (r) => (r.fxs.length ? NL.h("span", null, ...r.fxs.map(fxPill)) : "\u2014") },
+                            { k: "power", l: "Power", w: 92, sort: false, cell: powerCell },
+                            { k: "roi", l: "ROI", w: 74, sort: false, cell: (r) => (!r.vals.roi || r.vals.roi === "\u2014" ? "\u2014" : r.roiBest ? pill(r.vals.roi, ({ "nl2-t-ok": "nl2-t-pill-ok", "nl2-t-warn": "nl2-t-pill-amber", "nl2-t-bad": "nl2-t-pill-bad" })[r.cellCls.roi] || "nl2-t-pill-info", r.tips.roi) : r.vals.roi) },
+                            resCol("ore", "Ore"),
+                            resCol("silicates", "Silicates"),
+                            resCol("hydrogen", "Hydrogen"),
+                            resCol("alloys", "Alloys"),
+                            { k: "rare", l: "Other", w: 86, sort: false, cell: (r) => (r.rare.length ? NL.table.rare(r.rare.map((c) => ({ icon: c.src, v: c.v, name: c.name })), 1) : "\u2014") },
+                            { k: "time", l: "Time", w: 92, sort: false, cell: (r) => r.vals.time || "\u2014" },
+                            { k: "hide", l: "Hide", w: 52, after: true, sort: false, cell: (r) => {
+                                    const cb = NL.h("input", { type: "checkbox", "data-k": r.key });
+                                    cb.checked = r.hid;
+                                    const lab = NL.h("label", { class: "nl2-hide", "data-nl2-tip": r.hid ? "Show this building again" : "Hide this building on this moon" }, cb);
+                                    cb.addEventListener("change", () => { const c = cardOf(r.key), g = c && c.querySelector(".nl2-cardtools .nl2-hide input"); if (g && g.checked !== cb.checked)
+                                        g.click(); NL._kick(); });
+                                    return lab;
+                                } },
+                        ],
+                        actions: { w: 104, empty: { label: "" }, list: [
+                                { k: "bring", label: "Bring", cls: "nl2-t-b-amber", show: (r) => !!r.btn.bring && !r.btn.demolish, tip: (r) => "Bring missing resources" + (r.btn.up && txt(r.btn.up) ? "\nUpgrade: " + txt(r.btn.up) : ""), run: (r) => press(r, "bring") },
+                                { k: "up", cls: "nl2-t-b-ok", show: (r) => !!r.btn.up && !r.btn.bring && !r.btn.demolish, label: (r) => { const s = txt(r.btn.up), m = /upgrade\s+to\s+(?:lv\.?|level)\s*(\d+)/i.exec(s); return m ? "\u2191 to lvl " + m[1] : /^build$/i.test(s) ? "\u2191 to lvl 1" : s || "Upgrade"; }, enabled: (r) => !r.btn.up.disabled, tip: (r) => (r.btn.up.disabled ? txt(r.btn.up) : ""), run: (r) => press(r, "up") },
+                                { k: "cancel", label: "Cancel", cls: "nl2-t-b-bad", show: (r) => !!r.btn.cancel && !r.btn.demolish, run: (r) => press(r, "cancel") },
+                                { k: "demolish", label: "Demolish", cls: "nl2-t-b-bad", show: (r) => !!r.btn.demolish && !r.open, enabled: (r) => !r.btn.demolish.disabled, tip: (r) => txt(r.btn.demolish), run: (r) => press(r, "demolish") },
+                            ] },
+                    });
+                }
+                function drop(view) {
+                    if (t) {
+                        t.destroy();
+                        t = null;
+                    }
+                    if (host) {
+                        host.remove();
+                        host = null;
+                    }
+                    if (view)
+                        NL.setAttr(view, "data-nl2-mtt", null);
+                    if (tick) {
+                        clearInterval(tick);
+                        tick = 0;
+                    }
+                }
+                function draw(grid) {
+                    const view = grid.closest(".moon-view");
+                    if (!view)
+                        return;
+                    if (!on()) {
+                        drop(view);
+                        return;
+                    }
+                    NL.setAttr(view, "data-nl2-mtt", "");
+                    if (!t || !host || !host.isConnected) {
+                        drop(null);
+                        mount(grid);
+                    }
+                    else if (host.previousElementSibling !== grid)
+                        grid.after(host);
+                    const rows = [], hid = [];
+                    cardsOf(grid).forEach((card) => { const r = rowOf(card); if (r.hid) {
+                        r.cls = "nl2-t-row-dim";
+                        hid.push(r);
+                    }
+                    else
+                        rows.push(r); });
+                    const secs = [{ id: "all", tone: "sky", rows }];
+                    if (hid.length)
+                        secs.push({ id: "hid", label: "Hidden (" + hid.length + ")", hidden: true, rows: hid });
+                    t.update(secs);
+                    if (!tick && grid.querySelector(".moon-bcard-upgrading .countdown"))
+                        tick = setInterval(() => { const g = document.querySelector(".moon-view .entity-building-grid"); if (!g || !t || !g.querySelector(".moon-bcard-upgrading .countdown")) {
+                            clearInterval(tick);
+                            tick = 0;
+                            if (g && t)
+                                draw(g);
+                            return;
+                        } draw(g); }, 1000);
+                }
+                NL.watch(".moon-view .entity-building-grid", draw);
+                NL.watch("nav.moon-workspace-tabs", (nav) => {
+                    const want = NL.moTbl !== false && !!(NL.table && NL.table.mount) && !!document.querySelector(".moon-view .entity-building-grid");
+                    let lab = nav.querySelector(":scope > .nl2-mtt-tv");
+                    if (!want) {
+                        if (lab)
+                            lab.remove();
+                        return;
+                    }
+                    if (!lab) {
+                        const cb = NL.h("input", { type: "checkbox" });
+                        cb.addEventListener("change", () => { if (NL.moTv)
+                            NL.moTv.set(cb.checked); });
+                        lab = NL.h("label", { class: "nl2-mtt-tv", "data-nl2-tip": "Switch the moon buildings between cards and a table" }, cb, "Table View");
+                    }
+                    const first = nav.querySelector(":scope > .nl2-motx");
+                    if (first ? lab.nextElementSibling !== first : lab.parentElement !== nav)
+                        nav.insertBefore(lab, first || null);
+                    if (lab.firstChild.checked !== tvOn())
+                        lab.firstChild.checked = tvOn();
+                });
             },
         });
     }
@@ -39645,6 +40756,8 @@ nxtSnap | 92_gl_task_data | retired
         NL.pvTbl = true;
         NL.expRecent = true;
         NL.patReadout = true;
+        NL.pveData = true;
+        NL.pveTee = false;
         NL.pveHw = true;
         NL.btnKeep = true;
         NL.patCov = true;
@@ -39685,32 +40798,43 @@ nxtSnap | 92_gl_task_data | retired
                     }
                     catch (e) { }
                 };
-                const of = window.fetch;
-                if (typeof of === "function")
-                    window.fetch = function (input) {
-                        const p = of.apply(this, arguments);
+                if (NL.pveTee !== false && typeof NL.onData === "function") {
+                    NL.onData({ test: (p) => RE.test(p) }, (path, data, at) => {
+                        if (data == null || typeof data !== "object")
+                            return;
+                        T.map.set(path, { at: at || Date.now(), data });
+                        if (T.hook)
+                            T.hook(path, data);
+                    });
+                }
+                else {
+                    const of = window.fetch;
+                    if (typeof of === "function")
+                        window.fetch = function (input) {
+                            const p = of.apply(this, arguments);
+                            try {
+                                const u = typeof input === "string" ? input : input && input.url;
+                                if (/^\/api\/|^https?:\/\/[^/]+\/api\//.test(String(u || "")))
+                                    p.then((r) => { if (r && r.ok)
+                                        r.clone().json().then((d) => put(u, d)).catch(() => { }); }).catch(() => { });
+                            }
+                            catch (e) { }
+                            return p;
+                        };
+                    const oo = XMLHttpRequest.prototype.open;
+                    XMLHttpRequest.prototype.open = function (m, u) {
                         try {
-                            const u = typeof input === "string" ? input : input && input.url;
-                            if (/^\/api\/|^https?:\/\/[^/]+\/api\//.test(String(u || "")))
-                                p.then((r) => { if (r && r.ok)
-                                    r.clone().json().then((d) => put(u, d)).catch(() => { }); }).catch(() => { });
+                            if (/^\/api\//.test(String(u || "")))
+                                this.addEventListener("load", () => { try {
+                                    if (this.status === 200)
+                                        put(u, JSON.parse(this.responseText));
+                                }
+                                catch (e) { } });
                         }
                         catch (e) { }
-                        return p;
+                        return oo.apply(this, arguments);
                     };
-                const oo = XMLHttpRequest.prototype.open;
-                XMLHttpRequest.prototype.open = function (m, u) {
-                    try {
-                        if (/^\/api\//.test(String(u || "")))
-                            this.addEventListener("load", () => { try {
-                                if (this.status === 200)
-                                    put(u, JSON.parse(this.responseText));
-                            }
-                            catch (e) { } });
-                    }
-                    catch (e) { }
-                    return oo.apply(this, arguments);
-                };
+                }
             })();
         function nxsMain() {
             (function anomalies() {
@@ -39939,11 +41063,25 @@ nxtSnap | 92_gl_task_data | retired
                         readLogTimer = setTimeout(() => { readLogTimer = 0; lsSet("nxsLoadLog", readLog); }, 4000);
                 }
                 const PAT_BANDS_NET = { id: "pve-patrol-bands", _net: { until: 0, backoff: 0 } };
+                let missForce = false;
                 async function getJson(url) {
                     const u = userRead;
                     try {
                         const ttl = url === "/api/fleet/missions" ? 60000 : SLOW_RE.test(url) ? 600000 : 120000, hit = soloCache.get(url);
-                        if (!u && hit && Date.now() - hit.at < ttl)
+                        if (NL.pveData && NL.data && NL.data.need && url === "/api/fleet/missions") {
+                            const force = u || missForce;
+                            missForce = false;
+                            const t0 = Date.now(), r = await NL.data.need("missions", force ? { since: t0 } : { maxAge: 60000 });
+                            logRead(url + " (data)", Date.now() - t0, r ? (r.fresh ? "ok" : "old") : "none");
+                            if (r && r.fresh) {
+                                soloCache.set(url, { at: r.at || Date.now(), data: r.data });
+                                readAt[url] = r.at || Date.now();
+                                return r.data;
+                            }
+                            if (!force)
+                                return r ? r.data : (hit ? hit.data : null);
+                        }
+                        else if (!u && hit && Date.now() - hit.at < ttl)
                             return hit.data;
                         await soloGate(u);
                         const t0 = Date.now(), ac = new AbortController(), to = setTimeout(() => ac.abort(), READ_TIMEOUT);
@@ -41985,8 +43123,10 @@ nxtSnap | 92_gl_task_data | retired
                                 lsSet(READINGS_KEY, {});
                                 S.sRefill = true;
                                 paintStations();
-                                if (NL.stnFresh)
+                                if (NL.stnFresh) {
                                     soloCache.delete("/api/fleet/missions");
+                                    missForce = true;
+                                }
                                 await loadMissions();
                                 await loadStations(true);
                             }
@@ -44965,6 +46105,7 @@ nxtSnap | 92_gl_task_data | retired
                         return Promise.resolve();
                     stnFreshAt = Date.now();
                     soloCache.delete("/api/fleet/missions");
+                    missForce = true;
                     return loadMissions().then(() => { paint(); updateBadge(); }).catch(() => { });
                 }
                 const STN_ONE = "nl2.stn.one";
@@ -50933,15 +52074,15 @@ nxtSnap | 92_gl_task_data | retired
                         ] },
                     { k: "shb", page: ".shipyard-page[data-nl2-shb]:not([data-nl2-sh40])", box: ".ship-grid", row: ".ship-card", cols: [
                             { l: "Ship", key: at(".ship-header-text h4") },
-                            { l: "Owned", key: (r) => r.getAttribute("data-nl2-shl-own") || "" },
-                            { sub: ".ship-costs", cols: [R("Ore", "[data-nl2-shl-c=\"1\"]"), R("Silicates", "[data-nl2-shl-c=\"2\"]"), R("Hydrogen", "[data-nl2-shl-c=\"3\"]"), R("Alloys", "[data-nl2-shl-c=\"4\"]"), { l: "Rare" }, {}, { l: "Crew", key: at("[data-nl2-shl-c=\"7\"]") }, { l: "Time", key: at("[data-nl2-shl-c=\"8\"]") }, {}] },
+                            { l: "Owned", right: true, key: (r) => r.getAttribute("data-nl2-shl-own") || "" },
+                            { sub: ".ship-costs", cols: [R("Ore", "[data-nl2-shl-c=\"1\"]"), R("Silicates", "[data-nl2-shl-c=\"2\"]"), R("Hydrogen", "[data-nl2-shl-c=\"3\"]"), R("Alloys", "[data-nl2-shl-c=\"4\"]"), { l: "Rare" }, {}, { l: "Crew", right: true, key: at("[data-nl2-shl-c=\"7\"]") }, { l: "Time", key: at("[data-nl2-shl-c=\"8\"]") }, {}] },
                             {}
                         ] },
                     { k: "shb40", page: ".shipyard-page[data-nl2-shb][data-nl2-sh40]", box: ".ship-grid", row: ".ship-card", cols: [
                             { l: "Ship", key: at(".ship-header-text h4") },
                             { l: "Type", key: at(".ship-class") },
-                            { l: "Owned", key: (r) => r.getAttribute("data-nl2-shl-own") || "" },
-                            { sub: ".ship-costs", cols: [R("Ore", "[data-nl2-shl-c=\"1\"]"), R("Silicates", "[data-nl2-shl-c=\"2\"]"), R("Hydrogen", "[data-nl2-shl-c=\"3\"]"), R("Alloys", "[data-nl2-shl-c=\"4\"]"), { l: "Rare" }, {}, { l: "Crew", key: at("[data-nl2-shl-c=\"7\"]") }, { l: "Time", key: at("[data-nl2-shl-c=\"8\"]") }] },
+                            { l: "Owned", right: true, key: (r) => r.getAttribute("data-nl2-shl-own") || "" },
+                            { sub: ".ship-costs", cols: [R("Ore", "[data-nl2-shl-c=\"1\"]"), R("Silicates", "[data-nl2-shl-c=\"2\"]"), R("Hydrogen", "[data-nl2-shl-c=\"3\"]"), R("Alloys", "[data-nl2-shl-c=\"4\"]"), { l: "Rare" }, {}, { l: "Crew", right: true, key: at("[data-nl2-shl-c=\"7\"]") }, { l: "Time", key: at("[data-nl2-shl-c=\"8\"]") }] },
                             {}
                         ] },
                 ];
@@ -51012,7 +52153,7 @@ nxtSnap | 92_gl_task_data | retired
                             if (gh.dataset.sig !== hs) {
                                 gh.dataset.sig = hs;
                                 gh.replaceChildren(...shown.map(({ c, i }) => {
-                                    const sp = H("span", { style: "left:" + Math.round(c.x) + "px;width:" + Math.max(0, Math.round(c.w)) + "px" });
+                                    const sp = H("span", { style: "left:" + Math.round(c.x) + "px;width:" + Math.max(0, Math.round(c.w)) + "px" + (c.col.right ? ";justify-content:flex-end" : "") });
                                     if (c.col.key)
                                         sp.setAttribute("data-k", String(i));
                                     const ic = c.col.icon ? iconOf(c.col.icon) : null;
@@ -51215,7 +52356,13 @@ nxtSnap | 92_gl_task_data | retired
                     }
                     if (!row)
                         row = H("div", { class: "nl2-tstd-ctl", "data-k": "sh" });
-                    if (row.nextElementSibling !== sum)
+                    const hero = NL.shTvInHero !== false && pg.querySelector(":scope > .sy-hero");
+                    if (hero) {
+                        const at = hero.querySelector(":scope > .nl2-gf-btn") || hero.querySelector(":scope > .nl2-syopts");
+                        if (at ? row.nextElementSibling !== at : row.parentElement !== hero)
+                            hero.insertBefore(row, at || null);
+                    }
+                    else if (row.nextElementSibling !== sum)
                         sum.parentElement.insertBefore(row, sum);
                     const ins = srcs.map((l) => l.querySelector("input")).filter(Boolean);
                     syncMirror(mirrorLabel(row, "tv", "Table View", "Switch the Shipyard between cards and tables"), ins);

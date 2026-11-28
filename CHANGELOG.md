@@ -2,6 +2,32 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.176 · Nov 28, 2026
+
+**🚀 Shipyard**
+- The page title reads "<planet> Shipyard" in large white type (SH-084)
+- Each yard's queue is its own section of cards, with the running card in gold. Time left is on the left and the end time on the right. Empty queues are hidden (SH-085)
+- Fleet on Planet: Good / Bad against is plain text, Count is right-aligned, and section heads are blue with no ship total (SH-086)
+- The game's "Available only" checkbox is gone. The search bar and filter buttons stay (SH-088)
+- Repair and Maintain are one click when you can afford them. The script presses the game's own buttons and confirm. If you're short, the game's dialog stays open, and Shift-click always leaves it open (SH-087)
+- Ship size heads are blue, and Owned and Crew are right-aligned. The hourglass is gone from Time, and messages like "Moon Dockyard required" sit in one pill across the cost columns (SH-089)
+
+**🏗 Buildings and Research**
+- The Buildings and Research titles read "<planet> Buildings" and "<planet> Research" (GL-479)
+
+**👑 Leader**
+- The Leader page is redesigned: full width, a slim header with your vessel, status and Perks / Crew / Modules counts, and the tabs on the left. Free-slot counts are gold, and Active Bonuses values are plain text (GL-477)
+- The crew table is split into Assigned, Unassigned and Not owned. If an Assign fails, a short line says so on screen (GL-477)
+
+**🌙 Moons**
+- The moon Buildings Table View uses the same table as the planet Buildings page (MO-058)
+
+**📋 Menu**
+- The left menu reads Buildings, Shipyard, Research in that order (GL-480)
+
+**⚙ Behind the scenes**
+- The fleet slots line, the inbound strip, the delivery re-read, Station defense and PVE all read missions through the shared data helper (GL-471, owners 7 to 10)
+
 ## v0.5.175 · Nov 28, 2026
 
 **🌌 Galaxy**
@@ -222,8 +248,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 - One shared list of finished mission statuses for badges (FL-509)
 - One shared planet zone read, now used by Moons; other areas move over next (GL-381, in progress)
 - Removed the old Research click watcher; the Research badge already clears on the action itself (RE-045)
-
-## v0.5.156 · Nov 23, 2026
-
-**🚀 Performance**
-- Galaxy no longer stutters: very big tables draw only the rows on screen, and Galaxy remembers rows that haven't changed (GL-416, GA-010)

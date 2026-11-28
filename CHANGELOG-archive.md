@@ -1,5 +1,10 @@
 # Release notes archive
 
+## v0.5.156 · Nov 23, 2026
+
+**🚀 Performance**
+- Galaxy no longer stutters: very big tables draw only the rows on screen, and Galaxy remembers rows that haven't changed (GL-416, GA-010)
+
 ## v0.5.155 · Nov 22, 2026
 
 **🚀 Performance**
