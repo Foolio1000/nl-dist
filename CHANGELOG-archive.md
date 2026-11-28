@@ -1,5 +1,10 @@
 # Release notes archive
 
+## v0.5.154 · Nov 22, 2026
+
+**🪐 Planets**
+- Buildings: hovering a short cost shows exactly what is missing (BU-048)
+
 ## v0.5.153 · Nov 22, 2026
 
 **🛰 Fleet**

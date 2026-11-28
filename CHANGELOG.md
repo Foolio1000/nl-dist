@@ -2,6 +2,19 @@
 
 Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
+## v0.5.174 · Nov 28, 2026
+
+**👑 Leader**
+- The Crew tab's Table View is now one table with a row for each crew copy. Effects show as pills, and all the filters and a Sell menu sit in one row. The banner holds slots, marked and hiring points, plus Table View. The right panel is hidden, and the Sell box marks that exact copy for Transfer to the Guild (GL-473)
+
+**🏗 Buildings**
+- Every section header uses the Resource blue. Hidden stays grey (BU-060)
+- Lines inside the table are lighter, and the last row of a section has no bottom line (BU-061)
+- "Unhide all" shows only while the Hidden section is open (BU-063)
+
+**⚙ Behind the scenes**
+- Gather Fleets reads docked ships and missions through the shared data helper. It still waits its usual second between reads, so it's never faster than before (GL-471, fifth part)
+
 ## v0.5.173 · Nov 27, 2026
 
 **⚙ Behind the scenes**
@@ -202,8 +215,3 @@ Older versions: [CHANGELOG-archive.md](CHANGELOG-archive.md)
 
 **🪐 Planets**
 - Recycling compare shows the cost difference with the right sign and colour (RE-046)
-
-## v0.5.154 · Nov 22, 2026
-
-**🪐 Planets**
-- Buildings: hovering a short cost shows exactly what is missing (BU-048)

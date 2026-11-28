@@ -2,7 +2,7 @@
 // @name         Nexus Legacy
 // @namespace    nexuslegacy-userscripts
 // @description  Unified script: extends the game's own pages (Global, Overview, Buildings, Research, Shipyard, Fleet, Empire). Built from nl_src/ by build.js.
-// @version      0.5.173
+// @version      0.5.174
 // @match        https://*.nexuslegacy.space/*
 // @run-at       document-start
 // @noframes
@@ -14,7 +14,7 @@
     "use strict";
     if (window.__nl2)
         return;
-    const NL = window.__nl2 = { version: "0.5.173", features: [] };
+    const NL = window.__nl2 = { version: "0.5.174", features: [] };
     (function tee() {
         const latest = new Map();
         const subs = [];
@@ -12387,6 +12387,421 @@ nxtSnap | 92_gl_task_data | retired
                 });
             },
         });
+        NL.crewOne = true;
+        NL.feature({
+            id: "gl-crew-one",
+            set: "Global",
+            name: "Crew one table",
+            desc: "GL-473: on the Leader page Crew tab in Table View, one table with one row per crew copy, effect pills, all filters in one row, and a Sell box per copy that marks it for Transfer to the Guild.",
+            init(ctx) {
+                if (NL.crewOne === false || !(NL.table && NL.table.mount))
+                    return;
+                const st = ctx.store, tvSt = NL.store("gl-crew-table.");
+                const tvOn = () => tvSt.get("tv", true) !== false;
+                const f = () => Object.assign({ q: "", role: "", grade: "", scope: "owned", soldOnly: false, hideSold: false }, st.get("f", null) || {});
+                const setF = (k, v) => { const o = f(); o[k] = v; st.set("f", o); paint(); };
+                let mods = {}, roleCnt = {}, marked = new Set(), elig = new Map(), marksAt = 0;
+                NL.onData(/^\/api\/leadership(\?|$)/, (p, d) => {
+                    if (!d || !Array.isArray(d.modules))
+                        return;
+                    const m = {}, rc = {};
+                    for (const x of d.modules) {
+                        const md = x && x.metadata;
+                        if (!md || !md.crew)
+                            continue;
+                        const slotted = /^crew_\d+$/.test(String(x.slot || ""));
+                        (m[x.key] = m[x.key] || []).push({ id: x.id, slotted });
+                        const r = md.role ? String(md.role) : ROLE[key(md.origin)];
+                        if (slotted && r)
+                            rc[r] = (rc[r] || 0) + 1;
+                    }
+                    for (const k in m)
+                        m[k].sort((a, b) => (b.slotted - a.slotted) || (a.id > b.id ? 1 : -1));
+                    mods = m;
+                    roleCnt = rc;
+                    NL._kick();
+                });
+                NL.onData(/^\/api\/artifacts\/inventory-marks\?(.*&)?kind=crew(&|$)/, (p, d, at) => {
+                    if (!d || !Array.isArray(d.markedIds))
+                        return;
+                    marked = new Set(d.markedIds);
+                    elig = new Map((Array.isArray(d.eligible) ? d.eligible : []).map((e) => [e.id, e]));
+                    marksAt = Math.max(marksAt, at || Date.now());
+                    paint();
+                });
+                const fiberKey = (el) => { const k = Object.keys(el).find((x) => x.startsWith("__reactFiber")); const fb = k && el[k]; return fb && fb.key != null ? String(fb.key) : ""; };
+                const RAR = { specialist: "common", veteran: "rare", savant: "epic", genius: "legendary" };
+                const GN = ["specialist", "veteran", "savant", "genius"], cap = (s) => s[0].toUpperCase() + s.slice(1);
+                const GR = { genius: 4, savant: 3, veteran: 2, specialist: 1 };
+                NL.css("gl-crew-one", `
+      .leadership-crew-roster .nl2-crtv-cb{display:none!important}
+      .leadership-crew-roster[data-nl2-crone]{width:100%!important;max-width:none!important;grid-column:1 / -1!important}
+      .leadership-crew-roster[data-nl2-crone] > :not(.nl2-crone){display:none!important}
+      [data-nl2-crone-hid]{display:none!important}
+      [data-nl2-crone-full]{display:block!important}
+      .nl2-crone-top{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;padding:4px 0 10px}
+      .nl2-crone-top h2{margin:0 auto 0 0;font:700 22px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+      .nl2-crone-top input[type=text],.nl2-crone-top select{height:28px}
+      .nl2-crone-top select{width:170px}
+      .nl2-crone-top select.nl2-crone-gr{width:130px}
+      .nl2-crone-top .nl2-crone-btn{height:28px;box-sizing:border-box;border:1px solid rgba(56,189,248,.55);border-radius:6px;background:rgba(56,189,248,.12);color:var(--nl2-info,#38bdf8);font:600 13px Rajdhani,"Exo 2",sans-serif;padding:0 10px}
+      .nl2-crone-top input[type=text]{width:170px}
+      .nl2-crone-top label{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer;font:500 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7)}
+      .nl2-crone-top label input{margin:0;cursor:pointer}
+      .nl2-crone-seg{display:inline-flex;border:1px solid rgba(120,200,255,.25);border-radius:6px;overflow:hidden}
+      .nl2-crone-seg>button{height:26px;padding:0 10px;border:0;background:none;color:var(--nl2-text,#d9e6f7);font:600 13px Rajdhani,"Exo 2",sans-serif;cursor:pointer}
+      .nl2-crone-seg>button[data-on]{background:rgba(56,189,248,.18);color:var(--nl2-info,#38bdf8)}
+      .nl2-crone-btn{cursor:pointer;white-space:nowrap}
+      .nl2-crone-sell{position:relative}
+      .nl2-crone-sell>.nl2-t-menu{right:0;top:32px;min-width:190px}
+      .nl2-crone-sell>.nl2-t-menu>.nl2-crone-mh{color:var(--nl2-dim,#8aa3c0);font-size:12px;cursor:default}
+      .nl2-crone-sell>.nl2-t-menu>.nl2-crone-mh:hover{background:none}
+      .nl2-crone-sell>.nl2-t-menu>hr{border:0;border-top:1px solid rgba(255,255,255,.08);margin:4px 0}
+      .nl2-crone-sell>.nl2-t-menu>div[data-off]{color:var(--nl2-dim,#8aa3c0);cursor:default}
+      .nl2-t-pill.nl2-crone-fx{margin:2px 4px 2px 0;max-width:none}
+      .nl2-crone table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:4px;padding-bottom:4px}
+      .nl2-crone td input.nl2-crone-cb{margin:0;width:15px;height:15px;cursor:pointer;vertical-align:middle}
+      .nl2-crone td input.nl2-crone-cb:disabled{cursor:not-allowed;opacity:.35}
+      .nl2-crban{position:absolute;right:20px;bottom:14px;display:flex;align-items:center;gap:8px;white-space:nowrap;font:500 14px Rajdhani,"Exo 2",sans-serif;color:var(--nl2-text,#d9e6f7);z-index:2}
+      .nl2-crban b{color:#f1f5f9;font-weight:600}
+      .nl2-crban label{display:inline-flex;align-items:center;gap:6px;margin-left:10px;cursor:pointer}
+      .nl2-crban label input{margin:0;cursor:pointer}
+    `);
+                let busy = false;
+                const mark = async (ids, on) => {
+                    ids = [...new Set(ids)];
+                    if (busy || !ids.length)
+                        return false;
+                    busy = true;
+                    paint();
+                    const before = new Set(marked);
+                    for (const id of ids)
+                        on ? marked.add(id) : marked.delete(id);
+                    let ok = true;
+                    try {
+                        for (let i = 0; i < ids.length; i += 500) {
+                            const r = await NL.postJson("/api/artifacts/inventory-marks", { kind: "crew", marked: !!on, itemIds: ids.slice(i, i + 500) }, ctx);
+                            if (!r || !r.ok) {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }
+                    catch (e) {
+                        ok = false;
+                        ctx.err(e);
+                    }
+                    if (!ok)
+                        marked = before;
+                    busy = false;
+                    refresh();
+                    paint();
+                    return ok;
+                };
+                const refresh = () => {
+                    const at = Date.now();
+                    try {
+                        window.dispatchEvent(new Event("inventory-marks-changed"));
+                    }
+                    catch (e) { }
+                    setTimeout(() => { if (!(marksAt > at))
+                        NL.getJson("/api/artifacts/inventory-marks?kind=crew", ctx); }, 1500);
+                };
+                const setNative = (el, v) => { const d = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value"); d.set.call(el, v); el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input", { bubbles: true })); };
+                let scopeSet = false, tried = {};
+                const once = (k, fn) => { if (tried[k])
+                    return; tried[k] = true; fn(); };
+                const gameDefaults = (sec) => {
+                    const c = sec.querySelector(".leadership-crew-controls");
+                    if (c) {
+                        const q = c.querySelector("input:not([type=checkbox])");
+                        if (q && q.value)
+                            once("q", () => setNative(q, ""));
+                        c.querySelectorAll("select").forEach((s, n) => { if (s.value !== "all" && [...s.options].some((o) => o.value === "all"))
+                            once("sel" + n, () => setNative(s, "all")); });
+                        const all = [...c.querySelectorAll(".leadership-crew-scope button")].find((b) => /^\s*all\s*$/i.test(b.textContent || ""));
+                        if (all && !/(?:^|\s)(active|selected|is-active)(\s|$)/.test(all.className) && all.getAttribute("aria-pressed") !== "true")
+                            once("all", () => { all.click(); scopeSet = true; });
+                    }
+                    const mo = [...sec.querySelectorAll(".inventory-mark-actions > label")].find((l) => /marked only/i.test(l.textContent || ""));
+                    const moCb = mo && mo.querySelector("input[type=checkbox]");
+                    if (moCb && moCb.checked)
+                        once("mo", () => moCb.click());
+                };
+                const scopeBack = (sec) => {
+                    if (!scopeSet)
+                        return;
+                    scopeSet = false;
+                    const own = [...sec.querySelectorAll(".leadership-crew-scope button")].find((b) => /^\s*owned\s*$/i.test(b.textContent || ""));
+                    if (own)
+                        own.click();
+                };
+                const cardRows = (sec) => {
+                    const out = [];
+                    for (const card of sec.querySelectorAll(".leadership-crew-grid > .leadership-crew-card")) {
+                        const copy = card.querySelector(".leadership-crew-card-copy");
+                        if (!copy)
+                            continue;
+                        const nmEl = copy.querySelector(":scope > strong"), smEl = copy.querySelector(":scope > small");
+                        const full = nmEl ? nmEl.textContent.trim() : "", name = full.split(/,\s*["“]/)[0].trim() || full;
+                        const role = smEl ? ROLE[key(smEl.textContent)] || smEl.textContent.trim() : "";
+                        const g = /(?:^|\s)rarity-([a-z]+)/.exec(card.className), grade = g && GR[g[1]] ? g[1] : "";
+                        const fx = [...copy.querySelectorAll(":scope > .leadership-compact-effects > span")].map((s) => {
+                            const v = s.querySelector("strong"), vt = v ? v.textContent.trim() : "";
+                            const t = [...s.childNodes].filter((n) => n !== v).map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim();
+                            return (vt ? vt + " " : "") + t;
+                        }).filter(Boolean);
+                        const btn = copy.querySelector(":scope > .leadership-crew-action .leadership-inline-action");
+                        const hint = copy.querySelector(".leadership-crew-action-hint");
+                        const k = fiberKey(card), owned = card.classList.contains("owned");
+                        const cps = owned ? (mods[k] && mods[k].length ? mods[k] : [{ id: null, slotted: /assigned to slot/i.test((copy.firstElementChild || {}).textContent || "") }]) : [{ id: null, slotted: false, unowned: true }];
+                        cps.forEach((cp, i) => out.push({ k, i, card, btn, hint: hint ? hint.textContent.trim() : "", name, full, role, grade, fx, owned, id: cp.id, slotted: cp.slotted, unowned: !!cp.unowned }));
+                    }
+                    return out;
+                };
+                const unBtn = (r) => r.btn && /unassign/i.test(r.btn.textContent || "");
+                const sold = (r) => r.id != null && marked.has(r.id);
+                const canSell = (r) => r.id != null && !r.slotted && elig.has(r.id) && !busy;
+                const shown = (r, o) => {
+                    if (o.scope === "owned" && !r.owned)
+                        return false;
+                    if (o.scope === "assigned" && !r.slotted)
+                        return false;
+                    if (o.role && r.role !== o.role)
+                        return false;
+                    if (o.grade && r.grade !== o.grade)
+                        return false;
+                    if (o.q) {
+                        const q = o.q.toLowerCase();
+                        if (!(r.full + " " + r.role + " " + r.fx.join(" ")).toLowerCase().includes(q))
+                            return false;
+                    }
+                    if (o.soldOnly && !sold(r))
+                        return false;
+                    if (o.hideSold && sold(r))
+                        return false;
+                    return true;
+                };
+                let T = null, host = null, top = null, rowsAll = [], rowsShown = [], ui = {};
+                const buildTop = (title) => {
+                    top = NL.h("div", { class: "nl2-crone-top" });
+                    ui.h2 = NL.h("h2", null, title || "Bridge Assignments");
+                    ui.q = NL.h("input", { type: "text", placeholder: "Search crew" });
+                    ui.q.addEventListener("input", () => setF("q", ui.q.value));
+                    ui.role = NL.h("select");
+                    ui.role.addEventListener("change", () => setF("role", ui.role.value));
+                    ui.grade = NL.h("select", { class: "nl2-crone-gr" }, NL.h("option", { value: "" }, "All grades"), ...GN.slice().reverse().map((g) => NL.h("option", { value: g }, cap(g) + " (" + GR[g] + ")")));
+                    ui.grade.addEventListener("change", () => setF("grade", ui.grade.value));
+                    ui.seg = NL.h("span", { class: "nl2-crone-seg" }, ...[["owned", "Owned"], ["assigned", "Assigned"], ["all", "All"]].map(([v, l]) => {
+                        const b = NL.h("button", { type: "button", "data-v": v }, l);
+                        b.addEventListener("click", () => setF("scope", v));
+                        return b;
+                    }));
+                    const cb = (k, txt) => { const i = NL.h("input", { type: "checkbox" }); i.addEventListener("change", () => setF(k, i.checked)); const s = NL.h("span", null, txt); return { lab: NL.h("label", null, i, s), i, s }; };
+                    ui.so = cb("soldOnly", "Sold only");
+                    ui.hs = cb("hideSold", "Hide sold");
+                    ui.sellBtn = NL.h("button", { type: "button", class: "nl2-crone-btn" }, "Sell \u25BE");
+                    ui.sell = NL.h("span", { class: "nl2-crone-sell" }, ui.sellBtn);
+                    ui.sellBtn.addEventListener("click", (e) => { e.stopPropagation(); ui.menu ? closeMenu() : openMenu(); });
+                    top.append(ui.h2, ui.q, ui.role, ui.grade, ui.seg, ui.so.lab, ui.hs.lab, ui.sell);
+                };
+                const closeMenu = () => { if (ui.menu) {
+                    ui.menu.remove();
+                    ui.menu = null;
+                } };
+                document.addEventListener("click", (e) => { if (ui.menu && !ui.sell.contains(e.target))
+                    closeMenu(); }, true);
+                const openMenu = () => {
+                    const owned = rowsAll.filter((r) => r.id != null && !r.slotted);
+                    const pick = (rows, test) => rows.filter((r) => { const e = elig.get(r.id); return e && !marked.has(r.id) && test(e); }).map((r) => r.id);
+                    const items = [["h", "Mark for Transfer to the Guild"]].concat(GN.map((g) => ["Mark all " + cap(g), pick(owned, (e) => e.rarity === RAR[g] && !e.manualOnly), true]))
+                        .concat([["hr"], ["Mark shown rows", pick(rowsShown.filter((r) => r.id != null && !r.slotted), (e) => !e.manualOnly), true], ["Mark duplicates", pick(owned, (e) => !!e.duplicate), true], ["hr"], ["Clear all marks", [...marked], false], ["Refresh marks", null]]);
+                    const m = NL.h("div", { class: "nl2-t-menu" });
+                    for (const [l, ids, on] of items) {
+                        if (l === "h") {
+                            m.appendChild(NL.h("div", { class: "nl2-crone-mh" }, ids));
+                            continue;
+                        }
+                        if (l === "hr") {
+                            m.appendChild(NL.h("hr"));
+                            continue;
+                        }
+                        const n = ids ? ids.length : -1;
+                        const d = NL.h("div", n === 0 || busy ? { "data-off": "" } : null, l + (n >= 0 ? " (" + n + ")" : ""));
+                        d.addEventListener("click", (e) => { e.stopPropagation(); if (d.hasAttribute("data-off"))
+                            return; closeMenu(); if (ids)
+                            mark(ids, on);
+                        else
+                            refresh(); });
+                        m.appendChild(d);
+                    }
+                    ui.menu = m;
+                    ui.sell.appendChild(m);
+                };
+                const sellCell = (r) => {
+                    if (r.id == null)
+                        return "";
+                    const i = NL.h("input", { type: "checkbox", class: "nl2-crone-cb" });
+                    i.checked = sold(r);
+                    i.disabled = !canSell(r);
+                    i.setAttribute("aria-label", "Sell " + r.name);
+                    if (r.slotted)
+                        NL.tip(i, "In a crew slot: unassign first");
+                    else if (!elig.has(r.id) && !busy)
+                        NL.tip(i, "The game does not allow this copy to go to the Guild");
+                    i.addEventListener("change", () => { const want = i.checked; mark([r.id], want).then((ok) => { if (!ok)
+                        i.checked = !want; }); });
+                    return i;
+                };
+                const mountT = (sec) => {
+                    const head = sec.querySelector(":scope > .leadership-panel-head h2");
+                    host = NL.h("div", { class: "nl2-crone" });
+                    buildTop(head ? head.textContent.trim() : "");
+                    T = NL.table.mount(host, {
+                        id: "crew-one",
+                        top,
+                        cols: [
+                            { k: "name", l: "Name", w: 190, cell: (r) => r.name },
+                            { k: "role", l: "Role", w: 230, cell: (r) => (r.role ? r.role + " (" + (roleCnt[r.role] || 0) + ")" : "") },
+                            { k: "grade", l: "Grade", w: 120, cell: (r) => (r.grade ? cap(r.grade) + " (" + GR[r.grade] + ")" : "") },
+                            { k: "fx", l: "Effects", w: "flex", wrap: true, cell: (r) => { const s = NL.h("span", { "data-nl2-ex": "Leader > Crew effect pills" }, ...r.fx.map((t) => NL.h("span", { class: "nl2-t-pill nl2-t-pill-info nl2-crone-fx" }, t))); return s; } },
+                            { k: "sell", l: "Sell", w: 56, after: true, cell: (r) => sellCell(r) },
+                        ],
+                        actions: { w: 100, list: [{
+                                    k: "as",
+                                    label: (r) => (r.slotted ? "Unassign" : "Assign"),
+                                    show: (r) => !!r.btn && !r.unowned && (r.slotted ? unBtn(r) : !unBtn(r)),
+                                    enabled: (r) => !!r.btn && r.btn.isConnected && !r.btn.disabled && !r.btn.closest(".leadership-crew-action.blocked"),
+                                    tip: (r) => r.hint,
+                                    run: (r) => { if (r.btn && r.btn.isConnected)
+                                        r.btn.click(); },
+                                }] },
+                    });
+                    sec.appendChild(host);
+                };
+                const unmountT = () => { closeMenu(); tried = {}; if (T) {
+                    try {
+                        T.destroy();
+                    }
+                    catch (e) { }
+                } if (host)
+                    host.remove(); T = null; host = null; top = null; ui = {}; };
+                let ban = null;
+                const banner = (sec, on) => {
+                    const page = sec.closest(".leadership-page") || document;
+                    const tab = [...page.querySelectorAll("button, a, [role=tab]")].find((b) => !b.closest(".leadership-tab-panel") && /^\s*crew\s*$/i.test(b.textContent || ""));
+                    const bar = tab && tab.parentElement, box = bar && bar.parentElement;
+                    if (!ban) {
+                        const i = NL.h("input", { type: "checkbox" });
+                        i.addEventListener("change", () => { tvSt.set("tv", i.checked); NL._kick(); });
+                        ban = NL.h("div", { class: "nl2-crban" }, NL.h("span", { class: "nl2-crban-s" }), NL.h("label", { "data-nl2-tip": "Switch the crew between cards and a table" }, i, "Table View"));
+                    }
+                    const target = box || top;
+                    if (target && ban.parentElement !== target)
+                        target.appendChild(ban);
+                    if (box && getComputedStyle(box).position === "static")
+                        box.style.position = "relative";
+                    ban.classList.toggle("nl2-crban-inline", !box);
+                    if (!box)
+                        ban.style.position = "static";
+                    else
+                        ban.style.position = "";
+                    ban.querySelector("input").checked = on;
+                    const chip = sec.querySelector(".leadership-panel-chip"), sm = chip && /(\d+)\s*\/\s*(\d+)/.exec(chip.textContent || "");
+                    const hd = sec.querySelector(".inventory-mark-heading"), ht = hd ? hd.textContent || "" : "";
+                    const mk = /marked:?\s*([\d,]+)/i.exec(ht), hp = /hiring points:?\s*([\d,]+)/i.exec(ht);
+                    const parts = [];
+                    if (on && sm)
+                        parts.push(["Crew slots", sm[1] + "/" + sm[2]]);
+                    if (on && (mk || marksAt))
+                        parts.push(["Marked", mk ? mk[1] : String(marked.size)]);
+                    if (on && hp)
+                        parts.push(["Hiring points", hp[1]]);
+                    const sig = JSON.stringify(parts), s = ban.querySelector(".nl2-crban-s");
+                    if (s.dataset.sig !== sig) {
+                        s.dataset.sig = sig;
+                        s.textContent = "";
+                        parts.forEach(([l, v], n) => { if (n)
+                            s.append(" \u00B7 "); s.append(l + " ", NL.h("b", null, v)); });
+                    }
+                };
+                const layout = (sec, on) => {
+                    for (const el of document.querySelectorAll("[data-nl2-crone-hid],[data-nl2-crone-full]")) {
+                        if (!on || !el.isConnected) {
+                            el.removeAttribute("data-nl2-crone-hid");
+                            el.removeAttribute("data-nl2-crone-full");
+                        }
+                    }
+                    if (!on)
+                        return;
+                    const stop = sec.closest(".leadership-tab-panel");
+                    for (let el = sec; el && el !== stop && el.parentElement; el = el.parentElement) {
+                        for (const sib of el.parentElement.children)
+                            if (sib !== el && !sib.hasAttribute("data-nl2-crone-hid") && sib.tagName !== "STYLE" && sib.tagName !== "SCRIPT")
+                                sib.setAttribute("data-nl2-crone-hid", "");
+                        if (el.parentElement === stop)
+                            break;
+                        if (!el.parentElement.hasAttribute("data-nl2-crone-full"))
+                            el.parentElement.setAttribute("data-nl2-crone-full", "");
+                    }
+                };
+                let secNow = null;
+                const paint = () => {
+                    const sec = secNow;
+                    if (!sec || !sec.isConnected || !T)
+                        return;
+                    const o = f();
+                    rowsAll = cardRows(sec);
+                    if (document.activeElement !== ui.q && ui.q.value !== o.q)
+                        ui.q.value = o.q;
+                    const roles = [...new Set(Object.values(ROLE))].sort();
+                    if (ui.role.options.length !== roles.length + 1)
+                        ui.role.replaceChildren(NL.h("option", { value: "" }, "All roles"), ...roles.map((r) => NL.h("option", { value: r }, r)));
+                    if (ui.role.value !== o.role)
+                        ui.role.value = o.role;
+                    if (ui.grade.value !== o.grade)
+                        ui.grade.value = o.grade;
+                    for (const b of ui.seg.children)
+                        NL.setAttr(b, "data-on", b.getAttribute("data-v") === o.scope ? "" : null);
+                    ui.so.i.checked = !!o.soldOnly;
+                    ui.hs.i.checked = !!o.hideSold;
+                    const nSold = rowsAll.filter(sold).length, hsT = "Hide sold (" + nSold + ")";
+                    if (ui.hs.s.textContent !== hsT)
+                        ui.hs.s.textContent = hsT;
+                    rowsShown = rowsAll.filter((r) => shown(r, o));
+                    rowsShown.sort((a, b) => (GR[b.grade] || 0) - (GR[a.grade] || 0) || a.name.localeCompare(b.name) || (a.k > b.k ? 1 : a.k < b.k ? -1 : 0) || a.i - b.i);
+                    T.update(rowsShown.map((r) => ({
+                        key: r.k + "#" + (r.id != null ? r.id : r.i),
+                        _r: r,
+                        ...r,
+                        sortVals: { name: r.name.toLowerCase(), role: r.role.toLowerCase(), grade: GR[r.grade] || 0, fx: r.fx.length, sell: sold(r) ? 1 : 0 },
+                        tips: { name: r.full !== r.name ? r.full : "" },
+                        sig: { fx: r.fx.join("|"), sell: [r.id, sold(r), canSell(r)].join("|"), role: r.role + (roleCnt[r.role] || 0) },
+                    })));
+                };
+                NL.watch(".leadership-crew-roster", (sec) => {
+                    const on = tvOn();
+                    secNow = sec;
+                    NL.setAttr(sec, "data-nl2-crone", on ? "" : null);
+                    if (on) {
+                        if (!T || !host || host.parentElement !== sec) {
+                            unmountT();
+                            mountT(sec);
+                        }
+                        gameDefaults(sec);
+                    }
+                    else {
+                        if (T)
+                            unmountT();
+                        scopeBack(sec);
+                    }
+                    layout(sec, on);
+                    banner(sec, on);
+                    if (on)
+                        paint();
+                });
+            },
+        });
     }
     {
         NL.gl195 = true;
@@ -15209,8 +15624,11 @@ nxtSnap | 92_gl_task_data | retired
                     ".nl2-btt-det{display:flex;align-items:center;gap:16px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}",
                     ".nl2-btt-det .nl2-btt-opt{display:inline-flex;align-items:center;gap:8px}",
                     ".nl2-t-pill.nl2-btt-st{display:block;box-sizing:border-box;width:100%;text-align:center}",
-                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:7px;padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,.06)}",
+                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td{padding-top:7px;padding-bottom:7px;border-bottom:1px solid rgba(255,255,255,.11)}",
+                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td+td{border-left-color:rgba(255,255,255,.11)}",
+                    ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]:not(:has(~ tr[data-key]))>td{border-bottom-color:transparent}",
                     ".nl2-btt-host table.nl2-t-tbl>tbody>tr[data-key]>td .nl2-t-in{vertical-align:middle}",
+                    ".nl2-btt-host table.nl2-t-tbl>tbody[data-sec=\"hid\"]:not(:has(>tr[data-key]:not([hidden])))>tr.nl2-t-sec .nl2-t-ctl{display:none}",
                 ].join(""));
                 const on = () => NL.btTbl !== false && !!(NL.table && NL.table.mount);
                 const txt = (el) => (el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "");
@@ -15525,9 +15943,9 @@ nxtSnap | 92_gl_task_data | retired
                     });
                     const secs = [];
                     if (plain.length)
-                        secs.push({ id: "all", rows: plain });
+                        secs.push({ id: "all", tone: "sky", rows: plain });
                     SECS.forEach((n, i) => { if (groups[i].length)
-                        secs.push({ id: "s" + i, label: n + " (" + groups[i].length + ")", rows: groups[i] }); });
+                        secs.push({ id: "s" + i, label: n + " (" + groups[i].length + ")", tone: "sky", rows: groups[i] }); });
                     if (hid.length)
                         secs.push({ id: "hid", label: "Hidden (" + hid.length + ")", hidden: true, ctl: NL.buHideGuard !== false ? unhideCtl() : null, rows: hid });
                     t.update(secs);
@@ -18613,6 +19031,7 @@ nxtSnap | 92_gl_task_data | retired
             if (d && Array.isArray(d[k]))
                 return d[k]; return []; };
         const gfClean = (t) => String(t == null ? "" : t).replace(/\s*\[[^\]]*\]\s*$/, "").trim();
+        NL.plData = true;
         NL.feature({
             id: "sh-gather",
             set: "Shipyard",
@@ -18680,6 +19099,17 @@ nxtSnap | 92_gl_task_data | retired
                     return NL.getJson(path, ctx);
                 }
                 const get = async (path) => fresh(path) || (await read(path));
+                const viaData = () => NL.plData !== false && !!(NL.data && NL.data.need && NL.data.get);
+                async function need(name, o) {
+                    const cur = NL.data.get(name, o);
+                    if (!(cur && cur.age < 60000)) {
+                        const wait = lastRead + 1000 - Date.now();
+                        if (wait > 0)
+                            await gfSleep(wait);
+                        lastRead = Date.now();
+                    }
+                    return NL.data.need(name, { ...o, maxAge: 60000 });
+                }
                 const swName = () => gfClean((document.querySelector(".planet-switcher-btn .ps-name") || {}).textContent || "");
                 async function places() {
                     let planets = [], moons = [];
@@ -18752,9 +19182,14 @@ nxtSnap | 92_gl_task_data | retired
                     let i = 0;
                     for (const s of src) {
                         btn.textContent = "Gathering\u2026 " + (++i) + "/" + src.length;
-                        s.fleet = await get(s.kind === "moon" ? "/api/moons/" + s.id + "/fleet" : "/api/planets/" + s.id + "/fleet");
+                        if (viaData())
+                            s.fleet = ((await need(s.kind === "moon" ? "moonFleet" : "planetFleet", { id: s.id })) || {}).data || null;
+                        else
+                            s.fleet = await get(s.kind === "moon" ? "/api/moons/" + s.id + "/fleet" : "/api/planets/" + s.id + "/fleet");
                     }
-                    if (!fresh("/api/fleet/missions"))
+                    if (viaData())
+                        await need("missions", {});
+                    else if (!fresh("/api/fleet/missions"))
                         await get("/api/fleet/missions");
                     btn.textContent = "Gather Fleets";
                     btn.removeAttribute("data-nl2-busy");
@@ -19084,7 +19519,17 @@ nxtSnap | 92_gl_task_data | retired
                         paintRow(r);
                         paintTotal();
                         if (ok)
-                            setTimeout(async () => { await read("/api/fleet/missions"); await read(r.kind === "moon" ? "/api/moons/" + r.id + "/fleet" : "/api/planets/" + r.id + "/fleet"); }, 1000);
+                            setTimeout(async () => {
+                                if (viaData()) {
+                                    const t = Date.now();
+                                    await NL.data.need("missions", { since: t });
+                                    await NL.data.need(r.kind === "moon" ? "moonFleet" : "planetFleet", { id: r.id, since: t });
+                                }
+                                else {
+                                    await read("/api/fleet/missions");
+                                    await read(r.kind === "moon" ? "/api/moons/" + r.id + "/fleet" : "/api/planets/" + r.id + "/fleet");
+                                }
+                            }, 1000);
                         for (const x of rows)
                             if (x !== r)
                                 paintRow(x);
